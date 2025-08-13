@@ -6,6 +6,7 @@ import type { Employee, EmployeeInList, DailyReport } from '../App';
 import { getProjectColors, greenButtonStyle } from '../utils/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import AttachedFilesDisplay from './AttachedFilesDisplay';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface EmployeeDetailTabProps {
   employee: EmployeeInList;
@@ -52,7 +53,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
   const handleSubmitReview = async () => {
     if (!reportDetail || selectedRating === 0) {
-      alert('請給予評分');
+      toast.error('請給予評分');
       return;
     }
     try {
@@ -61,11 +62,11 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             body: JSON.stringify({ rating: selectedRating, feedback }),
         });
         if (!response.ok) throw new Error('提交審核失敗');
-        alert('審核已成功提交！');
+        toast.success('審核已成功提交！');
         onBack(); // Go back to the list view after submission
     } catch (error) {
         console.error(error);
-        alert('提交審核時發生錯誤。');
+        toast.error('提交審核時發生錯誤。');
     }
   };
 

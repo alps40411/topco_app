@@ -29,7 +29,12 @@ async def get_employee_details(db: AsyncSession, *, employee_id: int) -> Optiona
 
 
 async def review_daily_report(db: AsyncSession, *, report_id: int, review_in: ReportReviewCreate) -> Optional[DailyReport]:
-    report = await db.get(DailyReport, report_id)
+
+    query = select(DailyReport).where(DailyReport.id == report_id).options(
+        selectinload(DailyReport.employee)
+    )
+    result = await db.execute(query)
+    report = result.scalar_one_or_none()
     if not report:
         return None
     
