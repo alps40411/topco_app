@@ -18,7 +18,7 @@ const DailyReportTab: React.FC = () => {
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
   const { authFetch } = useAuth();
   const [isUploading, setIsUploading] = useState<boolean>(false);
-
+  
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
@@ -27,9 +27,12 @@ const DailyReportTab: React.FC = () => {
     try {
       const response = await authFetch('/api/records/consolidated/today');
       if (response.ok) {
-        setReports(await response.json());
-      } else {
-        console.error("Failed to fetch reports:", response.statusText);
+        const data: ConsolidatedReport[] = await response.json();
+        setReports(data);
+        // --- 關鍵修改 1：檢查是否已有 AI 內容，如有則自動開啟雙欄模式 ---
+        if (data.some(report => report.ai_content)) {
+          setIsAiViewActive(true);
+        }
       }
     } catch (error) {
       console.error("無法取得彙整報告:", error);
@@ -42,10 +45,28 @@ const DailyReportTab: React.FC = () => {
     fetchReports();
   }, []);
 
+  const handleEnhanceAll = async () => {
+    setIsGeneratingAi(true);
+    try {
+      const response = await authFetch('/api/records/ai/enhance_all', { method: 'POST' });
+      if (response.ok) {
+        const enhancedReports = await response.json();
+        setReports(enhancedReports);
+        setIsAiViewActive(true); // 成功後自動切換到雙欄檢視
+      } else {
+        throw new Error('AI 服務失敗');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('AI 潤飾所有報告時發生錯誤');
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+  
   const startEdit = (report: ConsolidatedReport) => {
     setEditingProjectId(report.project.id);
     setEditContent(report.content);
-    // 確保 is_selected_for_ai 屬性存在且為布林值
     setEditFiles(report.files.map(f => ({ ...f, id: f.id || f.url, is_selected_for_ai: !!f.is_selected_for_ai })));
   };
 
@@ -67,7 +88,7 @@ const DailyReportTab: React.FC = () => {
         body: JSON.stringify({
           ...reportToUpdate,
           content: editContent,
-          files: editFiles, // 傳送包含最新勾選狀態的完整檔案列表
+          files: editFiles,
         }),
       });
       if (!response.ok) throw new Error('更新報告失敗');
@@ -136,30 +157,7 @@ const DailyReportTab: React.FC = () => {
     setEditFiles(prev => prev.filter(file => file.url !== fileUrl));
   };
 
-
-  const handleEnhanceAll = async () => {
-    setIsGeneratingAi(true);
-    try {
-      const response = await authFetch('/api/records/ai/enhance_all', { method: 'POST' });
-      if (response.ok) {
-        const enhancedReports = await response.json();
-        setReports(prevReports => prevReports.map(pr => {
-          const enhanced = enhancedReports.find((er: ConsolidatedReport) => er.project.id === pr.project.id);
-          return enhanced ? enhanced : pr;
-        }));
-        setIsAiViewActive(true);
-      } else {
-        throw new Error('AI service failed');
-      }
-    } catch (error) {
-      console.error(error);
-      alert('An error occurred while enhancing reports with AI.');
-    } finally {
-      setIsGeneratingAi(false);
-    }
-  };
-
-  if (isLoading) { return <div className="p-6 text-center">Loading...</div>; }
+  if (isLoading) { return <div className="p-6 text-center">載入中...</div>; }
 
   return (
     <div className="p-6">
@@ -185,10 +183,14 @@ const DailyReportTab: React.FC = () => {
         </div>
       </div>
       
-      <div className={`grid gap-6 ${isAiViewActive ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        <div className="space-y-6">
-          {reports.map((report) => (
-            <div key={report.project.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="space-y-8">
+        {reports.map((report) => (
+          // --- 關鍵修改 2：外層包裹容器 ---
+          <div key={report.project.id} className={`grid grid-cols-1 ${isAiViewActive ? 'lg:grid-cols-2' : ''} gap-6 items-start bg-gray-50 p-4 rounded-xl border`}>
+            
+            {/* --- 左欄 / 單欄：可編輯區域 --- */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
+              {/* 專案標題和編輯按鈕 */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
@@ -202,24 +204,25 @@ const DailyReportTab: React.FC = () => {
                   </button>
                 )}
               </div>
+              
               {editingProjectId === report.project.id ? (
-                  <div className="space-y-4">
-                    <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full min-h-[200px] p-4 border rounded-lg" />
-                    <AttachedFilesManager 
-                      files={editFiles}
-                      onFileUpload={handleFileUpload}
-                      onRemoveFile={removeFile}
-                      onAiSelectionChange={handleAiSelectionChange}
-                      isUploading={isUploading}
-                    />
-                    <div className="flex space-x-3">
-                      <button onClick={saveEdit} disabled={isSaving} className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200`}>
-                          <Save className="w-4 h-4 mr-2" />
-                          {isSaving ? '儲存中...' : '儲存草稿'}
-                      </button>
-                      <button onClick={cancelEdit} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">取消</button>
-                    </div>
+                <div className="space-y-4">
+                  <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full min-h-[200px] p-4 border rounded-lg" />
+                  <AttachedFilesManager 
+                    files={editFiles}
+                    onFileUpload={handleFileUpload}
+                    onRemoveFile={removeFile}
+                    onAiSelectionChange={handleAiSelectionChange}
+                    isUploading={isUploading}
+                  />
+                  <div className="flex space-x-3">
+                    <button onClick={saveEdit} disabled={isSaving} className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200`}>
+                        <Save className="w-4 h-4 mr-2" />
+                        {isSaving ? '儲存中...' : '儲存草稿'}
+                    </button>
+                    <button onClick={cancelEdit} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">取消</button>
                   </div>
+                </div>
               ) : ( 
                 <div>
                   <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">{report.content}</p>
@@ -227,19 +230,14 @@ const DailyReportTab: React.FC = () => {
                 </div>
               )}
             </div>
-          ))}
-        </div>
 
-        {isAiViewActive && (
-          <div className="space-y-6">
-            {reports.map((report) => (
-              <div key={`ai-${report.project.id}`} className="bg-gray-50 rounded-lg border border-gray-200 p-6">
+            {/* --- 右欄：AI 參考資料 (僅在 AI 模式下顯示) --- */}
+            {isAiViewActive && (
+              // --- 關鍵修改 3：統一 UI 風格 ---
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full">
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
-                    {report.project.name}
-                  </div>
-                  <div className="flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
-                    <Wand2 className="w-3 h-3 mr-1" /> AI 參考
+                  <div className="flex items-center px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
+                    <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
                   </div>
                 </div>
                 {report.ai_content ? (
@@ -247,10 +245,16 @@ const DailyReportTab: React.FC = () => {
                     <div dangerouslySetInnerHTML={{ __html: report.ai_content.replace(/\n/g, '<br />') }} />
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400 italic">此專案無 AI 潤飾內容。</p>
+                  <p className="text-sm text-gray-400 italic">此專案無 AI 潤飾內容，或正在生成中...</p>
                 )}
               </div>
-            ))}
+            )}
+          </div>
+        ))}
+        
+        {reports.length === 0 && !isLoading && (
+          <div className="text-center py-12 text-gray-500">
+            <p>今天還沒有記錄，請先到資料輸入頁面新增筆記。</p>
           </div>
         )}
       </div>
