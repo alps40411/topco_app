@@ -1,7 +1,7 @@
 // frontend/src/components/DailyReportTab.tsx
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Edit, Save, Plus, X, Image, File, BrainCircuit, Wand2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, Edit, Save, Wand2 } from 'lucide-react';
 import type { ConsolidatedReport, FileAttachment, FileForUpload } from '../App';
 import { getProjectColors, blueButtonStyle, greenButtonStyle } from '../utils/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
@@ -262,4 +262,4 @@ const DailyReportTab: React.FC = () => {
   );
 };
 
-export default DailyReportTab;
+export default DailyReportTab; 
