@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Edit3, FileText, Wand2, Columns, LogOut } from 'lucide-react';
 import DataInputTab from './components/DataInputTab';
 import DailyReportTab from './components/DailyReportTab';
-import AIDailyReportTab from './components/AIDailyReportTab';
-import ComprehensiveEditTab from './components/ComprehensiveEditTab';
+// import AIDailyReportTab from './components/AIDailyReportTab';
+// import ComprehensiveEditTab from './components/ComprehensiveEditTab';
 import EmployeeListTab from './components/EmployeeListTab';
 import EmployeeDetailTab from './components/EmployeeDetailTab';
 import { useAuth } from './contexts/AuthContext';
@@ -87,7 +87,6 @@ function App() {
                 >
                   日報填寫
                 </button>
-                {/* --- ↓↓↓ 關鍵修改：條件渲染 ↓↓↓ --- */}
                 {user?.is_supervisor && (
                   <button
                     onClick={() => setMainTab('supervisor')}
@@ -121,12 +120,12 @@ function App() {
               <button onClick={() => setActiveTab('daily')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'daily' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                 <div className="flex items-center space-x-2"><FileText className="w-4 h-4" /><span>日報編輯</span></div>
               </button>
-              <button onClick={() => setActiveTab('ai')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'ai' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+              {/* <button onClick={() => setActiveTab('ai')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'ai' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                 <div className="flex items-center space-x-2"><Wand2 className="w-4 h-4" /><span>AI日報編輯</span></div>
               </button>
               <button onClick={() => setActiveTab('comprehensive')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'comprehensive' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                 <div className="flex items-center space-x-2"><Columns className="w-4 h-4" /><span>綜合編輯</span></div>
-              </button>
+              </button> */}
             </nav>
           </div>
         </div>
@@ -137,8 +136,8 @@ function App() {
             <>
                 {activeTab === 'input' && <DataInputTab />}
                 {activeTab === 'daily' && <DailyReportTab />}
-                {activeTab === 'ai' && <AIDailyReportTab />}
-                {activeTab === 'comprehensive' && <ComprehensiveEditTab />}
+                {/* {activeTab === 'ai' && <AIDailyReportTab />}
+                {activeTab === 'comprehensive' && <ComprehensiveEditTab />} */}
             </>
         )}
         

@@ -110,21 +110,3 @@ async def enhance_all_reports_with_ai(
     """一鍵潤飾今天所有的彙整報告"""
     return await records_service.enhance_all_today(db=db, employee_id=current_user.id)
 
-# --- ↓↓↓ 新增這個端點 ↓↓↓ ---
-@router.put("/ai/{project_id}", status_code=204)
-async def save_ai_report(
-    project_id: int,
-    report_in: AIEnhanceRequest, # 這裡借用一下，只需要 content
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
-):
-    """儲存使用者編輯後的 AI 報告內容"""
-    success = await records_service.update_ai_report(
-        db=db,
-        project_id=project_id,
-        ai_content=report_in.content,
-        employee_id=current_user.id
-    )
-    if not success:
-        raise HTTPException(status_code=404, detail="找不到可更新的紀錄")
-    return
