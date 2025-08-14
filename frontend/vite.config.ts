@@ -17,6 +17,10 @@ export default defineConfig({
         target: "http://127.0.0.1:8000", // 指向本機的後端服務
         changeOrigin: true,
       },
+      "/storage": {
+        target: "http://127.0.0.1:8000", // 代理圖片等靜態資源
+        changeOrigin: true,
+      },
     },
   },
 });

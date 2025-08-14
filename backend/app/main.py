@@ -5,6 +5,8 @@ from starlette.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from typing import Dict
 
+from fastapi.staticfiles import StaticFiles
+
 # --- 引入所有需要的 API 路由 ---
 from app.api import records, projects, supervisor, users, auth, documents
 
@@ -13,6 +15,9 @@ app = FastAPI(
     description="這是 TSC 業務日誌的後端 API 服務。",
     version="0.1.0",
 )
+
+# --- 掛載 storage 資料夾為靜態檔案目錄 ---
+app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()] or [
     "http://localhost:5173",

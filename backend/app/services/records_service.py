@@ -124,6 +124,80 @@ async def enhance_all_today(db: AsyncSession, *, employee_id: int) -> List[Conso
             
     return consolidated_reports
 
+
+async def enhance_one_today(db: AsyncSession, *, employee_id: int, project_id: int) -> ConsolidatedReport:
+    """潤飾今天單一一個專案報告"""
+    print(f"--- DEBUG: enhance_one_today --- ")
+    print(f"傳入參數: employee_id={employee_id}, project_id={project_id}")
+
+    # 1. 取得該使用者、該專案今天的所有紀錄
+    today_start = datetime.combine(date.today(), time.min)
+    today_end = datetime.combine(date.today(), time.max)
+    
+    query = (
+        select(models.WorkRecord)
+        .where(
+            models.WorkRecord.employee_id == employee_id,
+            models.WorkRecord.project_id == project_id,
+            models.WorkRecord.created_at >= today_start,
+            models.WorkRecord.created_at <= today_end
+        )
+        .options(
+            selectinload(models.WorkRecord.files), 
+            selectinload(models.WorkRecord.project)
+        )
+        .order_by(models.WorkRecord.created_at.asc()) # 確保第一筆是時間最早的
+    )
+    result = await db.execute(query)
+    today_records = result.scalars().all()
+
+    print(f"資料庫查詢結果: 找到 {len(today_records)} 筆記錄")
+
+    if not today_records:
+        print("--- DEBUG結束: 未找到記錄，返回 None ---")
+        return None
+
+    # 2. 彙整成單一報告物件
+    project_obj = today_records[0].project
+    content_list = [r.content for r in today_records]
+    files_list = [f for r in today_records for f in r.files]
+    
+    report = ConsolidatedReport(
+        project=project_obj,
+        content="\n\n".join(content_list),
+        files=[FileAttachmentSchema.from_orm(f) for f in files_list],
+        record_count=len(today_records),
+        ai_content=today_records[0].ai_content # 使用第一筆的 ai_content
+    )
+
+    # 3. 呼叫 AI 服務
+    print("準備呼叫 AI 服務...")
+    reference_texts = []
+    for file_attachment in report.files:
+        if file_attachment.is_selected_for_ai:
+            analyzed_text = await document_analysis_service.analyze_document_from_path(file_attachment.url)
+            reference_texts.append(analyzed_text)
+
+    ai_text = await azure_ai_service.get_ai_enhanced_report(
+        original_content=report.content,
+        project_name=report.project.name,
+        reference_texts=reference_texts
+    )
+    report.ai_content = ai_text
+    print("AI 服務呼叫完成")
+    
+    # 4. 將 AI 結果存回資料庫 (只更新第一筆)
+    record_to_update = today_records[0]
+    record_to_update.ai_content = ai_text
+    await db.commit()
+    await db.refresh(record_to_update)
+    print("AI 結果已存回資料庫")
+    print("--- DEBUG結束: 成功返回報告 ---")
+            
+    return report
+
+
+
 # --- ↓↓↓ 新增這個函式 ↓↓↓ ---
 async def update_ai_report(db: AsyncSession, *, project_id: int, ai_content: str, employee_id: int) -> bool:
     """儲存使用者編輯後的 AI 內容"""

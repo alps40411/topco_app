@@ -110,3 +110,20 @@ async def enhance_all_reports_with_ai(
     """一鍵潤飾今天所有的彙整報告"""
     return await records_service.enhance_all_today(db=db, employee_id=current_user.id)
 
+
+@router.post("/ai/enhance_one/{project_id}", response_model=ConsolidatedReport)
+async def enhance_one_report_with_ai(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """潤飾今天單一一個專案報告"""
+    enhanced_report = await records_service.enhance_one_today(
+        db=db, 
+        employee_id=current_user.id, 
+        project_id=project_id
+    )
+    if not enhanced_report:
+        raise HTTPException(status_code=404, detail="找不到該專案今日的報告紀錄")
+    return enhanced_report
+
