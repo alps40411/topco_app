@@ -14,4 +14,3 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_supervisor = Column(Boolean, default=False)
     employee = relationship("Employee", back_populates="user", uselist=False)
-    # 之後可以加入 is_supervisor 等角色欄位
