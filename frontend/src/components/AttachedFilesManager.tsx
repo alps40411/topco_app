@@ -35,6 +35,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const dragCounter = useRef(0);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -49,6 +50,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
 
   const handleDragIn = (e: React.DragEvent) => {
     handleDrag(e);
+    dragCounter.current++;
     if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       setIsDragging(true);
     }
@@ -56,12 +58,16 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
 
   const handleDragOut = (e: React.DragEvent) => {
     handleDrag(e);
-    setIsDragging(false);
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     handleDrag(e);
     setIsDragging(false);
+    dragCounter.current = 0;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       onFileUpload(e.dataTransfer.files);
       e.dataTransfer.clearData();

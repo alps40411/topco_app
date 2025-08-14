@@ -1,8 +1,8 @@
 // frontend/src/components/DataInputTab.tsx
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Save, Upload, Plus, X, FileText, Image, File, BrainCircuit } from 'lucide-react';
-import type { WorkRecord, FileAttachment, WorkRecordCreate, Project, FileForUpload } from '../App';
+import { Save, FileText } from 'lucide-react';
+import type { ConsolidatedReport, WorkRecordCreate, Project, FileForUpload } from '../App';
 import { getProjectColors, blueButtonStyle } from '../utils/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import AttachedFilesDisplay from './AttachedFilesDisplay';
@@ -10,7 +10,7 @@ import AttachedFilesManager from './AttachedFilesManager';
 import { toast } from 'react-hot-toast';
 
 const DataInputTab: React.FC = () => {
-  const [workRecords, setWorkRecords] = useState<WorkRecord[]>([]);
+  const [consolidatedRecords, setConsolidatedRecords] = useState<ConsolidatedReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentRecord, setCurrentRecord] = useState<Partial<WorkRecordCreate>>({
     content: '',
@@ -21,15 +21,17 @@ const DataInputTab: React.FC = () => {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const { authFetch } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
-  const fetchTodayRecords = async () => {
+
+  const fetchConsolidatedToday = async () => {
     setIsLoading(true);
     try {
-      const response = await authFetch('/api/records/today');
+      const response = await authFetch('/api/records/consolidated/today');
       if (response.ok) {
-        setWorkRecords(await response.json());
+        setConsolidatedRecords(await response.json());
       }
     } catch (error) {
-      console.error("取得今日筆記失敗:", error);
+      console.error("取得今日彙整筆記失敗:", error);
+      toast.error("取得今日彙整筆記失敗");
     } finally {
       setIsLoading(false);
     }
@@ -47,13 +49,17 @@ const DataInputTab: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchTodayRecords();
+    fetchConsolidatedToday();
     fetchProjects();
   }, []);
 
   const onSave = async () => {
-    if (!currentRecord.project_id || !currentRecord.content) {
-      toast.error('請選擇工作計劃並填寫內容');
+    if (!currentRecord.project_id) {
+      toast.error('請選擇工作計劃');
+      return;
+    }
+    if (!currentRecord.content?.trim() && (!currentRecord.files || currentRecord.files.length === 0)) {
+      toast.error('請填寫內容或附加檔案');
       return;
     }
     setIsSaving(true);
@@ -67,7 +73,7 @@ const DataInputTab: React.FC = () => {
         }),
       });
       if (!response.ok) throw new Error('儲存筆記失敗');
-      await fetchTodayRecords();
+      await fetchConsolidatedToday(); // Re-fetch consolidated records
       setCurrentRecord({ content: '', project_id: undefined, files: [] });
       toast.success('記錄儲存成功！');
     } catch (error) {
@@ -78,11 +84,9 @@ const DataInputTab: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+  const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setIsUploading(true);
-    const uploadedFiles: FileForUpload[] = [];
     const uploadPromises = Array.from(files).map(async (file) => {
       const formData = new FormData();
       formData.append('file', file);
@@ -90,17 +94,20 @@ const DataInputTab: React.FC = () => {
         const response = await authFetch('/api/records/upload', { method: 'POST', body: formData });
         if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
         const uploadedFile = await response.json();
-        uploadedFiles.push({
+        const newFile: FileForUpload = {
           name: uploadedFile.name,
           type: uploadedFile.type,
           size: uploadedFile.size,
           url: uploadedFile.url,
-          is_selected_for_ai: false, // 預設為 false
-        });
-      } catch (error) { console.error(error); alert(`檔案 ${file.name} 上傳失敗`); }
+          is_selected_for_ai: false,
+        };
+        setCurrentRecord(prev => ({ ...prev, files: [...(prev.files || []), newFile] }));
+      } catch (error: any) { 
+        console.error(error); 
+        toast.error(error.message);
+      }
     });
     await Promise.all(uploadPromises);
-    setCurrentRecord(prev => ({ ...prev, files: [...(prev.files || []), ...uploadedFiles] }));
     setIsUploading(false);
   };
 
@@ -114,8 +121,6 @@ const DataInputTab: React.FC = () => {
   const removeFile = (fileUrl: string) => {
     setCurrentRecord(prev => ({ ...prev, files: (prev.files || []).filter(file => file.url !== fileUrl) }));
   };
-
-  const formatTime = (timestamp: string) => new Date(timestamp).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="flex gap-6 p-6">
@@ -156,21 +161,21 @@ const DataInputTab: React.FC = () => {
       </div>
       <div className="w-1/2">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">今日筆記 ({workRecords.length})</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">今日彙整預覽 ({consolidatedRecords.length})</h2>
           <div className="space-y-4 h-[600px] overflow-y-auto pr-2">
             {isLoading ? ( <div className="text-center py-8 text-gray-500">載入中...</div> ) 
-            : workRecords.length === 0 ? ( <div className="text-center py-8 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-2 opacity-50" /><p>今天還沒有記錄，開始您的工作吧！</p></div> ) 
+            : consolidatedRecords.length === 0 ? ( <div className="text-center py-8 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-2 opacity-50" /><p>今天還沒有記錄，開始您的工作吧！</p></div> ) 
             : (
-              workRecords.map((record) => (
-                <div key={record.id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+              consolidatedRecords.map((report) => (
+                <div key={report.project.id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
                   <div className="flex items-start justify-between mb-2">
-                    <div className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md ${getProjectColors(record.project.name).tag}`}>
-                      {record.project.name}
+                    <div className={`inline-flex items-center px-2 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
+                      {report.project.name}
                     </div>
-                    <span className="text-xs text-gray-500">{formatTime(record.created_at)}</span>
+                    <span className="text-xs text-gray-500">{report.record_count} 筆記錄</span>
                   </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{record.content}</p>
-                  <AttachedFilesDisplay files={record.files} />
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{report.content}</p>
+                  <AttachedFilesDisplay files={report.files} />
                 </div>
               ))
             )}

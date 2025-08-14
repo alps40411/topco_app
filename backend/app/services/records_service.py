@@ -61,7 +61,10 @@ async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[
     for record in today_records:
         if record.project:
             proj_id = record.project_id
-            project_groups[proj_id]["content"].append(record.content)
+            # 只有在 content 存在且不為純空白時才加入列表
+            if record.content and record.content.strip():
+                project_groups[proj_id]["content"].append(record.content.strip())
+            
             project_groups[proj_id]["files"].extend(record.files)
             project_groups[proj_id]["record_count"] += 1
             project_groups[proj_id]["project_obj"] = record.project
@@ -72,11 +75,15 @@ async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[
     consolidated_list = []
     for project_id, data in project_groups.items():
         if data["project_obj"]:
+            # 過濾掉所有可能的空字串，然後用換行符連接
+            valid_content = [c for c in data["content"] if c]
+            final_content = "\n\n".join(valid_content)
+
             files_schema = [FileAttachmentSchema.from_orm(f) for f in data["files"]]
             consolidated_list.append(
                 ConsolidatedReport(
                     project=data["project_obj"],
-                    content="\n\n".join(data["content"]),
+                    content=final_content,
                     files=files_schema,
                     record_count=data["record_count"],
                     ai_content=data["ai_content"],
