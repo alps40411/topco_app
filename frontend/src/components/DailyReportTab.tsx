@@ -2,18 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, Edit, Save, Wand2, Plus, X } from 'lucide-react';
-import type { ConsolidatedReport, FileAttachment, FileForUpload, Project, WorkRecordCreate, DailyReport } from '../App';
+import type { ConsolidatedReport, FileAttachment, FileForUpload, Project, WorkRecordCreate } from '../App';
 import { getProjectColors, blueButtonStyle, greenButtonStyle } from '../utils/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import AttachedFilesManager from './AttachedFilesManager';
 import AttachedFilesDisplay from './AttachedFilesDisplay';
-import ChatInterface from './ChatInterface';
 import { toast } from 'react-hot-toast';
+
+interface WritingStatus {
+  allowed: boolean;
+  message: string;
+  current_time: string;
+}
 
 const DailyReportTab: React.FC = () => {
   const [reports, setReports] = useState<ConsolidatedReport[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [todayReport, setTodayReport] = useState<DailyReport | null>(null);
+  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,22 +56,16 @@ const DailyReportTab: React.FC = () => {
     }
   };
 
-  const fetchTodayReport = async () => {
-    if (!user) return;
-    
+
+  const fetchWritingStatus = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await authFetch(`/api/supervisor/reports-by-date?date=${today}`);
+      const response = await authFetch('/api/records/writing-status');
       if (response.ok) {
-        const allReports: DailyReport[] = await response.json();
-        // 找到當前用戶的日報
-        const myReport = allReports.find(report => 
-          user.is_supervisor ? report.employee.id === user.id : report.employee.name === user.name || report.employee.id === user.id
-        );
-        setTodayReport(myReport || null);
+        const status: WritingStatus = await response.json();
+        setWritingStatus(status);
       }
     } catch (error) {
-      console.error("無法取得今日日報:", error);
+      console.error("無法獲取填寫狀態:", error);
     }
   };
 
@@ -85,7 +84,7 @@ const DailyReportTab: React.FC = () => {
   useEffect(() => {
     fetchReports();
     fetchProjects();
-    fetchTodayReport();
+    fetchWritingStatus();
   }, []);
 
   const handleEnhanceOne = async (projectId: number) => {
@@ -278,9 +277,17 @@ const DailyReportTab: React.FC = () => {
 
   return (
     <>
-      <div className="p-6 h-screen flex flex-col">
+      <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">日報編輯</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">日報編輯</h2>
+            {writingStatus && (
+              <div className="flex items-center mt-1 text-sm text-gray-600">
+                <span className="mr-2">🕐 {writingStatus.current_time}</span>
+                <span className="text-blue-600">{writingStatus.message}</span>
+              </div>
+            )}
+          </div>
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
@@ -309,103 +316,83 @@ const DailyReportTab: React.FC = () => {
           </div>
         </div>
         
-        {/* 上下欄式布局 */}
-        <div className="flex-1 flex flex-col min-h-0 gap-6">
-          {/* 上欄 - 日報內容 */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="space-y-8">
-              {reports.map((report) => (
-                <div key={report.project.id} className={`grid grid-cols-1 ${isAiViewActive ? 'lg:grid-cols-2' : ''} gap-6 items-start bg-gray-50 p-4 rounded-xl border`}>
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
-                          {report.project.name}
-                        </div>
-                        <span className="text-sm text-gray-500">({report.record_count} 筆記錄)</span>
-                      </div>
-                      {editingProjectId !== report.project.id && (
-                        <div className="flex items-center space-x-2">
-                          <button onClick={() => handleEnhanceOne(report.project.id)} disabled={generatingAiFor !== null || isGeneratingAllAi || editingProjectId !== null} className={`inline-flex items-center p-2 text-sm font-medium rounded-lg ${greenButtonStyle} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
-                            {generatingAiFor === report.project.id ? <div className="w-4 h-4 border-2 border-transparent border-t-white rounded-full animate-spin"></div> : <Wand2 className="w-4 h-4" />}
-                          </button>
-                          <button onClick={() => startEdit(report)} disabled={generatingAiFor !== null || isGeneratingAllAi} className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${getProjectColors(report.project.name).button} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
-                            <Edit className="w-4 h-4 mr-1" /> 編輯
-                          </button>
-                        </div>
-                      )}
+        <div className="space-y-8 mt-6">
+          {reports.map((report) => (
+            <div key={report.project.id} className={`grid grid-cols-1 ${isAiViewActive ? 'lg:grid-cols-2' : ''} gap-6 items-start bg-gray-50 p-4 rounded-xl border`}>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full flex flex-col h-full">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
+                      {report.project.name}
                     </div>
-                    
-                    <div className="flex-grow">
-                      {editingProjectId === report.project.id ? (
-                        <div className="space-y-4">
-                          <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full min-h-[200px] p-4 border rounded-lg" />
-                          <AttachedFilesManager 
-                            files={editFiles}
-                            onFileUpload={handleEditFileUpload}
-                            onRemoveFile={removeEditFile}
-                            onAiSelectionChange={handleEditAiSelectionChange}
-                            isUploading={false} // This is now handled inside the manager
-                          />
-                          <div className="flex space-x-3">
-                            <button onClick={saveEdit} disabled={isSaving} className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200`}>
-                                <Save className="w-4 h-4 mr-2" />
-                                {isSaving ? '儲存中...' : '儲存草稿'}
-                            </button>
-                            <button onClick={cancelEdit} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">取消</button>
-                          </div>
-                        </div>
-                      ) : ( 
-                        <div>
-                          <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">{report.content}</p>
-                          <AttachedFilesDisplay files={report.files} />
-                        </div>
-                      )}
-                    </div>
+                    <span className="text-sm text-gray-500">({report.record_count} 筆記錄)</span>
                   </div>
-
-                  {isAiViewActive && (
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full h-full">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="flex items-center px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
-                          <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
-                        </div>
-                      </div>
-                      {generatingAiFor === report.project.id ? (
-                         <p className="text-sm text-gray-500 italic">AI 正在為此專案生成潤飾內容...</p>
-                      ) : report.ai_content ? (
-                        <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">
-                          <div dangerouslySetInnerHTML={{ __html: report.ai_content.replace(/\n/g, '<br />') }} />
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-400 italic">此專案無 AI 潤飾內容。點擊魔法棒按鈕開始生成。</p>
-                      )}
+                  {editingProjectId !== report.project.id && (
+                    <div className="flex items-center space-x-2">
+                      <button onClick={() => handleEnhanceOne(report.project.id)} disabled={generatingAiFor !== null || isGeneratingAllAi || editingProjectId !== null} className={`inline-flex items-center p-2 text-sm font-medium rounded-lg ${greenButtonStyle} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
+                        {generatingAiFor === report.project.id ? <div className="w-4 h-4 border-2 border-transparent border-t-white rounded-full animate-spin"></div> : <Wand2 className="w-4 h-4" />}
+                      </button>
+                      <button onClick={() => startEdit(report)} disabled={generatingAiFor !== null || isGeneratingAllAi} className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${getProjectColors(report.project.name).button} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
+                        <Edit className="w-4 h-4 mr-1" /> 編輯
+                      </button>
                     </div>
                   )}
                 </div>
-              ))}
-              
-              {reports.length === 0 && !isLoading && (
-                <div className="text-center py-12 text-gray-500">
-                  <p>今天還沒有記錄，點擊右上角「新增筆記」來開始。</p>
+                
+                <div className="flex-grow">
+                  {editingProjectId === report.project.id ? (
+                    <div className="space-y-4">
+                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full min-h-[200px] p-4 border rounded-lg" />
+                      <AttachedFilesManager 
+                        files={editFiles}
+                        onFileUpload={handleEditFileUpload}
+                        onRemoveFile={removeEditFile}
+                        onAiSelectionChange={handleEditAiSelectionChange}
+                        isUploading={false} // This is now handled inside the manager
+                      />
+                      <div className="flex space-x-3">
+                        <button onClick={saveEdit} disabled={isSaving} className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200`}>
+                            <Save className="w-4 h-4 mr-2" />
+                            {isSaving ? '儲存中...' : '儲存草稿'}
+                        </button>
+                        <button onClick={cancelEdit} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">取消</button>
+                      </div>
+                    </div>
+                  ) : ( 
+                    <div>
+                      <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">{report.content}</p>
+                      <AttachedFilesDisplay files={report.files} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isAiViewActive && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full h-full">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="flex items-center px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
+                      <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
+                    </div>
+                  </div>
+                  {generatingAiFor === report.project.id ? (
+                     <p className="text-sm text-gray-500 italic">AI 正在為此專案生成潤飾內容...</p>
+                  ) : report.ai_content ? (
+                    <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">
+                      <div dangerouslySetInnerHTML={{ __html: report.ai_content.replace(/\n/g, '<br />') }} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">此專案無 AI 潤飾內容。點擊魔法棒按鈕開始生成。</p>
+                  )}
                 </div>
               )}
             </div>
-          </div>
-
-          {/* 下欄 - 聊天介面 */}
-          <div className="h-96 flex-shrink-0">
-            {todayReport ? (
-              <ChatInterface reportId={todayReport.id} className="h-full" />
-            ) : (
-              <div className="h-full bg-white rounded-lg border border-gray-200 flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <p>今日還沒有提交的日報</p>
-                  <p className="text-sm mt-1">提交日報後即可開始對話</p>
-                </div>
-              </div>
-            )}
-          </div>
+          ))}
+          
+          {reports.length === 0 && !isLoading && (
+            <div className="text-center py-12 text-gray-500">
+              <p>今天還沒有記錄，點擊右上角「新增筆記」來開始。</p>
+            </div>
+          )}
         </div>
       </div>
 

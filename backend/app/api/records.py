@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+from datetime import datetime, time, timedelta
 
 from app.core.database import get_db
 from app.schemas.work_record import WorkRecord, WorkRecordCreate, WorkRecordInList, FileAttachment, ConsolidatedReport, WorkRecordUpdate, AIEnhanceRequest, ConsolidatedReportUpdate
@@ -11,6 +12,34 @@ from app.core import deps
 from app.models.user import User
 
 router = APIRouter(tags=["Work Records"])
+
+def check_writing_time_allowed() -> tuple[bool, str]:
+    """
+    檢查當前時間是否允許填寫日報
+    填寫時間：早上8:30到隔天早上8:30
+    
+    Returns:
+        tuple[bool, str]: (是否允許填寫, 提示訊息)
+    """
+    now = datetime.now()
+    current_time = now.time()
+    
+    # 實際上任何時間都可以填寫，但會給予不同的提示訊息
+    if current_time >= time(8, 30):
+        return True, f"正在填寫 {now.strftime('%Y-%m-%d')} 的日報"
+    else:
+        yesterday = now - timedelta(days=1)
+        return True, f"正在填寫 {yesterday.strftime('%Y-%m-%d')} 的日報（延長填寫時間）"
+
+@router.get("/writing-status")
+async def get_writing_status():
+    """獲取當前填寫狀態和提示訊息"""
+    allowed, message = check_writing_time_allowed()
+    return {
+        "allowed": allowed,
+        "message": message,
+        "current_time": datetime.now().strftime('%H:%M')
+    }
 
 # upload 端點不變
 @router.post("/upload", response_model=FileAttachment)

@@ -14,7 +14,24 @@ import toast from 'react-hot-toast';
 const MyReportsTab: React.FC = () => {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  // 根據當前時間決定預設查看哪一天的日報
+  const getDefaultViewDate = () => {
+    const now = new Date();
+    const currentTime = now.getTime();
+    const eightThirtyToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 30).getTime();
+    
+    // 如果現在是早上8:30之前，預設查看昨天的日報
+    if (currentTime < eightThirtyToday) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return yesterday;
+    }
+    
+    // 否則查看今天的日報
+    return now;
+  };
+  
+  const [selectedDate, setSelectedDate] = useState<Date | null>(getDefaultViewDate());
   const [isLoading, setIsLoading] = useState(true);
   const { authFetch, user } = useAuth();
 
@@ -139,9 +156,9 @@ const MyReportsTab: React.FC = () => {
           </div>
         </div>
 
-        {/* 主要內容區域 - 左右分欄 */}
-        <div className="flex-1 flex gap-6 min-h-0">
-          {/* 左側 - 日報內容 */}
+        {/* 主要內容區域 - 上下分欄 */}
+        <div className="flex-1 flex flex-col gap-6 min-h-0">
+          {/* 上欄 - 日報內容 */}
           <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-6 overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">我的日報內容</h3>
             <div className="space-y-4">
@@ -168,8 +185,8 @@ const MyReportsTab: React.FC = () => {
             </div>
           </div>
 
-          {/* 右側 - 對話區域 */}
-          <div className="w-96">
+          {/* 下欄 - 對話區域 */}
+          <div className="h-96 flex-shrink-0">
             <ChatInterface reportId={selectedReport.id} className="h-full" />
           </div>
         </div>

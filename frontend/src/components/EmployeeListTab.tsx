@@ -14,7 +14,14 @@ interface EmployeeListTabProps {
 const EmployeeListTab: React.FC<EmployeeListTabProps> = ({ onSelectEmployee }) => {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  // 主管審核頁面預設顯示前一天的日報，因為當天的日報通常隔天才審核
+  const getDefaultDate = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday;
+  };
+  
+  const [selectedDate, setSelectedDate] = useState<Date | null>(getDefaultDate());
   const { authFetch } = useAuth();
 
   useEffect(() => {
@@ -62,7 +69,12 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({ onSelectEmployee }) =
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">日報審核</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">日報審核</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            預設顯示前一天的日報，因為員工填寫時間到隔天8:30截止
+          </p>
+        </div>
         <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-1">
           <button onClick={() => changeDate(-1)} className="p-2 rounded hover:bg-gray-100"><ChevronLeft className="w-5 h-5" /></button>
           <DatePicker
