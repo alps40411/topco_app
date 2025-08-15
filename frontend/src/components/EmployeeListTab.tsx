@@ -1,7 +1,7 @@
 // frontend/src/components/EmployeeListTab.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Clock, CheckCircle, ChevronLeft, ChevronRight, Calendar, MessageCircle } from 'lucide-react';
 import type { DailyReport, EmployeeInList } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import DatePicker from 'react-datepicker';
@@ -87,6 +87,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({ onSelectEmployee }) =
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">員工姓名</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">留言</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
             </tr>
           </thead>
@@ -109,6 +110,14 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({ onSelectEmployee }) =
                       <span className="text-sm text-gray-500">已審核</span>
                     </div>
                   )}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex items-center space-x-1">
+                    <MessageCircle className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">
+                      {report.comments_count || 0} 則
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <button 

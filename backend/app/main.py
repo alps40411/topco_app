@@ -8,7 +8,7 @@ from typing import Dict
 from fastapi.staticfiles import StaticFiles
 
 # --- 引入所有需要的 API 路由 ---
-from app.api import records, projects, supervisor, users, auth, documents
+from app.api import records, projects, supervisor, users, auth, documents, comments
 
 app = FastAPI(
     title="TSC 業務日誌 API",
@@ -53,6 +53,7 @@ app.include_router(records.router, prefix="/api/records")
 app.include_router(projects.router, prefix="/api/projects")
 app.include_router(supervisor.router, prefix="/api/supervisor")
 app.include_router(documents.router, prefix="/api/documents")
+app.include_router(comments.router, prefix="/api")
 
 @app.get("/")
 def read_root():

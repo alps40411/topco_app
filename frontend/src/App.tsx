@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Edit3, FileText, LogOut } from "lucide-react";
 import DataInputTab from "./components/DataInputTab";
 import DailyReportTab from "./components/DailyReportTab";
+import MyReportsTab from "./components/MyReportsTab";
 // import AIDailyReportTab from './components/AIDailyReportTab';
 // import ComprehensiveEditTab from './components/ComprehensiveEditTab';
 import EmployeeListTab from "./components/EmployeeListTab";
@@ -65,6 +66,7 @@ export interface DailyReport {
   feedback: string | null;
   consolidated_content: ConsolidatedReport[];
   employee: EmployeeSummary;
+  comments_count?: number;
 }
 export interface Employee {
   id: number;
@@ -83,7 +85,7 @@ function App() {
   const { user, logout } = useAuth();
   const [mainTab, setMainTab] = useState<"employee" | "supervisor">("employee");
   const [activeTab, setActiveTab] = useState<
-    "input" | "daily" | "ai" | "comprehensive"
+    "input" | "daily" | "myreports" | "ai" | "comprehensive"
   >("input");
 
   const [selectedEmployee, setSelectedEmployee] =
@@ -212,6 +214,19 @@ function App() {
                   <span>日報編輯</span>
                 </div>
               </button>
+              <button
+                onClick={() => setActiveTab("myreports")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === "myreports"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4" />
+                  <span>我的日報</span>
+                </div>
+              </button>
               {/* <button onClick={() => setActiveTab('ai')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'ai' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                 <div className="flex items-center space-x-2"><Wand2 className="w-4 h-4" /><span>AI日報編輯</span></div>
               </button>
@@ -228,6 +243,7 @@ function App() {
           <>
             {activeTab === "input" && <DataInputTab />}
             {activeTab === "daily" && <DailyReportTab />}
+            {activeTab === "myreports" && <MyReportsTab />}
             {/* {activeTab === 'ai' && <AIDailyReportTab />}
                 {activeTab === 'comprehensive' && <ComprehensiveEditTab />} */}
           </>

@@ -14,3 +14,4 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_supervisor = Column(Boolean, default=False)
     employee = relationship("Employee", back_populates="user", uselist=False)
+    comments = relationship("ReviewComment", back_populates="author")

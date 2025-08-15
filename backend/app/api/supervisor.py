@@ -15,8 +15,10 @@ from app.models.user import User
 router = APIRouter(tags=["Supervisor"])
 
 @router.get("/employees", response_model=List[EmployeeForList])
-async def get_employees_for_supervisor(db: AsyncSession = Depends(get_db)):
-    employees = await supervisor_service.get_employees_with_pending_reports(db=db)
+async def get_employees_for_supervisor(db: AsyncSession = Depends(get_db), current_user: User = Depends(deps.get_current_user)):
+    if not current_user.employee:
+        raise HTTPException(status_code=404, detail="該用戶不是員工")
+    employees = await supervisor_service.get_employees_with_pending_reports(db=db, supervisor_id=current_user.employee.id)
     return employees
 
 @router.get("/employees/{employee_id}", response_model=EmployeeDetailSchema)
@@ -37,7 +39,16 @@ async def review_report(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
-    reviewed_report = await supervisor_service.review_daily_report(db=db, report_id=report_id, review_in=review_in)
+    # 檢查用戶是否為主管
+    if not current_user.is_supervisor:
+        raise HTTPException(status_code=403, detail="只有主管可以審核日報")
+    
+    reviewed_report = await supervisor_service.review_daily_report(
+        db=db, 
+        report_id=report_id, 
+        review_in=review_in, 
+        reviewer=current_user
+    )
     if not reviewed_report:
         raise HTTPException(status_code=404, detail="找不到該日報")
     return reviewed_report

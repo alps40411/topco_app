@@ -22,7 +22,7 @@ async def seed_data():
         if not user:
             user_in = UserCreate(
                 email=user_email, 
-                password="password123",
+                password="StrongPassword123",
                 name="測試員工",
                 department="技術部",
                 is_supervisor=False
@@ -36,7 +36,7 @@ async def seed_data():
         if not supervisor:
             supervisor_in = UserCreate(
                 email=supervisor_email,
-                password="password123",
+                password="StrongPassword123",
                 name="測試主管",
                 department="管理部",
                 is_supervisor=True

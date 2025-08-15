@@ -8,6 +8,8 @@ from pathlib import Path
 class Settings(BaseSettings):
     # Database settings
     DATABASE_URL: str = ""
+    SOURCE_DB_USER: str = ""
+    SOURCE_DB_PASSWORD: str = ""
 
     # Azure OpenAI settings
     AZURE_OPENAI_KEY: str = ""

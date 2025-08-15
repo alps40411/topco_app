@@ -17,9 +17,11 @@ class DailyReport(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date, default=datetime.date.today, nullable=False)
     status = Column(Enum(ReportStatus), default=ReportStatus.pending, nullable=False)
-    rating = Column(Float, nullable=True)
-    feedback = Column(Text, nullable=True)
+    
     consolidated_content = Column(JSONB)
+    
+    # 保留評分功能，與新的對話系統並存
+    rating = Column(Float, nullable=True)
     
     employee_id = Column(Integer, ForeignKey("employees.id"))
     employee = relationship("Employee", back_populates="reports")
@@ -32,3 +34,4 @@ class DailyReport(Base):
         secondary=report_work_record_association,
         backref="daily_reports"
     )
+    comments = relationship("ReviewComment", back_populates="report", cascade="all, delete-orphan")
