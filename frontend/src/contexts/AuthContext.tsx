@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useCallback } from 'react';
 import type { User } from '../App'; // 我們將從 App.tsx 引入統一的 User 型別
+import { buildApiUrl } from '../config/api';
 
 interface AuthContextType {
   token: string | null;
@@ -50,7 +51,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       newHeaders.set('Content-Type', 'application/json');
     }
 
-    const response = await fetch(url, { ...options, headers: newHeaders });
+    const fullUrl = buildApiUrl(url);
+    const response = await fetch(fullUrl, { ...options, headers: newHeaders });
 
     if (response.status === 401) {
       logout();

@@ -4,10 +4,11 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
+import { buildApiUrl } from '../config/api';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('test@example.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('employee@example.com');
+  const [password, setPassword] = useState('StrongPassword123');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -23,7 +24,7 @@ const LoginPage: React.FC = () => {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await fetch('/api/auth/token', {
+      const response = await fetch(buildApiUrl('/api/auth/token'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData,

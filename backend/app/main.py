@@ -19,17 +19,18 @@ app = FastAPI(
 # --- 掛載 storage 資料夾為靜態檔案目錄 ---
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
-origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()] or [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# 最寬鬆的CORS設置，允許所有來源
+origins = ["*"]  # 允許所有來源
+
+print(f"🔧 CORS允許的來源: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,  # 當使用 "*" 時必須設為 False
+    allow_methods=["*"],  # 允許所有HTTP方法
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # 基本啟動前檢查：確保必要環境變數已設定

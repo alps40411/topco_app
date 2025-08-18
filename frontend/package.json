@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "build:production": "vite build --config vite.config.production.ts --mode production",
+    "preview": "vite preview",
+    "preview:production": "vite preview --config vite.config.production.ts --mode production",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@types/react-datepicker": "^6.2.0",
