@@ -1,4 +1,4 @@
-"""Add review system with rating preserved
+"""Remove rating and feedback from daily_reports
 
 Revision ID: c717f1492737
 Revises: 1a2b3c4d5e6f
@@ -19,12 +19,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema: Keep rating, remove feedback (replaced by comments)."""
-    # Only remove feedback as it's replaced by the new comment system
-    # Keep rating as requested by user
-    op.drop_column('daily_reports', 'feedback')
+    # This migration is no longer needed as the initial schema is now correct.
+    pass
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
-    op.add_column('daily_reports', sa.Column('feedback', sa.Text(), nullable=True))
+    # This migration is no longer needed as the initial schema is now correct.
+    pass
