@@ -17,7 +17,7 @@ async def seed_data():
 
     async with AsyncSessionFactory() as session:
         # --- 建立一個一般員工使用者 ---
-        user_email = "test@example.com"
+        user_email = "employee@example.com"
         user = await user_service.get_user_by_email(session, email=user_email)
         if not user:
             user_in = UserCreate(

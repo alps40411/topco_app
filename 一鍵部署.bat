@@ -94,7 +94,7 @@ echo 訪問網址: http://%LOCAL_IP%:3000
 echo API服務: http://%LOCAL_IP%:8000/docs
 echo.
 echo 預設帳號:
-echo 員工: test@example.com / password123
+echo 員工: employee@example.com / password123
 echo 主管: supervisor@example.com / StrongPassword123
 echo.
 
