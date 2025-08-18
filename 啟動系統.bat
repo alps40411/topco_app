@@ -1,5 +1,5 @@
 @echo off
-echo 啟動頂寶日報系統...
+echo 啟動TOPCO日報系統...
 echo.
 echo 後端服務: http://192.168.56.1:8000
 echo 前端服務: http://192.168.56.1:3000
