@@ -12,14 +12,12 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/*" element={<ProtectedRoute><App /></ProtectedRoute>} />
-        </Routes>
-      </Router>
-    </AuthProvider>
-  </React.StrictMode>
+  <AuthProvider>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/*" element={<ProtectedRoute><App /></ProtectedRoute>} />
+      </Routes>
+    </Router>
+  </AuthProvider>
 );

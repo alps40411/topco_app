@@ -1,35 +1,67 @@
 # backend/reset_db.py
 
 import asyncio
+import sys
+import os
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import text
+
+# 讓此獨立腳本可以載入 app 內的模組
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.core.config import settings
+from app.core.database import AsyncSessionFactory, engine
 from app.models import Base
+from sqlalchemy import text
 
 async def reset_database():
-    print("開始徹底重設資料庫...")
-    # 建立一個獨立的引擎來執行操作
-    engine = create_async_engine(settings.DATABASE_URL)
-
-    async with engine.begin() as conn:
-        print("步驟 1/3: 強制刪除 alembic_version 資料表...")
-        # 使用 text() 來執行原生 SQL 指令，確保 alembic_version 表被刪除
-        await conn.execute(text("DROP TABLE IF EXISTS alembic_version;"))
-        print(" -> alembic_version 已刪除。")
-
-        print("步驟 2/3: 刪除所有應用程式資料表...")
-        await conn.run_sync(Base.metadata.drop_all)
-        print(" -> 所有應用程式資料表已成功刪除。")
-        
-        print("步驟 3/3: 根據最新模型，重新建立所有資料表...")
-        await conn.run_sync(Base.metadata.create_all)
-        print(" -> 已成功重新建立所有資料表！")
+    """
+    重置資料庫：刪除所有資料表並重新建立
+    """
+    print("[INFO] 開始重置資料庫...")
     
-    # 關閉引擎連線
-    await engine.dispose()
-    print("資料庫徹底重設完成。")
+    try:
+        async with engine.begin() as conn:
+            print("[INFO] 正在刪除所有現有資料表...")
+            
+            # 使用CASCADE強制刪除所有依賴關係
+            await conn.execute(text("DROP SCHEMA public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
+            await conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+            await conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+            print("[SUCCESS] 已清空並重建schema")
+            
+            print("[INFO] 正在重新建立所有資料表...")
+            await conn.run_sync(Base.metadata.create_all)
+            print("[SUCCESS] 所有資料表已重新建立")
+            
+        print("[SUCCESS] 資料庫重置完成！")
+        return True
+        
+    except Exception as e:
+        print(f"[ERROR] 資料庫重置失敗: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 if __name__ == "__main__":
-    # 確保在 Windows 上 asyncio 可以正常運作
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    asyncio.run(reset_database())
+    if len(sys.argv) > 1 and sys.argv[1] in ['-y', '--yes']:
+        # 自動確認模式
+        confirm = 'y'
+    else:
+        # 交互式確認
+        print("警告：此操作將刪除所有資料！")
+        print(f"目標資料庫: {settings.DATABASE_URL}")
+        confirm = input("您確定要繼續嗎？(y/N): ").strip().lower()
+    
+    if confirm == 'y':
+        # 確保在 Windows 上 asyncio 可以正常運作
+        if sys.platform == "win32":
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        
+        success = asyncio.run(reset_database())
+        if success:
+            print("\n[INFO] 資料庫已成功重置，您現在可以執行 seed_db.py 來填充初始資料")
+        else:
+            sys.exit(1)
+    else:
+        print("[INFO] 操作已取消")

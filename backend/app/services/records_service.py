@@ -55,15 +55,21 @@ async def get_multi_by_employee_today(db: AsyncSession, *, employee_id: int):
     return result.scalars().all()
 
 async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[ConsolidatedReport]:
+    print(f"[INFO] get_consolidated_today 開始 - employee_id: {employee_id}")
     today_records = await get_multi_by_employee_today(db=db, employee_id=employee_id)
+    print(f"   [INFO] 從資料庫取得 {len(today_records)} 筆今日記錄")
     project_groups = defaultdict(lambda: {"content": [], "files": [], "record_count": 0, "project_obj": None, "ai_content": None})
     
-    for record in today_records:
+    for i, record in enumerate(today_records):
+        print(f"   [INFO] 處理記錄 {i+1}: project_id={record.project_id}, files={len(record.files)}")
         if record.project:
             proj_id = record.project_id
             # 只有在 content 存在且不為純空白時才加入列表
             if record.content and record.content.strip():
                 project_groups[proj_id]["content"].append(record.content.strip())
+            
+            for j, file in enumerate(record.files):
+                print(f"      📎 檔案 {j+1}: {file.name} (is_selected_for_ai: {file.is_selected_for_ai})")
             
             project_groups[proj_id]["files"].extend(record.files)
             project_groups[proj_id]["record_count"] += 1
@@ -94,26 +100,47 @@ async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[
 # --- ↓↓↓ 新增這個函式 ↓↓↓ ---
 async def enhance_all_today(db: AsyncSession, *, employee_id: int) -> List[ConsolidatedReport]:
     """一鍵潤飾今天所有的專案報告"""
-    consolidated_reports = await get_consolidated_today(db=db, employee_id=employee_id)
+    print(f"[INFO] enhance_all_today 開始 - employee_id: {employee_id}")
     
-    for report in consolidated_reports:
+    consolidated_reports = await get_consolidated_today(db=db, employee_id=employee_id)
+    print(f"[INFO] 取得 {len(consolidated_reports)} 個彙整報告")
+    
+    for i, report in enumerate(consolidated_reports):
+        print(f"🚀 處理第 {i+1} 個報告: {report.project.name}")
         reference_texts = []
 
-        for file_attachment in report.files:
+        print(f"📁 檢查 {len(report.files)} 個附件")
+        for j, file_attachment in enumerate(report.files):
+            print(f"   檔案 {j+1}: {file_attachment.name} (is_selected_for_ai: {file_attachment.is_selected_for_ai})")
             if file_attachment.is_selected_for_ai:
-                print(f"分析檔案: {file_attachment.url}")
-                # 呼叫文件分析服務讀取檔案內容
-                analyzed_text = await document_analysis_service.analyze_document_from_path(file_attachment.url)
-                reference_texts.append(analyzed_text)
+                print(f"[INFO] 正在分析檔案: {file_attachment.url}")
+                try:
+                    # 呼叫文件分析服務讀取檔案內容
+                    analyzed_text = await document_analysis_service.analyze_document_from_path(file_attachment.url)
+                    print(f"[SUCCESS] 檔案分析成功，提取文字長度: {len(analyzed_text)}")
+                    reference_texts.append(analyzed_text)
+                except Exception as e:
+                    print(f"[ERROR] 檔案分析失敗: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
 
 
         # 呼叫 AI 服務
-        ai_text = await azure_ai_service.get_ai_enhanced_report(
-            original_content=report.content,
-            project_name=report.project.name,
-            reference_texts=reference_texts
-        )
-        report.ai_content = ai_text
+        print(f"🤖 呼叫 Azure AI 服務 - 專案: {report.project.name}, 參考檔案數: {len(reference_texts)}")
+        print(f"[INFO] 原始內容長度: {len(report.content)}")
+        try:
+            ai_text = await azure_ai_service.get_ai_enhanced_report(
+                original_content=report.content,
+                project_name=report.project.name,
+                reference_texts=reference_texts
+            )
+            print(f"[SUCCESS] AI 潤飾成功，結果長度: {len(ai_text)}")
+            report.ai_content = ai_text
+        except Exception as e:
+            print(f"[ERROR] AI 潤飾失敗: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            report.ai_content = report.content  # 失敗時使用原始內容
         
         # 將 AI 結果存回資料庫 (只更新第一筆)
         today_start = datetime.combine(date.today(), time.min)

@@ -13,6 +13,7 @@ from app.core.config import settings
 def _build_client() -> DocumentIntelligenceClient | None:
     if not settings.AZURE_DOC_INTELLIGENCE_ENDPOINT or not settings.AZURE_DOC_INTELLIGENCE_KEY:
         return None
+    
     return DocumentIntelligenceClient(
         endpoint=settings.AZURE_DOC_INTELLIGENCE_ENDPOINT,
         credential=AzureKeyCredential(settings.AZURE_DOC_INTELLIGENCE_KEY),
@@ -44,7 +45,6 @@ async def analyze_document_from_stream(file_stream: IO[bytes]) -> str:
             result = await loop.run_in_executor(executor, _analyze_document_sync, file_stream)
         return result
     except Exception as e:
-        print(f"與 Azure Document Intelligence 通訊時發生錯誤 (Stream): {e}")
         return "文件分析服務暫時無法使用。"
 
 def _analyze_document_from_path_sync(file_path: str) -> str:
@@ -77,7 +77,6 @@ async def analyze_document_from_path(file_path: str) -> str:
             result = await loop.run_in_executor(executor, _analyze_document_from_path_sync, file_path)
         return result
     except Exception as e:
-        print(f"與 Azure Document Intelligence 通訊時發生錯誤 (Path): {e}")
         return "文件分析服務暫時無法使用。"
 
 # 為向後兼容性提供別名

@@ -17,27 +17,60 @@ const AIDailyReportTab: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fetchReports = async () => {
+    console.log('📋 開始取得今日彙整報告');
     setIsLoading(true);
     try {
-      const response = await authFetch('/api/records/consolidated/today'); // <-- 使用 authFetch
-      if (response.ok) setReports(await response.json());
-    } catch (error) { console.error("無法取得彙整報告:", error); } 
-    finally { setIsLoading(false); }
+      const response = await authFetch('/api/records/consolidated/today');
+      console.log('📥 fetchReports 回應:', {
+        status: response.status,
+        ok: response.ok
+      });
+      if (response.ok) {
+        const reports = await response.json();
+        console.log('✅ 成功取得報告:', reports);
+        setReports(reports);
+      } else {
+        console.error('❌ fetchReports 失敗:', response.status);
+      }
+    } catch (error) { 
+      console.error("❌ 無法取得彙整報告:", error); 
+    } 
+    finally { 
+      setIsLoading(false); 
+      console.log('🏁 fetchReports 完成');
+    }
   };
 
   useEffect(() => { fetchReports(); }, []);
 
   const handleEnhanceAll = async () => {
+    console.log('🚀 開始執行 AI 一鍵潤飾全部功能');
     setIsBatchGenerating(true);
     try {
-      const response = await authFetch('/api/records/ai/enhance_all', { method: 'POST' }); // <-- 使用 authFetch
-      if (response.ok) setReports(await response.json());
-      else throw new Error('AI 服務失敗');
+      console.log('📤 發送 API 請求到 /api/records/ai/enhance_all');
+      const response = await authFetch('/api/records/ai/enhance_all', { method: 'POST' });
+      console.log('📥 收到 API 回應:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ AI 潤飾成功，收到結果:', result);
+        setReports(result);
+        toast.success('AI 潤飾完成！');
+      } else {
+        const errorText = await response.text();
+        console.error('❌ API 回應錯誤:', errorText);
+        throw new Error(`AI 服務失敗: ${response.status} ${errorText}`);
+      }
     } catch (error) {
-      console.error(error);
-      toast.error('AI 潤飾所有報告時發生錯誤');
+      console.error('❌ handleEnhanceAll 錯誤:', error);
+      toast.error(`AI 潤飾所有報告時發生錯誤: ${error}`);
     } finally {
       setIsBatchGenerating(false);
+      console.log('🏁 handleEnhanceAll 執行完成');
     }
   };
 

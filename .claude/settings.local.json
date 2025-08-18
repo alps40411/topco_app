@@ -10,7 +10,8 @@
       "Bash(curl:*)",
       "Bash(del:*)",
       "Bash(rm:*)",
-      "Bash(netsh:*)"
+      "Bash(netsh:*)",
+      "Bash(alembic:*)"
     ],
     "defaultMode": "acceptEdits"
   }

@@ -7,8 +7,8 @@ import { LogIn } from 'lucide-react';
 import { buildApiUrl } from '../config/api';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('employee@example.com');
-  const [password, setPassword] = useState('StrongPassword123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -62,11 +62,11 @@ const LoginPage: React.FC = () => {
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm font-medium text-gray-700">電子郵件</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder='員工編號@company.com' required className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">密碼</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder='員工編號' required className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           {error && <p className="text-sm text-center text-red-600">{error}</p>}
           <div>

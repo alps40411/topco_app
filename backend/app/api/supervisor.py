@@ -43,15 +43,19 @@ async def review_report(
     if not current_user.is_supervisor:
         raise HTTPException(status_code=403, detail="只有主管可以審核日報")
     
-    reviewed_report = await supervisor_service.review_daily_report(
-        db=db, 
-        report_id=report_id, 
-        review_in=review_in, 
-        reviewer=current_user
-    )
-    if not reviewed_report:
-        raise HTTPException(status_code=404, detail="找不到該日報")
-    return reviewed_report
+    try:
+        reviewed_report = await supervisor_service.review_daily_report(
+            db=db, 
+            report_id=report_id, 
+            review_in=review_in, 
+            reviewer=current_user
+        )
+        if not reviewed_report:
+            raise HTTPException(status_code=404, detail="找不到該日報")
+        return reviewed_report
+    except ValueError as e:
+        # 處理重複評分的錯誤
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/reports/submit", response_model=DailyReportDetail)
 async def submit_daily_report_for_review(

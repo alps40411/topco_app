@@ -6,6 +6,7 @@ from typing import List, Optional
 def _build_client() -> Optional[AsyncAzureOpenAI]:
     if not settings.AZURE_OPENAI_KEY or not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_DEPLOYMENT_NAME:
         return None
+    
     return AsyncAzureOpenAI(
         api_key=settings.AZURE_OPENAI_KEY,
         api_version="2024-02-01",
@@ -61,7 +62,6 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
     client = _build_client()
     if client is None:
         return "AI 服務未啟用或尚未配置。"
-
     try:
         response = await client.chat.completions.create(
             model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
@@ -75,5 +75,4 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
         ai_content = response.choices[0].message.content
         return ai_content if ai_content else "無法從 AI 服務獲取內容。"
     except Exception as e:
-        print(f"與 Azure OpenAI 通訊時發生錯誤: {e}")
         return "AI 服務暫時無法使用。"

@@ -1,6 +1,6 @@
 // frontend/src/components/ChatInterface.tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, User, Crown, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -39,19 +39,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // 審核相關狀態
-  const [showReviewForm, setShowReviewForm] = useState(false);
   const [selectedRating, setSelectedRating] = useState<number>(0);
   const [reviewComment, setReviewComment] = useState('');
+  const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
   
   const { authFetch, user } = useAuth();
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await authFetch(`/api/reports/${reportId}/comments`);
       if (response.ok) {
         const commentsData = await response.json();
         setComments(commentsData);
+        
+        // 檢查當前用戶是否已經提交過評分
+        const userReview = commentsData.find((comment: Comment) => 
+          comment.user_id === user?.id && comment.rating && comment.rating > 0
+        );
+        setHasSubmittedReview(!!userReview);
       }
     } catch (error) {
       console.error('獲取留言失敗:', error);
@@ -59,11 +65,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [authFetch, reportId, user?.id]);
 
   useEffect(() => {
     fetchComments();
-  }, [reportId]);
+  }, [fetchComments]);
 
 
   const handleSubmitMessage = async () => {
@@ -101,45 +107,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       return;
     }
 
+    // 防止重複提交
+    if (isSubmitting) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // 提交審核
-      // 透過留言API提交審核，包含評分
-      const response = await authFetch(`/api/reports/${reportId}/comments`, {
-        method: 'POST',
+      // 只調用審核API，讓後端統一處理評論創建
+      const response = await authFetch(`/api/supervisor/reports/${reportId}/review`, {
+        method: 'PUT',
         body: JSON.stringify({
-          content: reviewComment.trim() || `評分：${selectedRating} 分`,
-          rating: selectedRating || null
+          rating: selectedRating || null,
+          comment: reviewComment.trim() || null
         })
       });
 
       if (response.ok) {
-        const newComment = await response.json();
+        // 重新獲取評論列表以確保數據一致性
+        await fetchComments();
         
-        // 同時呼叫審核API來更新報告狀態和評分
-        await authFetch(`/api/supervisor/reports/${reportId}/review`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            rating: selectedRating || null,
-            comment: reviewComment.trim() || null
-          })
-        });
-        
-        // 直接添加新評論到列表中，避免重新獲取
-        setComments(prevComments => [...prevComments, newComment]);
         toast.success('審核已提交');
-        setShowReviewForm(false);
+        setHasSubmittedReview(true);
         setSelectedRating(0);
         setReviewComment('');
+        
         if (onReviewSubmitted) {
           onReviewSubmitted(); // 通知父組件更新報告狀態
         }
       } else {
-        throw new Error('提交審核失敗');
+        const errorData = await response.json();
+        // 顯示後端返回的錯誤訊息
+        throw new Error(errorData.detail || '提交審核失敗');
       }
     } catch (error) {
       console.error('提交審核失敗:', error);
-      toast.error('提交審核失敗');
+      toast.error(error instanceof Error ? error.message : '提交審核失敗');
     } finally {
       setIsSubmitting(false);
     }
@@ -288,111 +291,169 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* 輸入區域 */}
       <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
 
-        {/* 主管審核表單 */}
-        {user?.is_supervisor && reportStatus === 'pending' && !showReviewForm && (
+        {/* 主管審核表單 - 只在未評分時顯示 */}
+        {user?.is_supervisor && reportStatus === 'pending' && !hasSubmittedReview && (
           <div className="mb-4">
-            <button
-              onClick={() => setShowReviewForm(true)}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-            >
-              開始審核
-            </button>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
+                <Crown className="w-4 h-4 mr-2" />
+                主管評分與回饋
+              </h4>
+              
+              <div className="flex items-center space-x-4 mb-3">
+                <span className="text-sm font-medium text-gray-700">評分:</span>
+                <select
+                  value={selectedRating}
+                  onChange={(e) => setSelectedRating(Number(e.target.value))}
+                  className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value={0}>選擇評分</option>
+                  <option value={1}>1分 - 很差</option>
+                  <option value={2}>2分 - 差</option>
+                  <option value={3}>3分 - 普通</option>
+                  <option value={4}>4分 - 好</option>
+                  <option value={5}>5分 - 非常好</option>
+                </select>
+              </div>
+
+              {/* 建議回復按鈕 - 主管版 */}
+              <div className="mb-3">
+                <p className="text-xs text-blue-700 mb-2">快速回復建議：</p>
+                <div className="flex flex-wrap gap-2">
+                  {supervisorSuggestedReplies.map((reply, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setReviewComment(reply)}
+                      className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors border border-blue-200"
+                    >
+                      {reply.length > 25 ? reply.substring(0, 25) + '...' : reply}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="請輸入您的審核意見..."
+                className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                rows={4}
+                disabled={isSubmitting}
+              />
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleSubmitReview}
+                  disabled={selectedRating === 0 || !reviewComment.trim() || isSubmitting}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSubmitting ? '提交中...' : '提交評分'}
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedRating(0);
+                    setReviewComment('');
+                  }}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                >
+                  清除重寫
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* 審核表單 */}
-        {showReviewForm && (
+        {/* 已評分提示 */}
+        {user?.is_supervisor && hasSubmittedReview && (
           <div className="mb-4">
-            <div className="flex items-center space-x-4 mb-3">
-              <span className="text-sm font-medium text-gray-700">回應給:</span>
-              <select
-                value={selectedRating}
-                onChange={(e) => setSelectedRating(Number(e.target.value))}
-                className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value={0}>選擇評分</option>
-                <option value={1}>很差</option>
-                <option value={2}>差</option>
-                <option value={3}>普通</option>
-                <option value={4}>好</option>
-                <option value={5}>非常好</option>
-              </select>
-            </div>
-            
-            <textarea
-              value={reviewComment}
-              onChange={(e) => setReviewComment(e.target.value)}
-              placeholder="請輸入您的審核意見..."
-              className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
-              rows={4}
-              disabled={isSubmitting}
-            />
-
-            <div className="flex space-x-2">
-              <button
-                onClick={handleSubmitReview}
-                disabled={selectedRating === 0 || !reviewComment.trim() || isSubmitting}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                確定送出
-              </button>
-              <button
-                onClick={() => {
-                  setShowReviewForm(false);
-                  setSelectedRating(0);
-                  setReviewComment('');
-                }}
-                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-              >
-                清除重寫
-              </button>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-800">✅ 您已完成此日報的評分</p>
             </div>
           </div>
         )}
         
-        {/* 一般留言建議回覆按鈕 */}
-        {!showReviewForm && (
-          <div className="mb-3">
-            <div className="flex flex-wrap gap-2">
-              {(user?.is_supervisor ? supervisorSuggestedReplies : suggestedReplies).map((reply, index) => (
-                <button
-                  key={index}
-                  onClick={() => setNewMessage(reply)}
-                  className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 transition-colors"
-                >
-                  {reply.length > 20 ? reply.substring(0, 20) + '...' : reply}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* 多主管評分統計 */}
+        {user?.is_supervisor && (() => {
+          const supervisorRatings = comments.filter(comment => 
+            comment.rating && comment.rating > 0 && comment.author
+          );
+          
+          if (supervisorRatings.length > 1) {
+            const averageRating = supervisorRatings.reduce((sum, comment) => sum + (comment.rating || 0), 0) / supervisorRatings.length;
+            return (
+              <div className="mb-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800 font-medium">
+                    📊 多主管評分統計: 
+                    {supervisorRatings.map((rating, index) => (
+                      <span key={index} className="ml-1">
+                        {rating.author?.name}({rating.rating}分)
+                        {index < supervisorRatings.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                  </p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    平均評分: {averageRating.toFixed(1)}/5
+                  </p>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
-        {/* 一般留言輸入 */}
-        {!showReviewForm && (
+        {/* 員工回復區域 - 統一美觀設計 */}
+        {(!user?.is_supervisor || hasSubmittedReview || reportStatus !== 'pending') && (
           <div>
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="輸入您的留言..."
-              className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
-              rows={3}
-              disabled={isSubmitting}
-            />
-            <div className="flex space-x-2">
-              <button
-                onClick={handleSubmitMessage}
-                disabled={!newMessage.trim() || isSubmitting}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                確定送出
-              </button>
-              <button
-                onClick={() => setNewMessage('')}
-                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-              >
-                清除重寫
-              </button>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-slate-900 mb-3 flex items-center">
+                <User className="w-4 h-4 mr-2" />
+                {user?.is_supervisor ? '追加留言' : '員工回復'}
+              </h4>
+
+              {/* 建議回復按鈕 - 員工版或主管追加留言版 */}
+              <div className="mb-3">
+                <p className="text-xs text-slate-700 mb-2">快速回復建議：</p>
+                <div className="flex flex-wrap gap-2">
+                  {(user?.is_supervisor && hasSubmittedReview ? supervisorSuggestedReplies : suggestedReplies).map((reply, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setNewMessage(reply)}
+                      className="px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded hover:bg-slate-200 transition-colors border border-slate-200"
+                    >
+                      {reply.length > 25 ? reply.substring(0, 25) + '...' : reply}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder={user?.is_supervisor ? "輸入追加留言..." : "輸入您的回復..."}
+                className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3"
+                rows={4}
+                disabled={isSubmitting}
+              />
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleSubmitMessage}
+                  disabled={!newMessage.trim() || isSubmitting}
+                  className="px-4 py-2 bg-slate-500 text-white rounded hover:bg-slate-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSubmitting ? '提交中...' : '確定送出'}
+                </button>
+                <button
+                  onClick={() => setNewMessage('')}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                >
+                  清除重寫
+                </button>
+              </div>
             </div>
           </div>
         )}

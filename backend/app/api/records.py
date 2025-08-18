@@ -137,7 +137,16 @@ async def enhance_all_reports_with_ai(
     current_user: User = Depends(deps.get_current_user)
 ):
     """一鍵潤飾今天所有的彙整報告"""
-    return await records_service.enhance_all_today(db=db, employee_id=current_user.id)
+    print(f"[API] /ai/enhance_all 被呼叫 - user_id: {current_user.id}")
+    try:
+        result = await records_service.enhance_all_today(db=db, employee_id=current_user.id)
+        print(f"[SUCCESS] API: enhance_all_today 執行成功，返回 {len(result)} 個報告")
+        return result
+    except Exception as e:
+        print(f"[ERROR] API: enhance_all_today 執行失敗: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @router.post("/ai/enhance_one/{project_id}", response_model=ConsolidatedReport)

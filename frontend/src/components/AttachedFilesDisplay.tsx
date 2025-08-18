@@ -18,7 +18,31 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({ files }) =>
 
     if (!files || files.length === 0) return null;
 
-    const getFullUrl = (url: string) => url.startsWith('http') ? url : `/${url}`;
+    const getFullUrl = (url: string) => {
+        if (url.startsWith('http')) {
+            return url;
+        }
+        
+        // 在生產環境中，需要包含後端服務器地址
+        const isProduction = window.location.port === '3000';
+        const backendUrl = isProduction 
+            ? `http://${window.location.hostname}:8000`
+            : '';
+        
+        const fullUrl = url.startsWith('/') 
+            ? `${backendUrl}${url}`
+            : `${backendUrl}/${url}`;
+            
+        // console.log('🖼️ AttachedFilesDisplay - 圖片URL調試:', {
+        //     originalUrl: url,
+        //     fullUrl,
+        //     isHttp: url.startsWith('http'),
+        //     isProduction,
+        //     backendUrl,
+        //     currentLocation: window.location.href
+        // });
+        return fullUrl;
+    };
 
     return (
       <>

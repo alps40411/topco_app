@@ -88,18 +88,21 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
         </div>
         {reportDetail.rating && (
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">評分:</span>
+            <span className="text-sm text-gray-600">平均評分:</span>
             <div className="flex items-center text-yellow-500">
               {[...Array(5)].map((_, i) => (
                 <Star
                   key={i}
                   className={`w-5 h-5 ${
-                    i < (reportDetail.rating || 0)
+                    i < Math.floor(reportDetail.rating || 0)
                       ? "fill-current"
                       : "text-gray-300"
                   }`}
                 />
               ))}
+              <span className="ml-2 text-sm text-gray-600">
+                {reportDetail.rating.toFixed(1)}/5.0
+              </span>
             </div>
           </div>
         )}

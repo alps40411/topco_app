@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.core import deps
 from app.models import User, DailyReport, Employee
 from app.schemas.review_comment import ReviewComment, ReviewCommentCreate
-from app.services import comment_service
+from app.services import comment_service, supervisor_service
 
 router = APIRouter(tags=["Comments"])
 
@@ -32,9 +32,13 @@ async def check_report_access(
             detail="Daily report not found"
         )
     
-    # 如果是主管，可以存取所有日報
-    if current_user.is_supervisor:
-        return report
+    # 如果是主管，檢查是否有權限審核該報告的員工
+    if current_user.is_supervisor and current_user.employee:
+        can_review = await supervisor_service.can_supervisor_review_employee(
+            db, current_user.employee.id, report.employee_id
+        )
+        if can_review:
+            return report
     
     # 如果是員工，只能存取自己的日報
     if hasattr(current_user, 'employee') and current_user.employee:

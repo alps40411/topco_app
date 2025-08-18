@@ -1,9 +1,10 @@
 # backend/app/main.py
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from starlette.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from typing import Dict
+import time
 
 from fastapi.staticfiles import StaticFiles
 
@@ -22,7 +23,7 @@ app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 # 最寬鬆的CORS設置，允許所有來源
 origins = ["*"]  # 允許所有來源
 
-print(f"🔧 CORS允許的來源: {origins}")
+print(f"CORS允許的來源: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +33,19 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# 添加請求日誌中間件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    print(f"{request.method} {request.url.path} - 開始處理")
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    print(f"{request.method} {request.url.path} - 完成 ({response.status_code}) - {process_time:.2f}s")
+    
+    return response
 
 # 基本啟動前檢查：確保必要環境變數已設定
 required_settings: Dict[str, str] = {
