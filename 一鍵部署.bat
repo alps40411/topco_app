@@ -94,8 +94,8 @@ echo 訪問網址: http://%LOCAL_IP%:3000
 echo API服務: http://%LOCAL_IP%:8000/docs
 echo.
 echo 預設帳號:
-echo 員工: employee@example.com / password123
-echo 主管: supervisor@example.com / StrongPassword123
+echo 格式: {工號}@topco.com / {工號}
+echo 範例: 05489@topco.com / 05489
 echo.
 
 set /p START_NOW="現在啟動系統? (y/n): "

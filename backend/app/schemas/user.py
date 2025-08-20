@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from .employee import EmployeeForUser
+from .employee import EmployeeForUser
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -16,6 +18,8 @@ class User(UserBase):
     id: int
     is_active: bool
     is_supervisor: bool
+    employee: Optional[EmployeeForUser] = None
+    employee: Optional[EmployeeForUser] = None
 
     class Config:
         from_attributes = True

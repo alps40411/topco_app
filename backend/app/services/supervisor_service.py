@@ -6,10 +6,11 @@ from sqlalchemy.orm import selectinload
 from typing import List, Optional
 import datetime
 
-from app.models import Employee, DailyReport, ReportStatus, ReviewComment
+from app.models import Employee, DailyReport, ReportStatus, ReviewComment, ReportApproval, ApprovalStatus
 from app.models.employee import employee_supervisors
 from app.schemas.supervisor import ReportReviewCreate
 from app.schemas.review_comment import ReviewCommentCreate
+from app.schemas.report_approval import SupervisorApprovalInfo
 from app.services import comment_service
 
 async def get_direct_subordinates(db: AsyncSession, supervisor_id: int) -> List[int]:
@@ -50,7 +51,7 @@ async def get_all_subordinates(db: AsyncSession, supervisor_id: int, visited_ids
     return subordinate_ids
 
 async def get_employees_with_pending_reports(db: AsyncSession, *, supervisor_id: int) -> List[Employee]:
-    """獲取所有下級員工（包括多級下級）的待審核報告"""
+    """獲取所有下級員工（包括多級下級）有待該主管審核的報告"""
     print(f"[INFO] 查詢主管 {supervisor_id} 的所有下級員工")
     
     # 獲取所有下級員工ID（包括多級）
@@ -60,20 +61,42 @@ async def get_employees_with_pending_reports(db: AsyncSession, *, supervisor_id:
     if not all_subordinate_ids:
         return []
     
-    # 查詢這些員工的信息和報告
+    # 查詢這些員工的信息
     query = (
         select(Employee)
         .where(Employee.id.in_(all_subordinate_ids))
-        .options(selectinload(Employee.reports))
         .order_by(Employee.id)
     )
     
     result = await db.execute(query)
     employees = result.scalars().unique().all()
     
+    # 為每個員工計算該主管未審核的報告數量
     for emp in employees:
-        emp.pending_reports_count = sum(1 for report in emp.reports if report.status == ReportStatus.pending)
-        print(f"   [INFO] 員工 {emp.name} ({emp.id}): {emp.pending_reports_count} 個待審核報告")
+        # 查詢該員工的所有報告，並檢查該主管是否已審核
+        reports_query = (
+            select(DailyReport)
+            .where(DailyReport.employee_id == emp.id)
+            .options(selectinload(DailyReport.approvals))
+        )
+        reports_result = await db.execute(reports_query)
+        reports = reports_result.scalars().unique().all()
+        
+        pending_count = 0
+        for report in reports:
+            # 檢查該主管是否已審核此報告
+            supervisor_approval = None
+            for approval in report.approvals:
+                if approval.supervisor_id == supervisor_id:
+                    supervisor_approval = approval
+                    break
+            
+            # 如果沒有審核記錄或狀態為pending，則計入待審核
+            if supervisor_approval is None or supervisor_approval.status == ApprovalStatus.pending:
+                pending_count += 1
+        
+        emp.pending_reports_count = pending_count
+        print(f"   [INFO] 員工 {emp.name} ({emp.id}): {emp.pending_reports_count} 個待主管{supervisor_id}審核的報告")
         
     return employees
 
@@ -102,82 +125,61 @@ async def can_supervisor_review_employee(db: AsyncSession, supervisor_id: int, e
 
 async def review_daily_report(db: AsyncSession, *, report_id: int, review_in: ReportReviewCreate, reviewer) -> Optional[DailyReport]:
     """
-    審核日報：設定評分並建立對話記錄。支援多級主管評分機制。
+    新的多主管獨立審核機制：每個主管都有獨立的審核狀態
     """
     query = select(DailyReport).where(DailyReport.id == report_id).options(
         selectinload(DailyReport.employee),
-        selectinload(DailyReport.comments)
+        selectinload(DailyReport.approvals)
     )
     result = await db.execute(query)
     report = result.scalar_one_or_none()
     if not report:
         return None
     
-    # 檢查審核權限：確認當前用戶是該員工的主管（包括多級關係）
-    if not await can_supervisor_review_employee(db, reviewer.employee.id, report.employee.id):
-        print(f"[ERROR] 用戶 {reviewer.id} 沒有權限審核員工 {report.employee.id} 的報告")
+    supervisor_id = reviewer.employee.id
+    
+    # 檢查審核權限
+    if not await can_supervisor_review_employee(db, supervisor_id, report.employee.id):
+        print(f"[ERROR] 主管 {supervisor_id} 沒有權限審核員工 {report.employee.id} 的報告")
         return None
     
-    print(f"[SUCCESS] 用戶 {reviewer.id} 有權限審核員工 {report.employee.id} 的報告")
-    
-    # 檢查是否已經評分過：防止同一主管重複評分
-    existing_review = None
-    for comment in report.comments:
-        if (comment.user_id == reviewer.id and 
-            comment.rating is not None and 
-            comment.rating > 0):
-            existing_review = comment
+    # 檢查是否已經審核過
+    existing_approval = None
+    for approval in report.approvals:
+        if approval.supervisor_id == supervisor_id:
+            existing_approval = approval
             break
     
-    if existing_review:
-        print(f"[ERROR] 主管 {reviewer.id} 已經對此報告評分過了 (評分: {existing_review.rating})")
-        raise ValueError(f"您已經對此日報評分過了，不能重複評分")
+    if existing_approval and existing_approval.status != ApprovalStatus.pending:
+        print(f"[ERROR] 主管 {supervisor_id} 已經審核過此報告 (狀態: {existing_approval.status})")
+        raise ValueError(f"您已經審核過此日報，不能重複審核")
     
-    print(f"[SUCCESS] 主管 {reviewer.id} 尚未評分，可以進行審核")
-    
-    # 如果提供評分，計算多對多主管平均評分
-    if review_in.rating is not None:
-        # 取得該員工的所有直接主管ID
-        employee_supervisors_query = select(employee_supervisors.c.supervisor_id).where(
-            employee_supervisors.c.employee_id == report.employee.id
+    # 建立或更新審核記錄
+    if existing_approval:
+        # 更新現有記錄
+        #有評分就是已經審核過
+        existing_approval.status = ApprovalStatus.approved if review_in.rating else ApprovalStatus.pending
+        existing_approval.rating = review_in.rating
+        existing_approval.feedback = review_in.comment
+        existing_approval.approved_at = datetime.datetime.utcnow()
+        approval_record = existing_approval
+    else:
+        # 建立新記錄
+        approval_record = ReportApproval(
+            report_id=report_id,
+            supervisor_id=supervisor_id,
+            status=ApprovalStatus.approved if review_in.rating else ApprovalStatus.pending,
+            rating=review_in.rating,
+            feedback=review_in.comment,
+            approved_at=datetime.datetime.utcnow()
         )
-        supervisor_ids_result = await db.execute(employee_supervisors_query)
-        employee_supervisor_ids = set(supervisor_ids_result.scalars().all())
-        print(f"[INFO] 員工 {report.employee.id} 的所有主管: {employee_supervisor_ids}")
-        
-        # 取得所有主管的評分
-        supervisor_ratings = []
-        
-        # 從現有評論中取得其他主管的評分（僅限該員工的直接主管）
-        for comment in report.comments:
-            if (comment.rating is not None and 
-                comment.rating > 0 and 
-                comment.user_id != reviewer.id):  # 排除當前主管的舊評分
-                
-                # 檢查該評論作者是否為此員工的直接主管
-                comment_author_employee_id = comment.author.employee.id if comment.author and comment.author.employee else None
-                if comment_author_employee_id in employee_supervisor_ids:
-                    supervisor_ratings.append(comment.rating)
-                    print(f"[INFO] 加入主管 {comment_author_employee_id} 的評分: {comment.rating}")
-        
-        # 加入當前主管的評分
-        supervisor_ratings.append(review_in.rating)
-        print(f"[INFO] 加入當前主管 {reviewer.employee.id} 的評分: {review_in.rating}")
-        
-        # 計算平均評分
-        if supervisor_ratings:
-            average_rating = sum(supervisor_ratings) / len(supervisor_ratings)
-            report.rating = round(average_rating, 2)
-            print(f"[INFO] 多對多主管評分計算: {supervisor_ratings} -> 平均: {report.rating}")
+        db.add(approval_record)
     
-    # 更新狀態為已審核
-    report.status = ReportStatus.reviewed
-    
-    # 建立審核對話記錄（包含評分和留言）
+    # 為相容性，仍然建立評論記錄
     if review_in.comment and review_in.comment.strip():
         comment_create = ReviewCommentCreate(
-            content=review_in.comment, 
-            rating=review_in.rating  # 將評分也包含在對話記錄中
+            content=review_in.comment,
+            rating=review_in.rating
         )
         await comment_service.create_comment(
             db=db,
@@ -186,7 +188,6 @@ async def review_daily_report(db: AsyncSession, *, report_id: int, review_in: Re
             comment_in=comment_create
         )
     elif review_in.rating is not None:
-        # 如果只有評分沒有留言，建立一個評分記錄
         rating_text = f"評分：{review_in.rating} 分"
         comment_create = ReviewCommentCreate(
             content=rating_text,
@@ -203,9 +204,36 @@ async def review_daily_report(db: AsyncSession, *, report_id: int, review_in: Re
     await db.refresh(report)
     return report
 
+async def create_approval_records_for_supervisors(db: AsyncSession, report_id: int, employee_id: int):
+    """為所有主管建立初始的審核記錄"""
+    # 獲取該員工的所有主管
+    supervisors_query = select(employee_supervisors.c.supervisor_id).where(
+        employee_supervisors.c.employee_id == employee_id
+    )
+    result = await db.execute(supervisors_query)
+    supervisor_ids = result.scalars().all()
+    
+    # 為每個主管建立審核記錄
+    for supervisor_id in supervisor_ids:
+        # 檢查是否已存在記錄
+        existing_query = select(ReportApproval).where(
+            ReportApproval.report_id == report_id,
+            ReportApproval.supervisor_id == supervisor_id
+        )
+        existing_result = await db.execute(existing_query)
+        if not existing_result.scalar_one_or_none():
+            approval = ReportApproval(
+                report_id=report_id,
+                supervisor_id=supervisor_id,
+                status=ApprovalStatus.pending
+            )
+            db.add(approval)
+    
+    await db.commit()
+
 async def submit_daily_report(db: AsyncSession, *, employee_id: int, submitted_reports: List[dict]) -> DailyReport:
     """
-    建立一筆新的 DailyReport，並將當天所有彙整報告存入 JSON 欄位。
+    建立一筆新的 DailyReport，並為所有主管建立審核記錄。
     """
     today = datetime.date.today()
     query = select(DailyReport).where(
@@ -230,7 +258,9 @@ async def submit_daily_report(db: AsyncSession, *, employee_id: int, submitted_r
     
     await db.commit()
     await db.refresh(db_report)
-
+    
+    # 為所有主管建立審核記錄
+    await create_approval_records_for_supervisors(db, db_report.id, employee_id)
 
     final_query = select(DailyReport).where(DailyReport.id == db_report.id).options(
         selectinload(DailyReport.employee)
@@ -260,3 +290,29 @@ async def get_reports_by_date(db: AsyncSession, *, target_date: datetime.date) -
         report.comments_count = len(report.comments) if report.comments else 0
     
     return reports
+
+async def get_report_approval_status(db: AsyncSession, report_id: int) -> List[SupervisorApprovalInfo]:
+    """獲取報告的所有主管審核狀態"""
+    query = (
+        select(ReportApproval, Employee)
+        .join(Employee, ReportApproval.supervisor_id == Employee.id)
+        .where(ReportApproval.report_id == report_id)
+        .order_by(Employee.name)
+    )
+    
+    result = await db.execute(query)
+    approval_data = result.all()
+    
+    approval_info = []
+    for approval, supervisor in approval_data:
+        approval_info.append(SupervisorApprovalInfo(
+            supervisor_id=supervisor.id,
+            supervisor_name=supervisor.name,
+            supervisor_empno=supervisor.empno,
+            status=approval.status,
+            approved_at=approval.approved_at,
+            rating=approval.rating,
+            feedback=approval.feedback
+        ))
+    
+    return approval_info

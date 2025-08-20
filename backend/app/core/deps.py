@@ -36,5 +36,15 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     
     if user is None: raise credentials_exception
-    if not user.employee: raise HTTPException(status_code=403, detail="User is not associated with an employee profile.")
     return user
+
+async def get_current_user_with_employee(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Get current user ensuring they have an employee relationship"""
+    if not current_user.employee:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not associated with an employee profile"
+        )
+    return current_user

@@ -10,3 +10,4 @@ from .work_record import WorkRecord, FileAttachment
 from .project import Project
 from .user import User
 from .review_comment import ReviewComment
+from .report_approval import ReportApproval, ApprovalStatus

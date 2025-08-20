@@ -17,7 +17,9 @@ from app.models import (
     Employee, Department, 
     EmployeeDepartmentHistory, 
     EmployeeSupervisorHistory,
-    EmployeePositionHistory
+    EmployeePositionHistory,
+    DailyReport, WorkRecord, FileAttachment,
+    User, Project, ReviewComment
 )
 
 # 來源資料庫 (公司PostgreSQL) 的連線資訊
@@ -51,7 +53,7 @@ def parse_date(date_str):
         return None
 
 async def sync_company_a_data():
-    """同步公司別A的完整資料"""
+    """同步公司別A的完整資料，包括跨公司的主管關係"""
     
     print("[INFO] 開始同步公司別A的完整員工資料...")
     
@@ -86,27 +88,89 @@ async def sync_company_a_data():
         print(f"[ERROR] 讀取來源資料庫失敗: {e}")
         return False
 
-    # === 第二步：同步部門資料 ===
+    # === 第一步之二：讀取跨公司主管資料 ===
+    print("[INFO] 讀取跨公司主管資料...")
+    supervisor_empnos = set()
+    for row in source_data:
+        supervisor_empno = to_str(row.get('supervisor'))
+        if supervisor_empno:
+            supervisor_empnos.add(supervisor_empno)
+    
+    cross_company_supervisors = []
+    if supervisor_empnos:
+        try:
+            async with SourceSessionLocal() as source_db:
+                supervisor_list = "', '".join(supervisor_empnos)
+                result = await source_db.execute(text(f"""
+                    SELECT DISTINCT 
+                        empno, empnamec, deptno, dclass, xlevel, adm_rank, quitdate, 
+                        deptnamec, deptabbv, g_deptno, grp_empno, cocode
+                    FROM {SOURCE_TABLE}
+                    WHERE empno IN ('{supervisor_list}')
+                    AND empno IS NOT NULL 
+                    AND empno != ''
+                    ORDER BY empno
+                """))
+                cross_company_supervisors = result.mappings().all()
+                print(f"[SUCCESS] 讀取 {len(cross_company_supervisors)} 筆跨公司主管記錄")
+        except Exception as e:
+            print(f"[ERROR] 讀取跨公司主管資料失敗: {e}")
+            return False
+
+    # === 第二步：同步部門資料（包括跨公司主管的部門） ===
     print("\n[INFO] 同步部門資料...")
     unique_departments = {}
     
+    # 處理公司A員工的部門
     for row in source_data:
         dept_no = to_str(row.get('deptno'))
         dept_name = to_str(row.get('deptnamec'))
         
         if dept_no and dept_name:
-            dept_key = (dept_no, dept_name)
-            if dept_key not in unique_departments:
-                unique_departments[dept_key] = {
+            if dept_no not in unique_departments:
+                unique_departments[dept_no] = {
                     'dept_no': dept_no,
                     'dept_name': dept_name,
                     'dept_abbr': to_str(row.get('deptabbv')),
                     'group_dept_no': to_str(row.get('g_deptno')),
-                    'company_code': 'A'
+                    'company_code': to_str(row.get('cocode', 'A'))
+                }
+    
+    # 處理跨公司主管的部門
+    for row in cross_company_supervisors:
+        dept_no = to_str(row.get('deptno'))
+        dept_name = to_str(row.get('deptnamec'))
+        
+        if dept_no and dept_name:
+            if dept_no not in unique_departments:
+                unique_departments[dept_no] = {
+                    'dept_no': dept_no,
+                    'dept_name': dept_name,
+                    'dept_abbr': to_str(row.get('deptabbv')),
+                    'group_dept_no': to_str(row.get('g_deptno')),
+                    'company_code': to_str(row.get('cocode'))
                 }
 
     async with TargetSessionLocal() as target_db:
-        # 清空現有部門（重新開始）
+        # 先清空所有相關的資料（避免外鍵約束問題）
+        print("[INFO] 清空現有資料...")
+        await target_db.execute(delete(ReviewComment))
+        await target_db.execute(delete(FileAttachment))
+        await target_db.execute(delete(WorkRecord))
+        await target_db.execute(delete(DailyReport))
+        await target_db.execute(delete(EmployeeDepartmentHistory))
+        await target_db.execute(delete(EmployeeSupervisorHistory))
+        await target_db.execute(delete(EmployeePositionHistory))
+        
+        # 先清空員工對用戶的引用和主管關係，再清空用戶和員工
+        await target_db.execute(text("UPDATE employees SET user_id = NULL, supervisor_id = NULL"))
+        await target_db.execute(text("DELETE FROM employee_supervisors"))
+        await target_db.execute(delete(User))
+        await target_db.execute(delete(Employee))
+        await target_db.commit()
+        
+        # 再清空現有專案和部門（重新開始）
+        await target_db.execute(delete(Project))
         await target_db.execute(delete(Department))
         await target_db.commit()
         
@@ -126,12 +190,15 @@ async def sync_company_a_data():
         departments = dept_result.scalars().all()
         for dept in departments:
             department_map[dept.dept_name] = dept.id
+            # 也建立 dept_no 到 id 的映射
+            department_map[dept.dept_no] = dept.id
         print(f"[SUCCESS] 建立了 {len(department_map)} 個部門映射")
 
-    # === 第四步：同步員工資料 ===
+    # === 第四步：同步員工資料（包括跨公司主管） ===
     print("\n[INFO] 同步員工資料...")
     unique_employees = {}
     
+    # 先處理公司A員工
     for row in source_data:
         empno = to_str(row.get('empno'))
         if empno and empno not in unique_employees:
@@ -152,23 +219,47 @@ async def sync_company_a_data():
                 'dclass': to_str(row.get('dclass')),
                 'xlevel': to_str(row.get('xlevel')),
                 'admin_rank': to_str(row.get('adm_rank')),
-                'company_code': 'A',
+                'company_code': to_str(row.get('cocode', 'A')),
+                'group_emp_no': to_str(row.get('grp_empno')),
+                'quit_date': parse_date(row.get('quitdate'))
+            }
+    
+    # 再處理跨公司主管
+    for row in cross_company_supervisors:
+        empno = to_str(row.get('empno'))
+        if empno and empno not in unique_employees:
+            # 查找部門ID
+            dept_name = to_str(row.get('deptnamec'))
+            department_id = None
+            if dept_name and dept_name in department_map:
+                department_id = department_map[dept_name]
+            
+            unique_employees[empno] = {
+                'empno': empno,
+                'name': to_str(row.get('empnamec')) or f'主管{empno}',
+                'department_id': department_id,
+                'department_no': to_str(row.get('deptno')),
+                'department_name': to_str(row.get('deptnamec')),
+                'department_abbr': to_str(row.get('deptabbv')),
+                'group_dept_no': to_str(row.get('g_deptno')),
+                'dclass': to_str(row.get('dclass')),
+                'xlevel': to_str(row.get('xlevel')),
+                'admin_rank': to_str(row.get('adm_rank')),
+                'company_code': to_str(row.get('cocode')),
                 'group_emp_no': to_str(row.get('grp_empno')),
                 'quit_date': parse_date(row.get('quitdate'))
             }
 
     async with TargetSessionLocal() as target_db:
-        # 清空現有員工（重新開始）
-        await target_db.execute(delete(Employee))
-        await target_db.commit()
-        
         # 插入新員工
         for emp_data in unique_employees.values():
             employee = Employee(**emp_data)
             target_db.add(employee)
         
         await target_db.commit()
-        print(f"[SUCCESS] 同步了 {len(unique_employees)} 名員工")
+        company_a_count = sum(1 for emp in unique_employees.values() if emp.get('company_code') == 'A')
+        cross_company_count = len(unique_employees) - company_a_count
+        print(f"[SUCCESS] 同步了 {len(unique_employees)} 名員工 (公司A: {company_a_count}, 跨公司主管: {cross_company_count})")
 
     # === 第五步：建立員工映射並處理主管關係 ===
     print("\n[INFO] 處理主管關係...")

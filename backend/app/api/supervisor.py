@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.schemas.supervisor import EmployeeForList, DailyReportDetail, ReportReviewCreate
 from app.schemas.employee import Employee as EmployeeDetailSchema
 from app.schemas.work_record import ConsolidatedReport
+from app.schemas.report_approval import SupervisorApprovalInfo
 from app.services import supervisor_service
 from app.core import deps
 from app.models.user import User
@@ -87,3 +88,14 @@ async def get_daily_reports_by_date(
     根據指定日期，獲取當天所有已提交的日報列表。
     """
     return await supervisor_service.get_reports_by_date(db=db, target_date=date)
+
+@router.get("/reports/{report_id}/approvals", response_model=List[SupervisorApprovalInfo])
+async def get_report_approval_status(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    獲取指定日報的所有主管審核狀態
+    """
+    return await supervisor_service.get_report_approval_status(db=db, report_id=report_id)

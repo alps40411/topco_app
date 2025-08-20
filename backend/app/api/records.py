@@ -52,9 +52,9 @@ async def create_work_record(
     *,
     db: AsyncSession = Depends(get_db),
     record_in: WorkRecordCreate,
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_with_employee)
 ):
-    employee_id = current_user.id
+    employee_id = current_user.employee.id
     new_record = await records_service.create(db=db, obj_in=record_in, employee_id=employee_id)
     return new_record
 
@@ -62,9 +62,9 @@ async def create_work_record(
 async def get_today_records(
     *,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_with_employee)
 ):
-    employee_id = current_user.id
+    employee_id = current_user.employee.id
     records = await records_service.get_multi_by_employee_today(db=db, employee_id=employee_id)
     return records
 
@@ -72,9 +72,9 @@ async def get_today_records(
 async def get_consolidated_today_records(
     *,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_with_employee)
 ):
-    employee_id = current_user.id
+    employee_id = current_user.employee.id
     consolidated_reports = await records_service.get_consolidated_today(db=db, employee_id=employee_id)
     return consolidated_reports
 
@@ -84,7 +84,7 @@ async def update_consolidated_report_endpoint(
     project_id: int,
     report_in: ConsolidatedReportUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_with_employee)
 ):
     """
     更新指定專案的彙整報告內容，包含檔案列表。
@@ -99,7 +99,7 @@ async def update_consolidated_report_endpoint(
             project_id=project_id,
             content=report_in.content,
             files=report_in.files,
-            employee_id=current_user.id
+            employee_id=current_user.employee.id
         )
         
         if not success:
@@ -134,12 +134,12 @@ async def enhance_report_with_ai(
 @router.post("/ai/enhance_all", response_model=List[ConsolidatedReport])
 async def enhance_all_reports_with_ai(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_with_employee)
 ):
     """一鍵潤飾今天所有的彙整報告"""
-    print(f"[API] /ai/enhance_all 被呼叫 - user_id: {current_user.id}")
+    print(f"[API] /ai/enhance_all 被呼叫 - user_id: {current_user.id}, employee_id: {current_user.employee.id}")
     try:
-        result = await records_service.enhance_all_today(db=db, employee_id=current_user.id)
+        result = await records_service.enhance_all_today(db=db, employee_id=current_user.employee.id)
         print(f"[SUCCESS] API: enhance_all_today 執行成功，返回 {len(result)} 個報告")
         return result
     except Exception as e:
@@ -153,12 +153,12 @@ async def enhance_all_reports_with_ai(
 async def enhance_one_report_with_ai(
     project_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user_with_employee)
 ):
     """潤飾今天單一一個專案報告"""
     enhanced_report = await records_service.enhance_one_today(
         db=db, 
-        employee_id=current_user.id, 
+        employee_id=current_user.employee.id, 
         project_id=project_id
     )
     if not enhanced_report:

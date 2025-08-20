@@ -39,3 +39,17 @@ class Employee(EmployeeBase):
 # --- Forward Reference Resolution --- 
 from .supervisor import DailyReportDetail
 Employee.model_rebuild()
+
+# --- Schema for User object --- 
+class EmployeeForUser(BaseModel):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+# --- Schema for User object --- 
+class EmployeeForUser(BaseModel):
+    id: int
+
+    class Config:
+        from_attributes = True

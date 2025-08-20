@@ -9,6 +9,21 @@ import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ChatInterface from "./ChatInterface";
 import toast from "react-hot-toast";
 
+// Copied from EmployeeListTab.tsx for now, should be in a central types file
+interface SupervisorApprovalInfo {
+  supervisor_id: number;
+  supervisor_name: string;
+  supervisor_empno: string;
+  status: "pending" | "approved";
+  approved_at?: string;
+  rating?: number;
+  feedback?: string;
+}
+
+interface ReportWithApprovals extends DailyReport {
+  approvals?: SupervisorApprovalInfo[];
+}
+
 interface EmployeeDetailTabProps {
   employee: EmployeeInList;
   reportId: number; // Correctly added prop
@@ -20,26 +35,38 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   reportId,
   onBack,
 }) => {
-  const [reportDetail, setReportDetail] = useState<DailyReport | null>(null);
+  const [reportDetail, setReportDetail] = useState<ReportWithApprovals | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const { authFetch } = useAuth();
 
-
   const fetchReportDetails = async () => {
-    // This logic is now simpler as we fetch a single report
     setIsLoading(true);
-    // You would typically fetch a single report by its ID.
-    // We will simulate this by fetching all and finding the one.
-    // In a real app, you'd have a GET /api/supervisor/reports/{reportId} endpoint.
     try {
-      const dateString = new Date().toISOString().split("T")[0]; // Assuming today for now
+      const dateString = new Date().toISOString().split("T")[0]; // Flawed, but keeping as per user instruction
       const response = await authFetch(
         `/api/supervisor/reports-by-date?date=${dateString}`
       );
       if (response.ok) {
         const reports: DailyReport[] = await response.json();
         const specificReport = reports.find((r) => r.id === reportId);
-        setReportDetail(specificReport || null);
+
+        if (specificReport) {
+          // Now, fetch the detailed approval status for this specific report
+          const approvalResponse = await authFetch(
+            `/api/supervisor/reports/${reportId}/approvals`
+          );
+          if (approvalResponse.ok) {
+            const approvals = await approvalResponse.json();
+            setReportDetail({ ...specificReport, approvals });
+          } else {
+            // If approvals fail, still show the report
+            setReportDetail({ ...specificReport, approvals: [] });
+          }
+        } else {
+          setReportDetail(null);
+        }
       }
     } catch (error) {
       console.error("無法獲取日報詳情:", error);
@@ -86,26 +113,34 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             </p>
           </div>
         </div>
-        {reportDetail.rating && (
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">平均評分:</span>
-            <div className="flex items-center text-yellow-500">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`w-5 h-5 ${
-                    i < Math.floor(reportDetail.rating || 0)
-                      ? "fill-current"
-                      : "text-gray-300"
-                  }`}
-                />
-              ))}
-              <span className="ml-2 text-sm text-gray-600">
-                {reportDetail.rating.toFixed(1)}/5.0
-              </span>
+        {reportDetail.approvals && reportDetail.approvals.length > 0 && (() => {
+          const ratedApprovals = reportDetail.approvals.filter(a => a.rating && a.rating > 0);
+          if (ratedApprovals.length === 0) return null;
+
+          const totalRating = ratedApprovals.reduce((sum, approval) => sum + (approval.rating || 0), 0);
+          const averageRating = totalRating / ratedApprovals.length;
+
+          return (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">平均評分:</span>
+              <div className="flex items-center text-yellow-500">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-5 h-5 ${
+                      i < Math.floor(averageRating)
+                        ? "fill-current"
+                        : "text-gray-300"
+                    }`}
+                  />
+                ))}
+                <span className="ml-2 text-sm text-gray-600">
+                  {averageRating.toFixed(1)}/5.0
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* 上方 - 日報內容 */}
@@ -133,15 +168,15 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             )
           )}
         </div>
-
       </div>
 
       {/* 下方 - 對話區域 */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <ChatInterface 
-          reportId={reportDetail.id} 
-          className="min-h-[400px]" 
+        <ChatInterface
+          reportId={reportDetail.id}
+          className="min-h-[400px]"
           reportStatus={reportDetail.status}
+          approvals={reportDetail.approvals || []}
           onReviewSubmitted={fetchReportDetails}
         />
       </div>
