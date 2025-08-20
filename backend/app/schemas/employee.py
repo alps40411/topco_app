@@ -6,18 +6,19 @@ import datetime
 # --- Base Schema --- 
 class EmployeeBase(BaseModel):
     empno: str
-    name: str
-    department_no: Optional[str] = None
-    department_name: Optional[str] = None
-    department_abbr: Optional[str] = None
-    group_dept_no: Optional[str] = None
-    dclass: Optional[str] = None
-    xlevel: Optional[str] = None
-    admin_rank: Optional[str] = None
-    company_code: Optional[str] = None
-    group_emp_no: Optional[str] = None
-    quit_date: Optional[datetime.date] = None
-    supervisor_id: Optional[int] = None
+    empnamec: str
+    cocode: Optional[str] = 'A'
+    deptno: Optional[str] = None
+    adm_rank: Optional[str] = None
+    sop_role: Optional[str] = None
+    dutyscript: Optional[str] = None  # 職稱
+    firstnamec: Optional[str] = None
+    lastnamec: Optional[str] = None
+    g_deptno: Optional[str] = None
+    tam_pass: Optional[str] = None
+    deptabbv: Optional[str] = None
+    workcls: Optional[str] = None
+    department_id: Optional[int] = None
 
 # --- Create Schema --- 
 class EmployeeCreate(EmployeeBase):
@@ -43,13 +44,10 @@ Employee.model_rebuild()
 # --- Schema for User object --- 
 class EmployeeForUser(BaseModel):
     id: int
-
-    class Config:
-        from_attributes = True
-
-# --- Schema for User object --- 
-class EmployeeForUser(BaseModel):
-    id: int
+    empno: str
+    empnamec: str
+    dutyscript: Optional[str] = None  # 職稱
+    deptabbv: Optional[str] = None    # 部門簡稱
 
     class Config:
         from_attributes = True

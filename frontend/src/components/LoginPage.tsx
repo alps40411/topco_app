@@ -1,46 +1,45 @@
 // frontend/src/components/LoginPage.tsx
 
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { LogIn } from 'lucide-react';
-import { buildApiUrl } from '../config/api';
+import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { LogIn } from "lucide-react";
+import { buildApiUrl } from "../config/api";
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
 
     try {
       const formData = new URLSearchParams();
-      formData.append('username', email);
-      formData.append('password', password);
+      formData.append("username", email);
+      formData.append("password", password);
 
-      const response = await fetch(buildApiUrl('/api/auth/token'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      const response = await fetch(buildApiUrl("/api/auth/token"), {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('登入失敗，請檢查您的信箱或密碼。');
+        throw new Error("登入失敗，請檢查您的員工編號或密碼。");
       }
 
       const data = await response.json();
       // --- ↓↓↓ 關鍵修改：將 token 和 user 物件一起傳入 login 函式 ↓↓↓ ---
       login(data.token.access_token, data.user);
-      navigate('/');
-
+      navigate("/");
     } catch (err: any) {
-      setError(err.message || '發生未知錯誤');
+      setError(err.message || "發生未知錯誤");
     } finally {
       setIsLoading(false);
     }
@@ -50,29 +49,53 @@ const LoginPage: React.FC = () => {
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="w-full max-w-md p-8 pt-10 space-y-6 bg-white rounded-2xl shadow-lg">
         <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-xl">TSC</span>
-                </div>
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">TSC</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">登入 TSC 業務日誌</h2>
-            <p className="mt-1 text-sm text-gray-500">崇越科技</p>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            登入 TSC 業務日誌
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">崇越科技</p>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700">電子郵件</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder='員工編號@company.com' required className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <label className="block text-sm font-medium text-gray-700">
+              員工編號
+            </label>
+            <input
+              type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="請輸入您的員工編號"
+              required
+              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">密碼</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder='員工編號' required className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <label className="block text-sm font-medium text-gray-700">
+              密碼
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="請輸入您的員工編號"
+              required
+              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
           {error && <p className="text-sm text-center text-red-600">{error}</p>}
           <div>
-            <button type="submit" disabled={isLoading} className="w-full flex justify-center items-center px-4 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex justify-center items-center px-4 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+            >
               <LogIn className="w-4 h-4 mr-2" />
-              {isLoading ? '登入中...' : '登入'}
+              {isLoading ? "登入中..." : "登入"}
             </button>
           </div>
         </form>

@@ -27,7 +27,7 @@ async def get_active_projects(
     僅限公司別A的員工。
     """
     # 如果用戶有關聯員工且為公司別A
-    if current_user.employee and current_user.employee.company_code == 'A':
+    if current_user.employee and current_user.employee.cocode == 'A':
         return await projects_service.get_projects_for_employee(db=db, employee=current_user.employee)
     
     # 如果沒有員工資訊或非公司別A，返回所有通用專案

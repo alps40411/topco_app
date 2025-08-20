@@ -12,8 +12,12 @@
       "Bash(rm:*)",
       "Bash(netsh:*)",
       "Bash(alembic:*)",
-      "Bash(sc query:*)"
+      "Bash(sc query:*)",
+      "Bash(claude --usage)"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "D:\\"
+    ]
   }
 }

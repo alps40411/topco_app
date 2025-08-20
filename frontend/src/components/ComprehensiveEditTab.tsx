@@ -154,16 +154,16 @@ const ComprehensiveEditTab: React.FC = () => {
                   <div className="flex items-center justify-between mb-3">
                     <div
                       className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
-                        getProjectColors(report.project.name).tag
+                        getProjectColors(report.project.plan_subj_c).tag
                       }`}
                     >
-                      {report.project.name}
+                      {report.project.plan_subj_c}
                     </div>
                     {editingProjectId !== report.project.id && (
                       <button
                         onClick={() => startEdit(report, "manual")}
                         className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
-                          getProjectColors(report.project.name).button
+                          getProjectColors(report.project.plan_subj_c).button
                         }`}
                       >
                         <Edit className="w-3 h-3 mr-1" /> 編輯
@@ -226,17 +226,17 @@ const ComprehensiveEditTab: React.FC = () => {
                   <div className="flex items-center justify-between mb-3">
                     <div
                       className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
-                        getProjectColors(report.project.name).tag
+                        getProjectColors(report.project.plan_subj_c).tag
                       }`}
                     >
-                      {report.project.name}
+                      {report.project.plan_subj_c}
                     </div>
                     {report.ai_content &&
                       editingProjectId !== report.project.id && (
                         <button
                           onClick={() => startEdit(report, "ai")}
                           className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
-                            getProjectColors(report.project.name).button
+                            getProjectColors(report.project.plan_subj_c).button
                           }`}
                         >
                           <Edit className="w-3 h-3 mr-1" /> 編輯

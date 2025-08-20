@@ -340,6 +340,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
               <div className="flex items-center space-x-4 mb-3">
                 <span className="text-sm font-medium text-gray-700">評分:</span>
+
                 <select
                   value={selectedRating}
                   onChange={(e) => setSelectedRating(Number(e.target.value))}

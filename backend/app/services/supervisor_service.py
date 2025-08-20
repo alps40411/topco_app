@@ -6,23 +6,27 @@ from sqlalchemy.orm import selectinload
 from typing import List, Optional
 import datetime
 
-from app.models import Employee, DailyReport, ReportStatus, ReviewComment, ReportApproval, ApprovalStatus
-from app.models.employee import employee_supervisors
+from app.models import Employee, DailyReport, ReportStatus, ReviewComment, ReportApproval, ApprovalStatus, Supervisor
 from app.schemas.supervisor import ReportReviewCreate
 from app.schemas.review_comment import ReviewCommentCreate
 from app.schemas.report_approval import SupervisorApprovalInfo
 from app.services import comment_service
 
 async def get_direct_subordinates(db: AsyncSession, supervisor_id: int) -> List[int]:
-    """使用多對多關係獲取直屬下級員工ID，排除離職員工"""
+    """使用新的主管關係表獲取直屬下級員工ID"""
+    # 首先獲取主管的 empno
+    supervisor_query = select(Employee.empno).where(Employee.id == supervisor_id)
+    supervisor_result = await db.execute(supervisor_query)
+    supervisor_empno = supervisor_result.scalar_one_or_none()
+    
+    if not supervisor_empno:
+        return []
+    
+    # 查詢主管關係表
     query = (
         select(Employee.id)
-        .select_from(employee_supervisors)
-        .join(Employee, Employee.id == employee_supervisors.c.employee_id)
-        .where(
-            employee_supervisors.c.supervisor_id == supervisor_id,
-            Employee.quit_date.is_(None)  # 排除離職員工
-        )
+        .join(Supervisor, Employee.empno == Supervisor.empno)
+        .where(Supervisor.supervisor == supervisor_empno)
     )
     result = await db.execute(query)
     return result.scalars().all()
@@ -108,11 +112,23 @@ async def get_employee_details(db: AsyncSession, *, employee_id: int) -> Optiona
     return result.scalars().unique().one_or_none()
 
 async def can_supervisor_review_employee(db: AsyncSession, supervisor_id: int, employee_id: int) -> bool:
-    """檢查主管是否有權限審核該員工的報告（多對多關係，包括直接和間接下級）"""
-    # 先檢查是否為直接主管關係
-    direct_query = select(employee_supervisors.c.employee_id).where(
-        employee_supervisors.c.supervisor_id == supervisor_id,
-        employee_supervisors.c.employee_id == employee_id
+    """檢查主管是否有權限審核該員工的報告（基於新的主管關係表，包括直接和間接下級）"""
+    # 獲取主管和員工的 empno
+    supervisor_query = select(Employee.empno).where(Employee.id == supervisor_id)
+    supervisor_result = await db.execute(supervisor_query)
+    supervisor_empno = supervisor_result.scalar_one_or_none()
+    
+    employee_query = select(Employee.empno).where(Employee.id == employee_id)
+    employee_result = await db.execute(employee_query)
+    employee_empno = employee_result.scalar_one_or_none()
+    
+    if not supervisor_empno or not employee_empno:
+        return False
+    
+    # 檢查直接主管關係
+    direct_query = select(Supervisor).where(
+        Supervisor.supervisor == supervisor_empno,
+        Supervisor.empno == employee_empno
     )
     direct_result = await db.execute(direct_query)
     if direct_result.scalar_one_or_none():
@@ -206,9 +222,19 @@ async def review_daily_report(db: AsyncSession, *, report_id: int, review_in: Re
 
 async def create_approval_records_for_supervisors(db: AsyncSession, report_id: int, employee_id: int):
     """為所有主管建立初始的審核記錄"""
-    # 獲取該員工的所有主管
-    supervisors_query = select(employee_supervisors.c.supervisor_id).where(
-        employee_supervisors.c.employee_id == employee_id
+    # 獲取員工的 empno
+    employee_query = select(Employee.empno).where(Employee.id == employee_id)
+    employee_result = await db.execute(employee_query)
+    employee_empno = employee_result.scalar_one_or_none()
+    
+    if not employee_empno:
+        return
+    
+    # 從主管關係表獲取該員工的所有主管
+    supervisors_query = (
+        select(Employee.id)
+        .join(Supervisor, Employee.empno == Supervisor.supervisor)
+        .where(Supervisor.empno == employee_empno)
     )
     result = await db.execute(supervisors_query)
     supervisor_ids = result.scalars().all()
@@ -297,7 +323,7 @@ async def get_report_approval_status(db: AsyncSession, report_id: int) -> List[S
         select(ReportApproval, Employee)
         .join(Employee, ReportApproval.supervisor_id == Employee.id)
         .where(ReportApproval.report_id == report_id)
-        .order_by(Employee.name)
+        .order_by(Employee.empnamec)
     )
     
     result = await db.execute(query)
@@ -307,7 +333,7 @@ async def get_report_approval_status(db: AsyncSession, report_id: int) -> List[S
     for approval, supervisor in approval_data:
         approval_info.append(SupervisorApprovalInfo(
             supervisor_id=supervisor.id,
-            supervisor_name=supervisor.name,
+            supervisor_name=supervisor.empnamec,
             supervisor_empno=supervisor.empno,
             status=approval.status,
             approved_at=approval.approved_at,

@@ -10,12 +10,16 @@ import MyReportsTab from "./components/MyReportsTab";
 import EmployeeListTab from "./components/EmployeeListTab";
 import EmployeeDetailTab from "./components/EmployeeDetailTab";
 import { useAuth } from "./contexts/AuthContext";
+import { useHasSubordinates } from "./hooks/useHasSubordinates";
 import { Toaster } from "react-hot-toast";
 // --- Interface Definitions ---
 export interface Project {
   id: number;
-  name: string;
+  planno: string;
+  plan_subj_c: string;  // 專案名稱
+  pm_empno: string;     // 專案經理工號
   is_active: boolean;
+  department_id?: number;
 }
 export interface FileAttachment {
   id: number;
@@ -50,13 +54,15 @@ export interface ConsolidatedReport {
 export interface EmployeeInList {
   id: number;
   name: string;
-  department: string;
+  department_no?: string;
+  department_name?: string;
   pending_reports_count: number;
 }
 export interface EmployeeSummary {
   id: number;
   name: string;
-  department: string;
+  department_no?: string;
+  department_name?: string;
 }
 export interface DailyReport {
   id: number;
@@ -71,18 +77,29 @@ export interface DailyReport {
 export interface Employee {
   id: number;
   name: string;
-  department: string;
+  department_no?: string;
+  department_name?: string;
   reports: DailyReport[];
 }
+export interface EmployeeForUser {
+  id: number;
+  empno: string;
+  empnamec: string;
+  dutyscript?: string;  // 職稱
+  deptabbv?: string;    // 部門簡稱
+}
+
 export interface User {
   id: number;
   email: string;
   name: string;
   is_active: boolean;
   is_supervisor: boolean;
+  employee?: EmployeeForUser;
 }
 function App() {
   const { user, logout } = useAuth();
+  const { hasSubordinates, loading: subordinatesLoading } = useHasSubordinates();
   const [mainTab, setMainTab] = useState<"employee" | "supervisor">("employee");
   const [activeTab, setActiveTab] = useState<
     "input" | "daily" | "myreports" | "ai" | "comprehensive"
@@ -149,7 +166,7 @@ function App() {
                 >
                   日報填寫
                 </button>
-                {user?.is_supervisor && (
+                {!subordinatesLoading && hasSubordinates && (
                   <button
                     onClick={() => setMainTab("supervisor")}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -168,7 +185,7 @@ function App() {
                     {user?.name}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {user?.is_supervisor ? "主管" : "員工"}
+                    {user?.employee?.dutyscript || (hasSubordinates ? "主管" : "員工")}
                   </p>
                 </div>
                 <button

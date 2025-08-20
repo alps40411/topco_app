@@ -8,6 +8,7 @@ from jose import jwt, JWTError
 
 from app.core.database import get_db
 from app.models.user import User
+from app.models.employee import Employee
 from app.schemas.user import TokenData
 from app.services import user_service
 from app.core.security import SECRET_KEY, ALGORITHM
@@ -24,14 +25,14 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str | None = payload.get("sub")
-        if email is None: raise credentials_exception
-        token_data = TokenData(email=email)
+        empno: str | None = payload.get("sub")
+        if empno is None: raise credentials_exception
+        token_data = TokenData(empno=empno)
     except JWTError:
         raise credentials_exception
     
     result = await db.execute(
-        select(User).where(User.email == token_data.email).options(selectinload(User.employee))
+        select(User).where(User.email == token_data.empno).options(selectinload(User.employee))
     )
     user = result.scalar_one_or_none()
     

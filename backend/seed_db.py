@@ -4,7 +4,7 @@
 import asyncio
 import sys
 import os
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 from sqlalchemy.orm import selectinload
 
 # 讓此獨立腳本可以載入 app 內的模組
@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import AsyncSessionFactory
 from app.core.security import get_password_hash
-from app.models import Project, User, Employee, Department
+from app.models import Project, User, Employee, Department, Supervisor, ProjectMember
 
 async def seed_data():
     """
@@ -23,18 +23,20 @@ async def seed_data():
     async with AsyncSessionFactory() as session:
         try:
             # === 準備工作：清空舊的測試資料 ===
-            print("\n[INFO] 清空舊的專案和測試用戶資料...")
-            # 為避免誤刪，只刪除腳本創建的測試帳號
-            await session.execute(delete(User).where(User.email.like('%@topco.com')))
-            # 刪除所有專案以便重建
-            await session.execute(delete(Project))
+            print("\n[INFO] 清空舊的測試用戶資料...")
+            # 先清除員工的user_id關聯，再刪除用戶（只刪除員工編號格式的帳號，保留email格式的管理員帳號）
+            await session.execute(text("UPDATE employees SET user_id = NULL WHERE user_id IN (SELECT id FROM users WHERE email NOT LIKE '%@%')"))
+            await session.execute(delete(User).where(User.email.notlike('%@%')))
+            # 只清除測試專案（PROJ_開頭），保留真實專案資料
+            await session.execute(delete(ProjectMember).where(ProjectMember.planno.like('PROJ_%')))
+            await session.execute(delete(Project).where(Project.planno.like('PROJ_%')))
             await session.commit()
-            print("[SUCCESS] 舊資料清理完畢。")
+            print("[SUCCESS] 測試資料清理完畢，真實專案資料已保留。")
 
             # === 步驟 1：找到數位發展部 ===
             print("\n[INFO] 尋找數位發展部...")
             digital_dev_dept_result = await session.execute(
-                select(Department).where(Department.dept_name.like('%數位發展%'))
+                select(Department).where(Department.deptno == '00320')  # 數位發展部
             )
             digital_dev_dept = digital_dev_dept_result.scalar_one_or_none()
             
@@ -42,43 +44,32 @@ async def seed_data():
                 print("[ERROR] 找不到'數位發展部'，請先運行 `sync_company_a_data.py` 同步公司資料。" )
                 return
             
-            print(f"[SUCCESS] 找到數位發展部: {digital_dev_dept.dept_name} (ID: {digital_dev_dept.id})")
+            print(f"[SUCCESS] 找到數位發展部: {digital_dev_dept.deptabbv} (ID: {digital_dev_dept.id})")
 
-            # === 步驟 2：為數位發展部創建專案 ===
-            print("\n[INFO] 創建數位發展部專案...")
-            # 將通用專案也歸類至部門底下，方便管理
-            digital_projects = [
-                "AI日誌報表統規劃", "技術與Survey", "專案計畫", "分析工作",
-                "日常業務處理", "會議與協調", "教育訓練", "其他工作項目"
-            ]
             
-            for project_name in digital_projects:
-                project = Project(
-                    name=project_name,
-                    is_active=True,
-                    department_id=digital_dev_dept.id # 全部歸屬數位發展部
-                )
-                session.add(project)
-            
-            await session.commit()
-            print(f"[SUCCESS] 成功創建 {len(digital_projects)} 個數位發展部專案。")
-
             # === 步驟 3：收集需要創建帳號的員工及主管 ===
             print("\n[INFO] 收集數位發展部員工及其各級主管...")
             
             digital_employees_result = await session.execute(
-                select(Employee)
-                .options(selectinload(Employee.supervisors)) # 預先載入主管
-                .where(Employee.department_id == digital_dev_dept.id)
+                select(Employee).where(Employee.department_id == digital_dev_dept.id)
             )
-            digital_employees = digital_employees_result.scalars().unique().all()
+            digital_employees = digital_employees_result.scalars().all()
             
             personnel_to_check = set(digital_employees)
             supervisors_to_check = set()
 
+            # 查找主管關係
             for emp in digital_employees:
-                for supervisor in emp.supervisors:
-                    supervisors_to_check.add(supervisor)
+                supervisor_relations = await session.execute(
+                    select(Supervisor).where(Supervisor.empno == emp.empno)
+                )
+                for rel in supervisor_relations.scalars().all():
+                    supervisor_emp_result = await session.execute(
+                        select(Employee).where(Employee.empno == rel.supervisor)
+                    )
+                    supervisor_emp = supervisor_emp_result.scalar_one_or_none()
+                    if supervisor_emp:
+                        supervisors_to_check.add(supervisor_emp)
             
             personnel_to_check.update(supervisors_to_check)
             
@@ -91,27 +82,27 @@ async def seed_data():
                 if person.user_id:
                     continue
 
-                email = f"{person.empno}@topco.com"
+                email = f"{person.empno}"
                 
                 existing_user_res = await session.execute(select(User).where(User.email == email))
                 if existing_user_res.scalar_one_or_none():
                     continue
 
                 is_supervisor_flag = bool(
-                    (person.admin_rank and person.admin_rank.isdigit() and int(person.admin_rank) >= 7)
+                    (person.adm_rank and person.adm_rank.isdigit() and int(person.adm_rank) >= 7)
                     or (person in supervisors_to_check)
                 )
 
                 user = User(
                     email=email,
-                    name=person.name or f"員工{person.empno}",
+                    name=person.empnamec or f"員工{person.empno}",
                     hashed_password=get_password_hash(person.empno),
                     is_active=True,
                     is_supervisor=is_supervisor_flag
                 )
                 session.add(user)
                 created_accounts_count += 1
-                print(f"[INFO] 準備為 {person.name} ({person.empno}) 創建帳號: {email}")
+                print(f"[INFO] 準備為 {person.empnamec} ({person.empno}) 創建帳號: {email}")
 
             if created_accounts_count > 0:
                 await session.commit()
@@ -122,7 +113,7 @@ async def seed_data():
             linked_accounts_count = 0
             for person in personnel_to_check:
                 if not person.user_id:
-                    email = f"{person.empno}@topco.com"
+                    email = f"{person.empno}"
                     user_res = await session.execute(select(User).where(User.email == email))
                     user = user_res.scalar_one_or_none()
                     if user:
@@ -135,7 +126,7 @@ async def seed_data():
 
             # === 步驟 6：最終驗證 ===
             print("\n[INFO] 最終驗證...")
-            users_res = await session.execute(select(User).where(User.email.like('%@topco.com')))
+            users_res = await session.execute(select(User))
             users = users_res.scalars().all()
             print(f"[SUCCESS] 驗證完畢。資料庫中現在有 {len(users)} 個測試帳號。")
             print("\n[SUCCESS] 數位發展部初始資料設置完成！")

@@ -15,6 +15,18 @@ from app.models.user import User
 
 router = APIRouter(tags=["Supervisor"])
 
+@router.get("/has-subordinates")
+async def check_has_subordinates(
+    db: AsyncSession = Depends(get_db), 
+    current_user: User = Depends(deps.get_current_user)
+):
+    """檢查當前用戶是否有下屬"""
+    if not current_user.employee:
+        return {"has_subordinates": False}
+    
+    subordinates = await supervisor_service.get_direct_subordinates(db, current_user.employee.id)
+    return {"has_subordinates": len(subordinates) > 0}
+
 @router.get("/employees", response_model=List[EmployeeForList])
 async def get_employees_for_supervisor(db: AsyncSession = Depends(get_db), current_user: User = Depends(deps.get_current_user)):
     if not current_user.employee:
@@ -40,9 +52,14 @@ async def review_report(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
-    # 檢查用戶是否為主管
-    if not current_user.is_supervisor:
-        raise HTTPException(status_code=403, detail="只有主管可以審核日報")
+    # 檢查用戶是否有員工資料
+    if not current_user.employee:
+        raise HTTPException(status_code=404, detail="該用戶不是員工")
+    
+    # 檢查是否有下屬（實際的主管權限檢查）
+    has_subordinates = await supervisor_service.get_direct_subordinates(db, current_user.employee.id)
+    if not has_subordinates:
+        raise HTTPException(status_code=403, detail="您沒有下屬，無法審核日報")
     
     try:
         reviewed_report = await supervisor_service.review_daily_report(

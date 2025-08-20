@@ -191,7 +191,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                     {report.employee.name}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {report.employee.department}
+                    {report.employee.department_name || report.employee.department_no}
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
@@ -240,7 +240,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                         {
                           id: report.employee.id,
                           name: report.employee.name,
-                          department: report.employee.department,
+                          department_name: report.employee.department_name,
+                          department_no: report.employee.department_no,
                           pending_reports_count: 0,
                         },
                         report.id

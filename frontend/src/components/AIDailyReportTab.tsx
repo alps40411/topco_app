@@ -164,8 +164,8 @@ const AIDailyReportTab: React.FC = () => {
           <div key={report.project.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
-                  {report.project.name}
+                <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
+                  {report.project.plan_subj_c}
                 </div>
                 <span className="text-sm text-gray-500">({report.record_count} 筆記錄)</span>
                 {report.ai_content && (
@@ -177,7 +177,7 @@ const AIDailyReportTab: React.FC = () => {
               {editingProjectId !== report.project.id && (
                 <button 
                   onClick={() => startEdit(report)}
-                  className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${getProjectColors(report.project.name).button}`}
+                  className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${getProjectColors(report.project.plan_subj_c).button}`}
                 >
                   <Edit className="w-4 h-4 mr-1" /> 編輯
                 </button>

@@ -9,8 +9,11 @@ from app.models.employee import Employee
 from app.schemas.user import UserCreate
 from app.core.security import get_password_hash
 
-async def get_user_by_email(db: AsyncSession, *, email: str) -> Optional[User]:
-    query = select(User).where(User.email == email).options(selectinload(User.employee))
+
+
+async def get_user_by_empno(db: AsyncSession, *, empno: str) -> Optional[User]:
+    # 直接通過email欄位查找，因為現在email欄位存儲的是員工編號
+    query = select(User).where(User.email == empno).options(selectinload(User.employee))
     result = await db.execute(query)
     return result.scalar_one_or_none()
 

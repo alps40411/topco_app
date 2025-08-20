@@ -95,7 +95,7 @@ const DailyReportTab: React.FC = () => {
         const enhancedReport = await response.json();
         setReports(prev => prev.map(r => r.project.id === projectId ? enhancedReport : r));
         if (!isAiViewActive) setIsAiViewActive(true);
-        toast.success(`專案 ${enhancedReport.project.name} 已完成 AI 潤飾！`);
+        toast.success(`專案 ${enhancedReport.project.plan_subj_c} 已完成 AI 潤飾！`);
       } else {
         const err = await response.json().catch(() => ({ detail: 'AI 潤飾此專案時發生錯誤' }));
         throw new Error(err.detail);
@@ -322,8 +322,8 @@ const DailyReportTab: React.FC = () => {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full flex flex-col h-full">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
-                      {report.project.name}
+                    <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
+                      {report.project.plan_subj_c}
                     </div>
                     <span className="text-sm text-gray-500">({report.record_count} 筆記錄)</span>
                   </div>
@@ -332,7 +332,7 @@ const DailyReportTab: React.FC = () => {
                       <button onClick={() => handleEnhanceOne(report.project.id)} disabled={generatingAiFor !== null || isGeneratingAllAi || editingProjectId !== null} className={`inline-flex items-center p-2 text-sm font-medium rounded-lg ${greenButtonStyle} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
                         {generatingAiFor === report.project.id ? <div className="w-4 h-4 border-2 border-transparent border-t-white rounded-full animate-spin"></div> : <Wand2 className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => startEdit(report)} disabled={generatingAiFor !== null || isGeneratingAllAi} className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${getProjectColors(report.project.name).button} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
+                      <button onClick={() => startEdit(report)} disabled={generatingAiFor !== null || isGeneratingAllAi} className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${getProjectColors(report.project.plan_subj_c).button} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
                         <Edit className="w-4 h-4 mr-1" /> 編輯
                       </button>
                     </div>
@@ -415,7 +415,7 @@ const DailyReportTab: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">請選擇工作計劃</option>
-                  {projects.map((proj) => (<option key={proj.id} value={proj.id}>{proj.name}</option>))}
+                  {projects.map((proj) => (<option key={proj.id} value={proj.id}>{proj.plan_subj_c}</option>))}
                 </select>
               </div>
               <div>

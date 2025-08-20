@@ -109,7 +109,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
               {initialEmployee.name} - {formatDate(reportDetail.date)} 日報
             </h2>
             <p className="text-sm text-gray-500">
-              {initialEmployee.department}
+              {initialEmployee.department_name || initialEmployee.department_no}
             </p>
           </div>
         </div>
@@ -155,10 +155,10 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
               >
                 <div
                   className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md mb-3 ${
-                    getProjectColors(projectReport.project.name).tag
+                    getProjectColors(projectReport.project.plan_subj_c).tag
                   }`}
                 >
-                  {projectReport.project.name}
+                  {projectReport.project.plan_subj_c}
                 </div>
                 <p className="text-gray-700 whitespace-pre-wrap">
                   {projectReport.content}

@@ -132,7 +132,7 @@ const DataInputTab: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">工作計劃</label>
               <select value={currentRecord.project_id || ''} onChange={(e) => setCurrentRecord({ ...currentRecord, project_id: parseInt(e.target.value, 10) || undefined })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                 <option value="">請選擇工作計劃</option>
-                {projects.map((proj) => (<option key={proj.id} value={proj.id}>{proj.name}</option>))}
+                {projects.map((proj) => (<option key={proj.id} value={proj.id}>{proj.plan_subj_c}</option>))}
               </select>
             </div>
             <div>
@@ -169,8 +169,8 @@ const DataInputTab: React.FC = () => {
               consolidatedRecords.map((report) => (
                 <div key={report.project.id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
                   <div className="flex items-start justify-between mb-2">
-                    <div className={`inline-flex items-center px-2 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.name).tag}`}>
-                      {report.project.name}
+                    <div className={`inline-flex items-center px-2 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
+                      {report.project.plan_subj_c}
                     </div>
                     <span className="text-xs text-gray-500">{report.record_count} 筆記錄</span>
                   </div>

@@ -1,7 +1,7 @@
 # backend/app/schemas/project.py
 
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from .base_schema import BaseSchema
 
 # 我們需要先宣告 WorkRecordInList，但只宣告它的存在
@@ -11,8 +11,11 @@ class WorkRecordInList(BaseSchema):
     content: str
 
 class ProjectBase(BaseModel):
-    name: str
+    planno: str
+    plan_subj_c: str
+    pm_empno: str
     is_active: bool = True
+    department_id: Optional[int] = None
 
 class ProjectCreate(ProjectBase):
     pass
@@ -22,7 +25,6 @@ class ProjectUpdate(ProjectBase):
 
 class Project(ProjectBase):
     id: int
-
 
     class Config:
         from_attributes = True
