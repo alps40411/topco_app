@@ -89,9 +89,9 @@ echo echo 前端服務: http://%LOCAL_IP%:3000
 echo echo 請讓同事使用: http://%LOCAL_IP%:3000
 echo echo.
 echo cd /d "%~dp0"
-echo start "後端服務" cmd /k "cd backend ^&^& venv\Scripts\activate.bat ^&^& python start_production.py"
+echo start "後端服務" cmd /k "cd backend && venv\Scripts\activate.bat && python start_production.py"
 echo timeout /t 3 /nobreak ^> nul
-echo start "前端服務" cmd /k "cd frontend ^&^& npm run preview:production"
+echo start "前端服務" cmd /k "cd frontend && npm run preview:production"
 echo timeout /t 5 /nobreak ^> nul
 echo start "" "http://%LOCAL_IP%:3000"
 ) > 啟動系統.bat
