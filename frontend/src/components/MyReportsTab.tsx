@@ -10,13 +10,12 @@ import {
   Star,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import ChatInterface from "./ChatInterface";
-import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import { getProjectColors } from "../utils/colorUtils";
 import type { DailyReport } from "../App";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import toast from "react-hot-toast";
+import EmployeeDetailTab from "./EmployeeDetailTab";
 
 const MyReportsTab: React.FC = () => {
   const [reports, setReports] = useState<DailyReport[]>([]);
@@ -111,109 +110,23 @@ const MyReportsTab: React.FC = () => {
       day: "numeric",
     });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-            <MessageCircle className="w-3 h-3 mr-1" />
-            待審核
-          </span>
-        );
-      case "reviewed":
-        return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-            <Eye className="w-3 h-3 mr-1" />
-            已審核
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
-
+  // 當選取某一筆日報時，直接沿用主管審核的詳情頁 UI
   if (selectedReport) {
+    const backToList = () => setSelectedReport(null);
+    const employeeForDetail = {
+      id: selectedReport.employee.id,
+      name: selectedReport.employee.name,
+      department_no: selectedReport.employee.department_no,
+      department_name: selectedReport.employee.department_name,
+      pending_reports_count: 0,
+    };
+
     return (
-      <div className="p-6 h-screen flex flex-col">
-        {/* 標題列 */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setSelectedReport(null)}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                我的日報 - {formatDate(selectedReport.date)}
-              </h2>
-              <div className="flex items-center space-x-3 mt-1">
-                {getStatusBadge(selectedReport.status)}
-                {selectedReport.rating && (
-                  <div className="flex items-center space-x-1">
-                    <span className="text-sm text-gray-600">評分:</span>
-                    <div className="flex items-center text-yellow-500">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < (selectedReport.rating || 0)
-                              ? "fill-current"
-                              : "text-gray-300"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 主要內容區域 - 上下分欄 */}
-        <div className="flex-1 flex flex-col gap-6 min-h-0">
-          {/* 上欄 - 日報內容 */}
-          <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-6 overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              我的日報內容
-            </h3>
-            <div className="space-y-4">
-              {(selectedReport.consolidated_content || []).map(
-                (projectReport, index) => (
-                  <div
-                    key={index}
-                    className="border border-gray-100 rounded-lg p-4"
-                  >
-                    <div
-                      className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md mb-3 ${
-                        getProjectColors(projectReport.project.plan_subj_c).tag
-                      }`}
-                    >
-                      {projectReport.project.plan_subj_c}
-                    </div>
-                    <p className="text-gray-700 whitespace-pre-wrap">
-                      {projectReport.content}
-                    </p>
-                    <AttachedFilesDisplay files={projectReport.files} />
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-
-          {/* 下欄 - 對話區域 */}
-          <div className="h-96 flex-shrink-0">
-            <ChatInterface
-              reportId={selectedReport.id}
-              className="h-full"
-              isReadOnly={true} // 在自己報告的頁面，對話應為唯讀
-              approvals={[]}
-            />
-          </div>
-        </div>
-      </div>
+      <EmployeeDetailTab
+        employee={employeeForDetail as any}
+        reportId={selectedReport.id}
+        onBack={backToList}
+      />
     );
   }
 
@@ -279,32 +192,46 @@ const MyReportsTab: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900">
                     {formatDate(report.date)} 的日報
                   </h3>
-                  {getStatusBadge(report.status)}
+                  {(() => {
+                    switch (report.status) {
+                      case "pending":
+                        return (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            <MessageCircle className="w-3 h-3 mr-1" />
+                            待審核
+                          </span>
+                        );
+                      case "reviewed":
+                        return (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <Eye className="w-3 h-3 mr-1" />
+                            已審核
+                          </span>
+                        );
+                      default:
+                        return null;
+                    }
+                  })()}
                 </div>
 
-                <div className="flex items-center space-x-4">
-                  {report.rating && (
-                    <div className="flex items-center space-x-1">
-                      <span className="text-sm text-gray-600">評分:</span>
-                      <div className="flex items-center text-yellow-500">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < (report.rating || 0)
-                                ? "fill-current"
-                                : "text-gray-300"
-                            }`}
-                          />
-                        ))}
-                      </div>
+                {/* 列表維持顯示後端 top-level rating（若有）*/}
+                {report.rating && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600">我的分數:</span>
+                    <div className="flex items-center text-yellow-500">
+                      {[...Array(3)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i < (report.rating || 0)
+                              ? "fill-current"
+                              : "text-gray-300"
+                          }`}
+                        />
+                      ))}
                     </div>
-                  )}
-
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    查看詳情 →
-                  </button>
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* 預覽專案內容 */}
@@ -318,7 +245,8 @@ const MyReportsTab: React.FC = () => {
                     >
                       <div
                         className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded mb-1 ${
-                          getProjectColors(projectReport.project.plan_subj_c).tag
+                          getProjectColors(projectReport.project.plan_subj_c)
+                            .tag
                         }`}
                       >
                         {projectReport.project.plan_subj_c}

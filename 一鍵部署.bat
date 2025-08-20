@@ -50,15 +50,24 @@ echo [2/5] 設置後端環境...
 cd backend
 if not exist "venv" python -m venv venv
 call venv\Scripts\activate.bat
-pip install -r requirements.txt >nul 2>&1
-alembic upgrade head
+echo 安裝依賴套件...
+pip install -r requirements.txt
+echo 執行資料庫遷移...
+call venv\Scripts\activate.bat && alembic upgrade head
 cd ..
 
 :: 構建前端
 echo [3/5] 構建前端...
 cd frontend
-call npm install >nul 2>&1
+echo 安裝前端依賴...
+call npm install
+echo 構建生產版本...
 call npm run build:production
+if errorlevel 1 (
+    echo 前端構建失敗！
+    pause
+    exit /b 1
+)
 cd ..
 
 :: 開放防火牆
@@ -72,15 +81,17 @@ netsh advfirewall firewall add rule name="日報系統-後端" dir=in action=all
 echo [5/5] 創建啟動腳本...
 (
 echo @echo off
+echo chcp 65001 ^>nul
 echo echo 啟動TOPCO日報系統...
 echo echo.
 echo echo 後端服務: http://%LOCAL_IP%:8000
 echo echo 前端服務: http://%LOCAL_IP%:3000
 echo echo 請讓同事使用: http://%LOCAL_IP%:3000
 echo echo.
-echo start "後端服務" cmd /k "cd backend && venv\Scripts\activate.bat && python start_production.py"
+echo cd /d "%~dp0"
+echo start "後端服務" cmd /k "cd backend ^&^& venv\Scripts\activate.bat ^&^& python start_production.py"
 echo timeout /t 3 /nobreak ^> nul
-echo start "前端服務" cmd /k "cd frontend && npm run preview:production"
+echo start "前端服務" cmd /k "cd frontend ^&^& npm run preview:production"
 echo timeout /t 5 /nobreak ^> nul
 echo start "" "http://%LOCAL_IP%:3000"
 ) > 啟動系統.bat
@@ -94,8 +105,8 @@ echo 訪問網址: http://%LOCAL_IP%:3000
 echo API服務: http://%LOCAL_IP%:8000/docs
 echo.
 echo 預設帳號:
-echo 格式: {工號}@topco.com / {工號}
-echo 範例: 05489@topco.com / 05489
+echo 格式: {工號} / {工號}
+echo 範例: 05489 / 05489
 echo.
 
 set /p START_NOW="現在啟動系統? (y/n): "

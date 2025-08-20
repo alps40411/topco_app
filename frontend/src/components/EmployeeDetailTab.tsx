@@ -1,13 +1,12 @@
 // frontend/src/components/EmployeeDetailTab.tsx
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Send, Star } from "lucide-react";
+import { ArrowLeft, Star } from "lucide-react";
 import type { EmployeeInList, DailyReport } from "../App";
-import { getProjectColors, greenButtonStyle } from "../utils/colorUtils";
+import { getProjectColors } from "../utils/colorUtils";
 import { useAuth } from "../contexts/AuthContext";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ChatInterface from "./ChatInterface";
-import toast from "react-hot-toast";
 
 // Copied from EmployeeListTab.tsx for now, should be in a central types file
 interface SupervisorApprovalInfo {
@@ -86,6 +85,27 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       day: "numeric",
     });
 
+  const getRatingLabel = (rating: number | null | undefined) => {
+    if (!rating) return null;
+    if (rating === 1) return "差";
+    if (rating === 2) return "普通";
+    if (rating === 3) return "好";
+    return `${rating}`;
+  };
+
+  const renderThreeLevelStars = (rating: number) => (
+    <div className="flex items-center text-yellow-500">
+      {[...Array(3)].map((_, i) => (
+        <Star
+          key={i}
+          className={`w-5 h-5 ${
+            i < (rating || 0) ? "fill-current" : "text-gray-300"
+          }`}
+        />
+      ))}
+    </div>
+  );
+
   if (isLoading) {
     return <div className="p-6 text-center">載入日報詳情中...</div>;
   }
@@ -106,41 +126,50 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           </button>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              {reportDetail.employee.name} - {formatDate(reportDetail.date)} 日報
+              {reportDetail.employee.empnamec || reportDetail.employee.name} -{" "}
+              {formatDate(reportDetail.date)} 日報
             </h2>
             <p className="text-sm text-gray-500">
-              {reportDetail.employee.department_name || reportDetail.employee.department_no}
+              {reportDetail.employee.department_name ||
+                reportDetail.employee.department_no}
             </p>
           </div>
         </div>
-        {reportDetail.approvals && reportDetail.approvals.length > 0 && (() => {
-          const ratedApprovals = reportDetail.approvals.filter(a => a.rating && a.rating > 0);
-          if (ratedApprovals.length === 0) return null;
+        <div className="flex items-center space-x-4">
+          {reportDetail.approvals &&
+            reportDetail.approvals.length > 0 &&
+            (() => {
+              const ratedApprovals = reportDetail.approvals.filter(
+                (a) => a.rating && a.rating > 0
+              );
+              if (ratedApprovals.length === 0) return null;
+              const totalRating = ratedApprovals.reduce(
+                (sum, a) => sum + (a.rating || 0),
+                0
+              );
+              const averageRating = totalRating / ratedApprovals.length;
+              const clampedAvg = Math.min(3, Math.max(1, averageRating));
+              return (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">平均評分:</span>
+                  {renderThreeLevelStars(Math.round(clampedAvg))}
+                  <span className="text-sm text-gray-600">
+                    {clampedAvg.toFixed(1)}/3.0
+                  </span>
+                </div>
+              );
+            })()}
 
-          const totalRating = ratedApprovals.reduce((sum, approval) => sum + (approval.rating || 0), 0);
-          const averageRating = totalRating / ratedApprovals.length;
-
-          return (
+          {typeof reportDetail.rating === "number" && (
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">平均評分:</span>
-              <div className="flex items-center text-yellow-500">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-5 h-5 ${
-                      i < Math.floor(averageRating)
-                        ? "fill-current"
-                        : "text-gray-300"
-                    }`}
-                  />
-                ))}
-                <span className="ml-2 text-sm text-gray-600">
-                  {averageRating.toFixed(1)}/5.0
-                </span>
-              </div>
+              <span className="text-sm text-gray-600">此日報評分:</span>
+              {renderThreeLevelStars(reportDetail.rating)}
+              <span className="text-sm text-gray-700">
+                {getRatingLabel(reportDetail.rating)}
+              </span>
             </div>
-          );
-        })()}
+          )}
+        </div>
       </div>
 
       {/* 上方 - 日報內容 */}
@@ -174,6 +203,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <ChatInterface
           reportId={reportDetail.id}
+          reportOwnerId={reportDetail.employee.id}
           className="min-h-[400px]"
           reportStatus={reportDetail.status}
           approvals={reportDetail.approvals || []}

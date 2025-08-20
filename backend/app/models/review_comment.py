@@ -10,7 +10,7 @@ class ReviewComment(Base):
     id = Column(Integer, primary_key=True, index=True)
     content = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    rating = Column(Integer, nullable=True)  # 審核評分（只有審核留言才會有）
+    rating = Column(Integer, nullable=True)  # 審核評分（1:差, 2:普通, 3:好）
 
     # Foreign Keys
     report_id = Column(Integer, ForeignKey("daily_reports.id"), nullable=False)
