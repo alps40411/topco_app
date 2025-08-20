@@ -1,6 +1,6 @@
 // frontend/src/components/DailyReportTab.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Upload, Edit, Save, Wand2, Plus, X } from 'lucide-react';
 import type { ConsolidatedReport, FileAttachment, FileForUpload, Project, WorkRecordCreate } from '../App';
 import { getProjectColors, blueButtonStyle, greenButtonStyle } from '../utils/colorUtils';
@@ -56,7 +56,6 @@ const DailyReportTab: React.FC = () => {
     }
   };
 
-
   const fetchWritingStatus = async () => {
     try {
       const response = await authFetch('/api/records/writing-status');
@@ -85,7 +84,7 @@ const DailyReportTab: React.FC = () => {
     fetchReports();
     fetchProjects();
     fetchWritingStatus();
-  }, []);
+  }, []); // 空依賴數組，只在組件掛載時執行
 
   const handleEnhanceOne = async (projectId: number) => {
     setGeneratingAiFor(projectId);

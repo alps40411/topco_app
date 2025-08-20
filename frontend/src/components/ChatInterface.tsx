@@ -88,7 +88,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, reportId]);
+  }, [reportId]); // 移除 authFetch 依賴，因為它每次渲染都會變化
 
   useEffect(() => {
     fetchComments();

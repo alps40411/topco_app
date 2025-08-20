@@ -1,6 +1,6 @@
 // frontend/src/components/AIDailyReportTab.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Upload, Edit, Wand2, Save } from 'lucide-react';
 import type { ConsolidatedReport } from '../App';
 import { getProjectColors, blueButtonStyle, greenButtonStyle } from '../utils/colorUtils';
@@ -16,7 +16,7 @@ const AIDailyReportTab: React.FC = () => {
   const { authFetch } = useAuth(); // <-- 取得 authFetch 函式
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     console.log('📋 開始取得今日彙整報告');
     setIsLoading(true);
     try {
@@ -39,9 +39,9 @@ const AIDailyReportTab: React.FC = () => {
       setIsLoading(false); 
       console.log('🏁 fetchReports 完成');
     }
-  };
+  }, []); // 移除authFetch依賴
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => { fetchReports(); }, [fetchReports]);
 
   const handleEnhanceAll = async () => {
     console.log('🚀 開始執行 AI 一鍵潤飾全部功能');

@@ -114,7 +114,7 @@ async def sync_company_a_data():
     try:
         async with SourceSessionLocal() as source_db:
             result = await source_db.execute(text("""
-                SELECT planno, part_empno
+                SELECT DISTINCT planno, part_empno
                 FROM jps.tjp_partner
                 WHERE cocode_g = 'A'
             """))

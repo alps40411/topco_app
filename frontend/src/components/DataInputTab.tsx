@@ -1,6 +1,6 @@
 // frontend/src/components/DataInputTab.tsx
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Save, FileText } from 'lucide-react';
 import type { ConsolidatedReport, WorkRecordCreate, Project, FileForUpload } from '../App';
 import { getProjectColors, blueButtonStyle } from '../utils/colorUtils';
@@ -22,7 +22,7 @@ const DataInputTab: React.FC = () => {
   const { authFetch } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
 
-  const fetchConsolidatedToday = async () => {
+  const fetchConsolidatedToday = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await authFetch('/api/records/consolidated/today');
@@ -35,9 +35,9 @@ const DataInputTab: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // 移除authFetch依賴
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       const response = await authFetch('/api/projects/');
       if (response.ok) {
@@ -46,12 +46,12 @@ const DataInputTab: React.FC = () => {
     } catch (error) {
       console.error("無法獲取專案列表:", error);
     }
-  };
+  }, []); // 移除authFetch依賴
 
   useEffect(() => {
     fetchConsolidatedToday();
     fetchProjects();
-  }, []);
+  }, [fetchConsolidatedToday, fetchProjects]);
 
   const onSave = async () => {
     if (!currentRecord.project_id) {

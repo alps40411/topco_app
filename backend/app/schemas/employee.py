@@ -45,7 +45,7 @@ Employee.model_rebuild()
 class EmployeeForUser(BaseModel):
     id: int
     empno: str
-    empnamec: str
+    empnamec: Optional[str] = None # Made empnamec optional
     dutyscript: Optional[str] = None  # 職稱
     deptabbv: Optional[str] = None    # 部門簡稱
 

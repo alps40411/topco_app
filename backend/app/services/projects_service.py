@@ -1,6 +1,6 @@
 # backend/app/services/projects_service.py
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import selectinload
 from typing import List
 
@@ -16,7 +16,7 @@ async def get_all_active(db: AsyncSession) -> List[Project]:
 
 # backend/app/services/projects_service.py
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import selectinload
 from typing import List
 
@@ -36,11 +36,10 @@ async def get_projects_for_employee(db: AsyncSession, employee: Employee) -> Lis
     基於：
     1. 員工作為專案經理
     2. 員工是專案成員
-    3. 專案屬於員工部門，或是通用專案 (無部門)
     """
     from app.models import ProjectMember
 
-    # 建立所有可能的條件
+    # 建立所有可能的條件 - 只包含員工直接相關的專案
     conditions = [
         # 條件1: 員工作為專案經理
         Project.pm_empno == employee.empno,
@@ -48,20 +47,18 @@ async def get_projects_for_employee(db: AsyncSession, employee: Employee) -> Lis
         ProjectMember.part_empno == employee.empno
     ]
 
-    # 條件3: 如果員工有部門，則加入部門相關的專案
-    if employee.department_id:
-        conditions.append(
-            or_(
-                Project.department_id == employee.department_id,
-                Project.department_id.is_(None)  # 通用專案
-            )
-        )
+    # 移除部門相關專案的條件，只保留員工直接參與的專案
 
     # 建立主查詢
     query = (
         select(Project)
         # 使用 outerjoin，因為一個專案可能符合 PM 或部門條件，但不一定符合成員條件
-        .outerjoin(ProjectMember, Project.planno == ProjectMember.planno)
+        .outerjoin(ProjectMember, 
+            and_(
+                Project.planno == ProjectMember.planno,
+                ProjectMember.part_empno == employee.empno  # 確保只join該員工的成員關係
+            )
+        )
         .where(
             Project.is_active == True,
             or_(*conditions)  # 將所有條件用 OR 組合起來
