@@ -106,10 +106,10 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           </button>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              {initialEmployee.name} - {formatDate(reportDetail.date)} 日報
+              {reportDetail.employee.name} - {formatDate(reportDetail.date)} 日報
             </h2>
             <p className="text-sm text-gray-500">
-              {initialEmployee.department_name || initialEmployee.department_no}
+              {reportDetail.employee.department_name || reportDetail.employee.department_no}
             </p>
           </div>
         </div>

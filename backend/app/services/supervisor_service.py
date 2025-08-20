@@ -100,7 +100,7 @@ async def get_employees_with_pending_reports(db: AsyncSession, *, supervisor_id:
                 pending_count += 1
         
         emp.pending_reports_count = pending_count
-        print(f"   [INFO] 員工 {emp.name} ({emp.id}): {emp.pending_reports_count} 個待主管{supervisor_id}審核的報告")
+        print(f"   [INFO] 員工 {emp.empnamec} ({emp.id}): {emp.pending_reports_count} 個待主管{supervisor_id}審核的報告")
         
     return employees
 

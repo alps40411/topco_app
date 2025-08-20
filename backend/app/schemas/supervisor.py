@@ -7,7 +7,7 @@ import datetime
 
 class EmployeeSummary(BaseModel):
     id: int
-    name: str
+    empnamec: str
     department_no: Optional[str] = None
     department_name: Optional[str] = None
 
@@ -32,7 +32,7 @@ class DailyReportDetail(BaseModel):
 
 class EmployeeForList(BaseModel):
     id: int
-    name: str
+    empnamec: str
     department_no: Optional[str] = None
     department_name: Optional[str] = None
     pending_reports_count: int

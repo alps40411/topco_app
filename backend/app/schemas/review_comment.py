@@ -19,7 +19,7 @@ class ReviewCommentBase(BaseModel):
 # --- 建立留言時使用的 Schema ---
 class ReviewCommentCreate(ReviewCommentBase):
     parent_comment_id: Optional[int] = None
-    rating: Optional[float] = None  # 審核評分（只有主管審核時會有）
+    rating: Optional[int] = None  # 審核評分（1:差, 2:普通, 3:好）
 
 # --- 不包含回覆的簡單留言 Schema ---
 class ReviewCommentSimple(ReviewCommentBase):
@@ -27,7 +27,7 @@ class ReviewCommentSimple(ReviewCommentBase):
     created_at: datetime
     author: UserSummary
     parent_comment_id: Optional[int] = None
-    rating: Optional[float] = None  # 評分（如果是審核留言）
+    rating: Optional[int] = None  # 評分（如果是審核留言）
 
     class Config:
         from_attributes = True
@@ -41,7 +41,7 @@ class ReviewComment(ReviewCommentBase):
     created_at: datetime
     author: UserSummary
     parent_comment_id: Optional[int] = None
-    rating: Optional[float] = None  # 評分（如果是審核留言）
+    rating: Optional[int] = None  # 評分（如果是審核留言）
     replies: List[ReviewCommentRef] = []
 
     class Config:

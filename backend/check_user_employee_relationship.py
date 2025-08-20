@@ -68,7 +68,7 @@ async def check_user_employee_relationship():
             print("\n3. 檢查所有用戶與員工的關聯:")
             result = await target_db.execute(text("""
                 SELECT u.id as user_id, u.email, u.name as user_name,
-                       e.id as employee_id, e.empno, e.name as employee_name
+                       e.id as employee_id, e.empno, e.empnamec as employee_name
                 FROM users u
                 LEFT JOIN employees e ON u.id = e.user_id
                 ORDER BY u.id

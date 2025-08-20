@@ -188,7 +188,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
               <tr key={report.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
-                    {report.employee.name}
+                    {report.employee.name || report.employee.empnamec}
                   </div>
                   <div className="text-sm text-gray-500">
                     {report.employee.department_name || report.employee.department_no}

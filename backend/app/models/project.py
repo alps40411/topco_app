@@ -27,6 +27,12 @@ class Project(Base):
     department = relationship("Department", back_populates="projects")
     work_records = relationship("WorkRecord", back_populates="project")
     
+    # --- 屬性別名 ---
+    @property
+    def name(self):
+        """為了與現有代碼兼容，提供 name 屬性作為 plan_subj_c 的別名"""
+        return self.plan_subj_c
+    
     # 專案經理關係
     project_manager = relationship("Employee", back_populates="managed_projects")
     

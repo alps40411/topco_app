@@ -68,13 +68,13 @@ async def comprehensive_test():
         
         if emp_05489:
             print(f"   工號: {emp_05489.empno}")
-            print(f"   姓名: {emp_05489.name}")
+            print(f"   姓名: {emp_05489.empnamec}")
             print(f"   部門: {emp_05489.department_name}")
             print(f"   公司別: {emp_05489.company_code}")
             
             # 測試多對多主管關係
             supervisors_result = await target_db.execute(text("""
-                SELECT supervisors.empno, supervisors.name, supervisors.department_name, supervisors.company_code
+                SELECT supervisors.empno, supervisors.empnamec, supervisors.department_name, supervisors.company_code
                 FROM employees e
                 JOIN employee_supervisors es ON e.id = es.employee_id
                 JOIN employees supervisors ON es.supervisor_id = supervisors.id
@@ -96,10 +96,10 @@ async def comprehensive_test():
         cross_company_result = await target_db.execute(text("""
             SELECT 
                 e.empno as employee_empno, 
-                e.name as employee_name,
+                e.empnamec as employee_name,
                 e.company_code as employee_company,
                 s.empno as supervisor_empno,
-                s.name as supervisor_name,
+                s.empnamec as supervisor_name,
                 s.company_code as supervisor_company
             FROM employees e
             JOIN employee_supervisors es ON e.id = es.employee_id

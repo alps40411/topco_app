@@ -71,7 +71,7 @@ async def debug_approval_status():
             result = await target_db.execute(text("""
                 SELECT ra.id, ra.report_id, ra.supervisor_id, ra.status, 
                        ra.rating, ra.feedback, ra.approved_at,
-                       sup.empno as supervisor_empno, sup.name as supervisor_name,
+                       sup.empno as supervisor_empno, sup.empnamec as supervisor_name,
                        dr.employee_id as report_employee_id,
                        emp.empno as report_employee_empno
                 FROM report_approvals ra
@@ -100,8 +100,8 @@ async def debug_approval_status():
             print("4. 檢查主管關係:")
             result = await target_db.execute(text("""
                 SELECT es.employee_id, es.supervisor_id,
-                       emp.empno as employee_empno, emp.name as employee_name,
-                       sup.empno as supervisor_empno, sup.name as supervisor_name
+                       emp.empno as employee_empno, emp.empnamec as employee_name,
+                       sup.empno as supervisor_empno, sup.empnamec as supervisor_name
                 FROM employee_supervisors es
                 JOIN employees emp ON es.employee_id = emp.id
                 JOIN employees sup ON es.supervisor_id = sup.id

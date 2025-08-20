@@ -65,18 +65,12 @@ const MyReportsTab: React.FC = () => {
         const allReports: DailyReport[] = await response.json();
         // 只顯示自己的日報 - 根據用戶ID進行篩選
         const myReports = allReports.filter((report) => {
-          // 如果是主管，只顯示主管自己提交的日報（如果有的話）
-          // 如果是員工，只顯示該員工的日報
-          if (user.is_supervisor) {
-            // 主管通常不會有employee記錄，這裡可能需要根據實際資料結構調整
-            return report.employee.id === user.id;
-          } else {
-            // 員工只能看到自己的日報
-            return (
-              report.employee.name === user.name ||
-              report.employee.id === user.id
-            );
+          // 確保 user 和 user.employee存在
+          if (!user || !user.employee) {
+            return false;
           }
+          // 無論是否為主管，都只顯示與當前登入者員工ID相符的報告
+          return report.employee.id === user.employee.id;
         });
         setReports(myReports);
       } else {
@@ -211,7 +205,12 @@ const MyReportsTab: React.FC = () => {
 
           {/* 下欄 - 對話區域 */}
           <div className="h-96 flex-shrink-0">
-            <ChatInterface reportId={selectedReport.id} className="h-full" />
+            <ChatInterface
+              reportId={selectedReport.id}
+              className="h-full"
+              isReadOnly={true} // 在自己報告的頁面，對話應為唯讀
+              approvals={[]}
+            />
           </div>
         </div>
       </div>

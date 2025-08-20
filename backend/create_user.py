@@ -36,11 +36,11 @@ async def create_user(empno: str, email: str, password: str):
             print(f"錯誤：找不到員工編號為 {empno} 的員工。")
             return
 
-        print(f"成功找到員工: {employee.name}")
+        print(f"成功找到員工: {employee.empnamec}")
 
         # --- 2. 檢查是否已關聯帳號 ---
         if employee.user_id:
-            print(f"錯誤：該員工 {employee.name} ({empno}) 已經關聯了使用者帳號。")
+            print(f"錯誤：該員工 {employee.empnamec} ({empno}) 已經關聯了使用者帳號。")
             return
 
         # --- 3. 檢查 Email 是否已被使用 ---
@@ -56,15 +56,15 @@ async def create_user(empno: str, email: str, password: str):
 
         new_user = User(
             email=email,
-            name=employee.name,
+            name=employee.empnamec,
             hashed_password=hashed_password,
             is_active=True,
             is_supervisor=is_supervisor
         )
         
-        print(f"正在為 {employee.name} 建立使用者帳號...")
+        print(f"正在為 {employee.empnamec} 建立使用者帳號...")
         print(f"  - Email (帳號): {email}")
-        print(f"  - 姓名: {employee.name}")
+        print(f"  - 姓名: {employee.empnamec}")
         print(f"  - 是否為主管: {'是' if is_supervisor else '否'}")
 
         db.add(new_user)

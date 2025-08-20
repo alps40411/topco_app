@@ -106,7 +106,7 @@ async def enhance_all_today(db: AsyncSession, *, employee_id: int) -> List[Conso
     print(f"[INFO] 取得 {len(consolidated_reports)} 個彙整報告")
     
     for i, report in enumerate(consolidated_reports):
-        print(f"🚀 處理第 {i+1} 個報告: {report.project.name}")
+        print(f"🚀 處理第 {i+1} 個報告: {report.project.plan_subj_c}")
         reference_texts = []
 
         print(f"📁 檢查 {len(report.files)} 個附件")
@@ -126,12 +126,12 @@ async def enhance_all_today(db: AsyncSession, *, employee_id: int) -> List[Conso
 
 
         # 呼叫 AI 服務
-        print(f"🤖 呼叫 Azure AI 服務 - 專案: {report.project.name}, 參考檔案數: {len(reference_texts)}")
+        print(f"🤖 呼叫 Azure AI 服務 - 專案: {report.project.plan_subj_c}, 參考檔案數: {len(reference_texts)}")
         print(f"[INFO] 原始內容長度: {len(report.content)}")
         try:
             ai_text = await azure_ai_service.get_ai_enhanced_report(
                 original_content=report.content,
-                project_name=report.project.name,
+                project_name=report.project.plan_subj_c,
                 reference_texts=reference_texts
             )
             print(f"[SUCCESS] AI 潤飾成功，結果長度: {len(ai_text)}")
@@ -214,7 +214,7 @@ async def enhance_one_today(db: AsyncSession, *, employee_id: int, project_id: i
 
     ai_text = await azure_ai_service.get_ai_enhanced_report(
         original_content=report.content,
-        project_name=report.project.name,
+        project_name=report.project.plan_subj_c,
         reference_texts=reference_texts
     )
     report.ai_content = ai_text

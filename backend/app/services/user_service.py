@@ -22,13 +22,13 @@ async def create_user(db: AsyncSession, *, obj_in: UserCreate) -> User:
     
     db_user = User(
         email=obj_in.email,
-        name=obj_in.name,
+        name=obj_in.empnamec,
         hashed_password=hashed_password,
         is_supervisor=obj_in.is_supervisor
     )
     
     db_employee = Employee(
-        name=obj_in.name,
+        name=obj_in.empnamec,
         department=obj_in.department,
         user=db_user
     )

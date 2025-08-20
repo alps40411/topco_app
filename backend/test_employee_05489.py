@@ -72,7 +72,7 @@ async def test_employee_05489():
         async with TargetSessionLocal() as target_db:
             # 查詢多對多關係
             result = await target_db.execute(text("""
-                SELECT supervisors.empno, supervisors.name, supervisors.department_name, supervisors.admin_rank
+                SELECT supervisors.empno, supervisors.empnamec, supervisors.department_name, supervisors.admin_rank
                 FROM employees e
                 JOIN employee_supervisors es ON e.id = es.employee_id
                 JOIN employees supervisors ON es.supervisor_id = supervisors.id
