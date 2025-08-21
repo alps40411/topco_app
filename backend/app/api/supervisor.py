@@ -106,6 +106,35 @@ async def get_daily_reports_by_date(
     """
     return await supervisor_service.get_reports_by_date(db=db, target_date=date)
 
+@router.get("/my-reports-by-date", response_model=List[DailyReportDetail])
+async def get_my_reports_by_date(
+    date: datetime.date,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    根據指定日期，獲取當前用戶的日報列表。
+    """
+    if not current_user.employee:
+        raise HTTPException(status_code=404, detail="該用戶不是員工")
+    
+    return await supervisor_service.get_reports_by_date_and_employee(
+        db=db, 
+        target_date=date, 
+        employee_id=current_user.employee.id
+    )
+
+@router.get("/reports/{report_id}", response_model=DailyReportDetail)
+async def get_report_by_id(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    根據報告ID獲取特定的日報詳情
+    """
+    return await supervisor_service.get_report_by_id(db=db, report_id=report_id)
+
 @router.get("/reports/{report_id}/approvals", response_model=List[SupervisorApprovalInfo])
 async def get_report_approval_status(
     report_id: int,

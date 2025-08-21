@@ -1,7 +1,7 @@
 // frontend/src/components/ChatInterface.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { User, Crown, MessageCircle, Star } from "lucide-react";
+import { User, Crown, MessageCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 
@@ -33,19 +33,19 @@ export interface Comment {
 
 interface ChatInterfaceProps {
   reportId: number;
-  reportOwnerId: number; // 新增，報告擁有者的員工ID
+  reportOwnerId?: number; // 報告擁有者的員工ID
   className?: string;
   reportStatus?: string;
   approvals: SupervisorApprovalInfo[];
   onReviewSubmitted?: () => void;
-  isReadOnly?: boolean; // 允許父層控制唯讀
+  isReadOnly?: boolean; // 新增只讀模式屬性
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   reportId,
   reportOwnerId,
   className = "",
-  // reportStatus, // 目前未使用
+  // reportStatus, // 暫時未使用
   approvals, // Added prop
   onReviewSubmitted,
   isReadOnly = false, // 預設為 false
@@ -56,50 +56,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 審核相關狀態
-  const [selectedRating, setSelectedRating] = useState<number>(2); // 預設評分為「普通」
+  const [selectedRating, setSelectedRating] = useState<number>(3); // 預設評分為「普通」(5分制)
   const [reviewComment, setReviewComment] = useState("");
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
 
   const { authFetch, user } = useAuth();
 
-  // 主管與員工的快速建議回覆
-  const suggestedReplies = [
-    "好的，我會修改",
-    "收到，謝謝主管指導",
-    "關於這點，我想補充說明...",
-    "我會在下次注意這個問題",
-    "謝謝建議，我會改進",
-  ];
-
-  const supervisorSuggestedReplies = [
-    "工作內容詳實，執行效果良好，請繼續保持。",
-    "報告內容完整，建議在執行細節上可以更加具體。",
-    "工作進度符合預期，期待看到更多創新想法。",
-    "整體表現良好，建議加強時程管控。",
-    "請在下次日報中提供更多執行細節。",
-    "表現優秀，值得肯定。",
-    "請注意品質管控的細節。",
-  ];
-
-  // 依據當前使用者是否已提交審核，更新狀態
+  // This effect now correctly determines if the current user has reviewed
   useEffect(() => {
     if (user?.employee?.id && approvals) {
       const myApproval = approvals.find(
         (approval) => approval.supervisor_id === user.employee.id
       );
-      // 非 pending 視為已提交審核
+      // A review is considered submitted if the status is no longer pending.
       setHasSubmittedReview(!!myApproval && myApproval.status !== "pending");
     }
   }, [approvals, user]);
-
-  // 身份與顯示判斷
-  const isReportOwner = !!(
-    user?.employee?.id &&
-    reportOwnerId &&
-    user.employee.id === reportOwnerId
-  );
-  const showFooterSection = !isReadOnly || isReportOwner; // 報告擁有者可回覆，不受唯讀限制
-  const canReply = !user?.is_supervisor || hasSubmittedReview || isReportOwner; // 員工可回覆；主管在送審後也可回覆；報告擁有者永遠可回覆
 
   const fetchComments = useCallback(async () => {
     try {
@@ -205,22 +177,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const getRatingText = (rating: number) => {
-    const labels: { [key: number]: string } = { 1: "差", 2: "普通", 3: "好" };
+    const labels: { [key: number]: string } = { 1: "很差", 2: "差", 3: "普通", 4: "好", 5: "很好" };
     return labels[rating] || "未評分";
   };
-
-  const renderThreeLevelStars = (rating: number) => (
-    <div className="flex items-center text-yellow-500">
-      {[...Array(3)].map((_, i) => (
-        <Star
-          key={i}
-          className={`w-4 h-4 ${
-            i < (rating || 0) ? "fill-current" : "text-gray-300"
-          }`}
-        />
-      ))}
-    </div>
-  );
 
   const flattenComments = (comments: Comment[]): Comment[] => {
     const result: Comment[] = [];
@@ -266,7 +225,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           {comment.rating && comment.rating > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded p-2 mt-auto">
               <div className="text-sm font-medium text-amber-700">
-                評分: {getRatingText(comment.rating)}
+                評分: {getRatingText(comment.rating)} ({comment.rating}分)
               </div>
             </div>
           )}
@@ -274,7 +233,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
     );
   };
+  const suggestedReplies = [
+    "好的，我會修改",
+    "收到，謝謝主管指導",
+    "關於這點，我想補充說明...",
+    "我會在下次注意這個問題",
+    "謝謝建議，我會改進",
+  ];
 
+  const supervisorSuggestedReplies = [
+    "工作內容詳實，執行效果良好，請繼續保持。",
+    "報告內容完整，建議在執行細節上可以更加具體。",
+    "工作進度符合預期，期待看到更多創新想法。",
+    "整體表現良好，建議加強時程管控。",
+    "請在下次日報中提供更多執行細節。",
+    "表現優秀，值得肯定。",
+    "請注意品質管控的細節。",
+  ];
   if (isLoading) {
     return (
       <div
@@ -285,12 +260,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     );
   }
 
-  // 產生審核結果（唯讀）區塊，供員工或任何人查看審核結果
-  // 員工視圖不顯示審核摘要卡片，只保留輸入/回覆區塊
-
   return (
     <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
-      <div className="p-4 border-b border-gray-200 bg-white rounded-t-lg">
+      <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
         <div className="flex items-center space-x-2">
           <MessageCircle className="w-5 h-5 text-gray-600" />
           <h3 className="font-medium text-gray-900">回應內容</h3>
@@ -301,7 +273,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           )}
         </div>
       </div>
-      <div className="p-4 bg-white">
+      <div className="p-4 bg-gray-50">
         {comments.length === 0 ? (
           <div className="text-center py-8">
             <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -314,11 +286,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         )}
       </div>
-
-      {showFooterSection && (
+      {!isReadOnly && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
-          {/* 主管審核區塊（擁有者不顯示） */}
-          {user?.is_supervisor && !hasSubmittedReview && !isReportOwner && (
+          {user?.is_supervisor && !hasSubmittedReview && user.employee?.id !== reportOwnerId && (
             <div className="mb-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
@@ -334,12 +304,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     onChange={(e) => setSelectedRating(Number(e.target.value))}
                     className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value={1}>差</option>
-                    <option value={2}>普通</option>
-                    <option value={3}>好</option>
+                    <option value={1}>很差</option>
+                    <option value={2}>差</option>
+                    <option value={3}>普通</option>
+                    <option value={4}>好</option>
+                    <option value={5}>很好</option>
                   </select>
                 </div>
-
                 {/* 建議回復按鈕 - 主管版 */}
                 <div className="mb-3">
                   <p className="text-xs text-blue-700 mb-2">快速回復建議：</p>
@@ -357,7 +328,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     ))}
                   </div>
                 </div>
-
                 <textarea
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
@@ -374,25 +344,44 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   >
                     {isSubmitting ? "提交中..." : "提交評分"}
                   </button>
+                  <button
+                    onClick={() => {
+                      setSelectedRating(3); // Reset to default (普通)
+                      setReviewComment("");
+                    }}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                  >
+                    清除重寫
+                  </button>
                 </div>
               </div>
             </div>
           )}
-
-          {/* 一般回覆區塊：員工可回覆（主管也可在審核後繼續留言） */}
-          {canReply && (
+          {/* 已評分提示 */}
+          {user?.is_supervisor && hasSubmittedReview && user.employee?.id !== reportOwnerId && (
+            <div className="mb-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-sm text-green-800">
+                  ✅ 您已完成此日報的評分
+                </p>
+              </div>
+            </div>
+          )}
+          {(!user?.is_supervisor || hasSubmittedReview || user.employee?.id === reportOwnerId) && (
             <div>
-              <div className="bg-white border border-slate-200 rounded-lg p-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-slate-900 mb-3 flex items-center">
                   <User className="w-4 h-4 mr-2" />
-                  {user?.is_supervisor ? "追加留言" : "員工回復"}
+                  {user?.is_supervisor && user.employee?.id !== reportOwnerId ? "追加留言" : "員工回復"}
                 </h4>
-
-                {/* 建議回復按鈕 - 員工版 */}
                 <div className="mb-3">
                   <p className="text-xs text-slate-700 mb-2">快速回復建議：</p>
                   <div className="flex flex-wrap gap-2">
-                    {suggestedReplies.map((reply, index) => (
+                    {(user?.is_supervisor && hasSubmittedReview && user.employee?.id !== reportOwnerId
+                      ? supervisorSuggestedReplies
+                      : suggestedReplies
+                    ).map((reply, index) => (
                       <button
                         key={index}
                         onClick={() => setNewMessage(reply)}
@@ -403,13 +392,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     ))}
                   </div>
                 </div>
-
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder={
-                    user?.is_supervisor ? "輸入追加留言..." : "輸入您的回復..."
+                    user?.is_supervisor && user.employee?.id !== reportOwnerId ? "輸入追加留言..." : "輸入您的回復..."
                   }
                   className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3"
                   rows={4}
@@ -422,6 +410,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     className="px-4 py-2 bg-slate-500 text-white rounded hover:bg-slate-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
                     {isSubmitting ? "提交中..." : "確定送出"}
+                  </button>
+                  <button
+                    onClick={() => setNewMessage("")}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                  >
+                    清除重寫
                   </button>
                 </div>
               </div>

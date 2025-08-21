@@ -39,7 +39,7 @@ const AIDailyReportTab: React.FC = () => {
       setIsLoading(false); 
       console.log('🏁 fetchReports 完成');
     }
-  }, []); // 移除authFetch依賴
+  }, [authFetch]); // authFetch 是必要的依賴
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
 

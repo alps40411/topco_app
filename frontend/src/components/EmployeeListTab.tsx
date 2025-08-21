@@ -13,16 +13,7 @@ import type { DailyReport, EmployeeInList } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-
-interface SupervisorApprovalInfo {
-  supervisor_id: number;
-  supervisor_name: string;
-  supervisor_empno: string;
-  status: "pending" | "approved";
-  approved_at?: string;
-  rating?: number;
-  feedback?: string;
-}
+import type { SupervisorApprovalInfo } from "../types/supervisor";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];

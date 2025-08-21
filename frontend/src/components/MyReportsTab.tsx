@@ -57,20 +57,12 @@ const MyReportsTab: React.FC = () => {
     setIsLoading(true);
     try {
       const dateString = selectedDate.toISOString().split("T")[0];
+      // 使用新的優化API端點，直接獲取當前用戶的日報
       const response = await authFetch(
-        `/api/supervisor/reports-by-date?date=${dateString}`
+        `/api/supervisor/my-reports-by-date?date=${dateString}`
       );
       if (response.ok) {
-        const allReports: DailyReport[] = await response.json();
-        // 只顯示自己的日報 - 根據用戶ID進行篩選
-        const myReports = allReports.filter((report) => {
-          // 確保 user 和 user.employee存在
-          if (!user || !user.employee) {
-            return false;
-          }
-          // 無論是否為主管，都只顯示與當前登入者員工ID相符的報告
-          return report.employee.id === user.employee.id;
-        });
+        const myReports: DailyReport[] = await response.json();
         setReports(myReports);
       } else {
         setReports([]);
@@ -219,7 +211,7 @@ const MyReportsTab: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-600">我的分數:</span>
                     <div className="flex items-center text-yellow-500">
-                      {[...Array(3)].map((_, i) => (
+                      {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
                           className={`w-4 h-4 ${

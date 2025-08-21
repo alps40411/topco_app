@@ -317,6 +317,47 @@ async def get_reports_by_date(db: AsyncSession, *, target_date: datetime.date) -
     
     return reports
 
+async def get_report_by_id(db: AsyncSession, *, report_id: int) -> Optional[DailyReport]:
+    """
+    根據報告ID獲取特定的日報詳情
+    """
+    query = select(DailyReport).where(
+        DailyReport.id == report_id
+    ).options(
+        selectinload(DailyReport.employee),  # 同時載入關聯的員工資訊
+        selectinload(DailyReport.comments)   # 載入留言以計算數量
+    )
+    result = await db.execute(query)
+    report = result.scalar_one_or_none()
+    
+    if report:
+        # 計算留言數量
+        report.comments_count = len(report.comments) if report.comments else 0
+    
+    return report
+
+async def get_reports_by_date_and_employee(db: AsyncSession, *, target_date: datetime.date, employee_id: int) -> List[DailyReport]:
+    """
+    根據指定日期和員工ID，取得該員工當天的日報
+    """
+    query = select(DailyReport).where(
+        DailyReport.date == target_date,
+        DailyReport.employee_id == employee_id
+    ).options(
+        selectinload(DailyReport.employee),  # 同時載入關聯的員工資訊
+        selectinload(DailyReport.comments)   # 載入留言以計算數量
+    ).order_by(
+        DailyReport.status.asc()  # 讓「待審核」的排在前面
+    )
+    result = await db.execute(query)
+    reports = result.scalars().unique().all()
+    
+    # 為每個日報計算留言數量
+    for report in reports:
+        report.comments_count = len(report.comments) if report.comments else 0
+    
+    return reports
+
 async def get_report_approval_status(db: AsyncSession, report_id: int) -> List[SupervisorApprovalInfo]:
     """獲取報告的所有主管審核狀態"""
     query = (

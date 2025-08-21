@@ -7,17 +7,7 @@ import { getProjectColors } from "../utils/colorUtils";
 import { useAuth } from "../contexts/AuthContext";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ChatInterface from "./ChatInterface";
-
-// Copied from EmployeeListTab.tsx for now, should be in a central types file
-interface SupervisorApprovalInfo {
-  supervisor_id: number;
-  supervisor_name: string;
-  supervisor_empno: string;
-  status: "pending" | "approved";
-  approved_at?: string;
-  rating?: number;
-  feedback?: string;
-}
+import type { SupervisorApprovalInfo } from "../types/supervisor";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];
@@ -43,32 +33,28 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   const fetchReportDetails = async () => {
     setIsLoading(true);
     try {
-      const dateString = new Date().toISOString().split("T")[0]; // Flawed, but keeping as per user instruction
-      const response = await authFetch(
-        `/api/supervisor/reports-by-date?date=${dateString}`
-      );
+      // Fetch specific report directly by ID instead of fetching all reports
+      const response = await authFetch(`/api/supervisor/reports/${reportId}`);
       if (response.ok) {
-        const reports: DailyReport[] = await response.json();
-        const specificReport = reports.find((r) => r.id === reportId);
-
-        if (specificReport) {
-          // Now, fetch the detailed approval status for this specific report
-          const approvalResponse = await authFetch(
-            `/api/supervisor/reports/${reportId}/approvals`
-          );
-          if (approvalResponse.ok) {
-            const approvals = await approvalResponse.json();
-            setReportDetail({ ...specificReport, approvals });
-          } else {
-            // If approvals fail, still show the report
-            setReportDetail({ ...specificReport, approvals: [] });
-          }
+        const specificReport: DailyReport = await response.json();
+        
+        // Fetch the detailed approval status for this specific report
+        const approvalResponse = await authFetch(
+          `/api/supervisor/reports/${reportId}/approvals`
+        );
+        if (approvalResponse.ok) {
+          const approvals = await approvalResponse.json();
+          setReportDetail({ ...specificReport, approvals });
         } else {
-          setReportDetail(null);
+          // If approvals fail, still show the report
+          setReportDetail({ ...specificReport, approvals: [] });
         }
+      } else {
+        setReportDetail(null);
       }
     } catch (error) {
       console.error("無法獲取日報詳情:", error);
+      setReportDetail(null);
     } finally {
       setIsLoading(false);
     }
@@ -87,15 +73,13 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
   const getRatingLabel = (rating: number | null | undefined) => {
     if (!rating) return null;
-    if (rating === 1) return "差";
-    if (rating === 2) return "普通";
-    if (rating === 3) return "好";
-    return `${rating}`;
+    const labels: { [key: number]: string } = { 1: "很差", 2: "差", 3: "普通", 4: "好", 5: "很好" };
+    return labels[rating] || `${rating}`;
   };
 
-  const renderThreeLevelStars = (rating: number) => (
+  const renderFiveLevelStars = (rating: number) => (
     <div className="flex items-center text-yellow-500">
-      {[...Array(3)].map((_, i) => (
+      {[...Array(5)].map((_, i) => (
         <Star
           key={i}
           className={`w-5 h-5 ${
@@ -148,13 +132,13 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                 0
               );
               const averageRating = totalRating / ratedApprovals.length;
-              const clampedAvg = Math.min(3, Math.max(1, averageRating));
+              const clampedAvg = Math.min(5, Math.max(1, averageRating));
               return (
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">平均評分:</span>
-                  {renderThreeLevelStars(Math.round(clampedAvg))}
+                  {renderFiveLevelStars(Math.round(clampedAvg))}
                   <span className="text-sm text-gray-600">
-                    {clampedAvg.toFixed(1)}/3.0
+                    {Math.round(clampedAvg)}/5
                   </span>
                 </div>
               );
@@ -163,7 +147,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           {typeof reportDetail.rating === "number" && (
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">此日報評分:</span>
-              {renderThreeLevelStars(reportDetail.rating)}
+              {renderFiveLevelStars(reportDetail.rating)}
               <span className="text-sm text-gray-700">
                 {getRatingLabel(reportDetail.rating)}
               </span>
