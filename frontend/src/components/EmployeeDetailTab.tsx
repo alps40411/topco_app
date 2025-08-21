@@ -37,7 +37,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       const response = await authFetch(`/api/supervisor/reports/${reportId}`);
       if (response.ok) {
         const specificReport: DailyReport = await response.json();
-        
+
         // Fetch the detailed approval status for this specific report
         const approvalResponse = await authFetch(
           `/api/supervisor/reports/${reportId}/approvals`
@@ -73,7 +73,13 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
   const getRatingLabel = (rating: number | null | undefined) => {
     if (!rating) return null;
-    const labels: { [key: number]: string } = { 1: "很差", 2: "差", 3: "普通", 4: "好", 5: "很好" };
+    const labels: { [key: number]: string } = {
+      1: "很差",
+      2: "差",
+      3: "普通",
+      4: "好",
+      5: "很好",
+    };
     return labels[rating] || `${rating}`;
   };
 
