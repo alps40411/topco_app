@@ -177,7 +177,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const getRatingText = (rating: number) => {
-    const labels: { [key: number]: string } = { 1: "很差", 2: "差", 3: "普通", 4: "好", 5: "很好" };
+    const labels: { [key: number]: string } = {
+      1: "很差",
+      2: "差",
+      3: "普通",
+      4: "好",
+      5: "很好",
+    };
     return labels[rating] || "未評分";
   };
 
@@ -225,7 +231,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           {comment.rating && comment.rating > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded p-2 mt-auto">
               <div className="text-sm font-medium text-amber-700">
-                評分: {getRatingText(comment.rating)} ({comment.rating}分)
+                評分: {getRatingText(comment.rating)}
               </div>
             </div>
           )}
@@ -288,97 +294,109 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
       {!isReadOnly && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
-          {user?.is_supervisor && !hasSubmittedReview && user.employee?.id !== reportOwnerId && (
-            <div className="mb-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
-                  <Crown className="w-4 h-4 mr-2" />
-                  主管評分與回饋
-                </h4>
-                <div className="flex items-center space-x-4 mb-3">
-                  <span className="text-sm font-medium text-gray-700">
-                    評分:
-                  </span>
-                  <select
-                    value={selectedRating}
-                    onChange={(e) => setSelectedRating(Number(e.target.value))}
-                    className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value={1}>很差</option>
-                    <option value={2}>差</option>
-                    <option value={3}>普通</option>
-                    <option value={4}>好</option>
-                    <option value={5}>很好</option>
-                  </select>
-                </div>
-                {/* 建議回復按鈕 - 主管版 */}
-                <div className="mb-3">
-                  <p className="text-xs text-blue-700 mb-2">快速回復建議：</p>
-                  <div className="flex flex-wrap gap-2">
-                    {supervisorSuggestedReplies.map((reply, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setReviewComment(reply)}
-                        className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors border border-blue-200"
-                      >
-                        {reply.length > 25
-                          ? reply.substring(0, 25) + "..."
-                          : reply}
-                      </button>
-                    ))}
+          {user?.is_supervisor &&
+            !hasSubmittedReview &&
+            user.employee?.id !== reportOwnerId && (
+              <div className="mb-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
+                    <Crown className="w-4 h-4 mr-2" />
+                    主管評分與回饋
+                  </h4>
+                  <div className="flex items-center space-x-4 mb-3">
+                    <span className="text-sm font-medium text-gray-700">
+                      評分:
+                    </span>
+                    <select
+                      value={selectedRating}
+                      onChange={(e) =>
+                        setSelectedRating(Number(e.target.value))
+                      }
+                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value={1}>很差</option>
+                      <option value={2}>差</option>
+                      <option value={3}>普通</option>
+                      <option value={4}>好</option>
+                      <option value={5}>很好</option>
+                    </select>
+                  </div>
+                  {/* 建議回復按鈕 - 主管版 */}
+                  <div className="mb-3">
+                    <p className="text-xs text-blue-700 mb-2">快速回復建議：</p>
+                    <div className="flex flex-wrap gap-2">
+                      {supervisorSuggestedReplies.map((reply, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setReviewComment(reply)}
+                          className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors border border-blue-200"
+                        >
+                          {reply.length > 25
+                            ? reply.substring(0, 25) + "..."
+                            : reply}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="請輸入您的審核意見..."
+                    className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                    rows={4}
+                    disabled={isSubmitting}
+                  />
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleSubmitReview}
+                      disabled={!reviewComment.trim() || isSubmitting}
+                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isSubmitting ? "提交中..." : "提交評分"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedRating(3); // Reset to default (普通)
+                        setReviewComment("");
+                      }}
+                      disabled={isSubmitting}
+                      className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                    >
+                      清除重寫
+                    </button>
                   </div>
                 </div>
-                <textarea
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="請輸入您的審核意見..."
-                  className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
-                  rows={4}
-                  disabled={isSubmitting}
-                />
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleSubmitReview}
-                    disabled={!reviewComment.trim() || isSubmitting}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isSubmitting ? "提交中..." : "提交評分"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedRating(3); // Reset to default (普通)
-                      setReviewComment("");
-                    }}
-                    disabled={isSubmitting}
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
-                  >
-                    清除重寫
-                  </button>
+              </div>
+            )}
+          {/* 已評分提示 */}
+          {user?.is_supervisor &&
+            hasSubmittedReview &&
+            user.employee?.id !== reportOwnerId && (
+              <div className="mb-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800">
+                    ✅ 您已完成此日報的評分
+                  </p>
                 </div>
               </div>
-            </div>
-          )}
-          {/* 已評分提示 */}
-          {user?.is_supervisor && hasSubmittedReview && user.employee?.id !== reportOwnerId && (
-            <div className="mb-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="text-sm text-green-800">
-                  ✅ 您已完成此日報的評分
-                </p>
-              </div>
-            </div>
-          )}
-          {(!user?.is_supervisor || hasSubmittedReview || user.employee?.id === reportOwnerId) && (
+            )}
+          {(!user?.is_supervisor ||
+            hasSubmittedReview ||
+            user.employee?.id === reportOwnerId) && (
             <div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-slate-900 mb-3 flex items-center">
                   <User className="w-4 h-4 mr-2" />
-                  {user?.is_supervisor && user.employee?.id !== reportOwnerId ? "追加留言" : "員工回復"}
+                  {user?.is_supervisor && user.employee?.id !== reportOwnerId
+                    ? "追加留言"
+                    : "員工回復"}
                 </h4>
                 <div className="mb-3">
                   <p className="text-xs text-slate-700 mb-2">快速回復建議：</p>
                   <div className="flex flex-wrap gap-2">
-                    {(user?.is_supervisor && hasSubmittedReview && user.employee?.id !== reportOwnerId
+                    {(user?.is_supervisor &&
+                    hasSubmittedReview &&
+                    user.employee?.id !== reportOwnerId
                       ? supervisorSuggestedReplies
                       : suggestedReplies
                     ).map((reply, index) => (
@@ -397,7 +415,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder={
-                    user?.is_supervisor && user.employee?.id !== reportOwnerId ? "輸入追加留言..." : "輸入您的回復..."
+                    user?.is_supervisor && user.employee?.id !== reportOwnerId
+                      ? "輸入追加留言..."
+                      : "輸入您的回復..."
                   }
                   className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3"
                   rows={4}

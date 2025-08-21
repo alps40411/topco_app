@@ -160,9 +160,7 @@ async def enhance_all_today(db: AsyncSession, *, employee_id: int) -> List[Conso
 
 
 async def enhance_one_today(db: AsyncSession, *, employee_id: int, project_id: int) -> ConsolidatedReport:
-    """潤飾今天單一一個專案報告"""
-    print(f"--- DEBUG: enhance_one_today --- ")
-    print(f"傳入參數: employee_id={employee_id}, project_id={project_id}")
+
 
     # 1. 取得該使用者、該專案今天的所有紀錄
     today_start = datetime.combine(date.today(), time.min)
@@ -184,8 +182,6 @@ async def enhance_one_today(db: AsyncSession, *, employee_id: int, project_id: i
     )
     result = await db.execute(query)
     today_records = result.scalars().all()
-
-    print(f"資料庫查詢結果: 找到 {len(today_records)} 筆記錄")
 
     if not today_records:
         print("--- DEBUG結束: 未找到記錄，返回 None ---")
@@ -211,6 +207,7 @@ async def enhance_one_today(db: AsyncSession, *, employee_id: int, project_id: i
         if file_attachment.is_selected_for_ai:
             analyzed_text = await document_analysis_service.analyze_document_from_path(file_attachment.url)
             reference_texts.append(analyzed_text)
+    print(f"AI 文件分析結果: {reference_texts}")
 
     ai_text = await azure_ai_service.get_ai_enhanced_report(
         original_content=report.content,
@@ -261,9 +258,6 @@ async def update_consolidated_report(db: AsyncSession, *, project_id: int, conte
     更新一個專案的彙整報告。
     此版本將智慧處理檔案的新增、刪除與狀態更新。
     """
-    print(f"DEBUG: update_consolidated_report - project_id: {project_id}, employee_id: {employee_id}")
-    print(f"DEBUG: content 長度: {len(content)}, files 數量: {len(files)}")
-    
     today_start = datetime.combine(date.today(), time.min)
     today_end = datetime.combine(date.today(), time.max)
 
@@ -277,8 +271,6 @@ async def update_consolidated_report(db: AsyncSession, *, project_id: int, conte
     result = await db.execute(query)
     records_to_update = result.scalars().all()
 
-    print(f"DEBUG: 找到 {len(records_to_update)} 條記錄需要更新")
-    
     if not records_to_update:
         print("DEBUG: 沒有找到可更新的記錄")
         return False

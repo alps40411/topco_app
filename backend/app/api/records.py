@@ -90,9 +90,6 @@ async def update_consolidated_report_endpoint(
     更新指定專案的彙整報告內容，包含檔案列表。
     """
     try:
-        print(f"DEBUG: 收到更新請求 - project_id: {project_id}, user_id: {current_user.id}")
-        print(f"DEBUG: content 長度: {len(report_in.content)}")
-        print(f"DEBUG: files 數量: {len(report_in.files)}")
         
         success = await records_service.update_consolidated_report(
             db=db,
@@ -106,7 +103,6 @@ async def update_consolidated_report_endpoint(
             print(f"DEBUG: 更新失敗 - 找不到對應的專案或記錄")
             raise HTTPException(status_code=404, detail="找不到對應的專案或記錄可更新")
         
-        print(f"DEBUG: 更新成功")
         return
         
     except HTTPException:

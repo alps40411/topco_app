@@ -143,9 +143,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">平均評分:</span>
                   {renderFiveLevelStars(Math.round(clampedAvg))}
-                  <span className="text-sm text-gray-600">
+                  {/* <span className="text-sm text-gray-600">
                     {Math.round(clampedAvg)}/5
-                  </span>
+                  </span> */}
                 </div>
               );
             })()}

@@ -16,8 +16,8 @@ import { Toaster } from "react-hot-toast";
 export interface Project {
   id: number;
   planno: string;
-  plan_subj_c: string;  // 專案名稱
-  pm_empno: string;     // 專案經理工號
+  plan_subj_c: string; // 專案名稱
+  pm_empno: string; // 專案經理工號
   is_active: boolean;
   department_id?: number;
 }
@@ -85,8 +85,8 @@ export interface EmployeeForUser {
   id: number;
   empno: string;
   empnamec: string;
-  dutyscript?: string;  // 職稱
-  deptabbv?: string;    // 部門簡稱
+  dutyscript?: string; // 職稱
+  deptabbv?: string; // 部門簡稱
 }
 
 export interface User {
@@ -99,7 +99,8 @@ export interface User {
 }
 function App() {
   const { user, logout } = useAuth();
-  const { hasSubordinates, loading: subordinatesLoading } = useHasSubordinates();
+  const { hasSubordinates, loading: subordinatesLoading } =
+    useHasSubordinates();
   const [mainTab, setMainTab] = useState<"employee" | "supervisor">("employee");
   const [activeTab, setActiveTab] = useState<
     "input" | "daily" | "myreports" | "ai" | "comprehensive"
@@ -175,7 +176,7 @@ function App() {
                         : "text-gray-600 hover:bg-gray-100"
                     }`}
                   >
-                    日報審核
+                    日報審閱
                   </button>
                 )}
               </div>
@@ -185,7 +186,8 @@ function App() {
                     {user?.name}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {user?.employee?.dutyscript || (hasSubordinates ? "主管" : "員工")}
+                    {user?.employee?.dutyscript ||
+                      (hasSubordinates ? "主管" : "員工")}
                   </p>
                 </div>
                 <button

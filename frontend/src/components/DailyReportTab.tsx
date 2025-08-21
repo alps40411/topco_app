@@ -1,13 +1,34 @@
 // frontend/src/components/DailyReportTab.tsx
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Upload, Edit, Save, Wand2, Plus, X } from 'lucide-react';
-import type { ConsolidatedReport, FileAttachment, FileForUpload, Project, WorkRecordCreate } from '../App';
-import { getProjectColors, blueButtonStyle, greenButtonStyle } from '../utils/colorUtils';
-import { useAuth } from '../contexts/AuthContext';
-import AttachedFilesManager from './AttachedFilesManager';
-import AttachedFilesDisplay from './AttachedFilesDisplay';
-import { toast } from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import {
+  Upload,
+  Edit,
+  Save,
+  Wand2,
+  Plus,
+  X,
+  Copy,
+  ArrowBigLeftDash,
+  ArrowUp,
+  ArrowLeft,
+} from "lucide-react";
+import type {
+  ConsolidatedReport,
+  FileAttachment,
+  FileForUpload,
+  Project,
+  WorkRecordCreate,
+} from "../App";
+import {
+  getProjectColors,
+  blueButtonStyle,
+  greenButtonStyle,
+} from "../utils/colorUtils";
+import { useAuth } from "../contexts/AuthContext";
+import AttachedFilesManager from "./AttachedFilesManager";
+import AttachedFilesDisplay from "./AttachedFilesDisplay";
+import { toast } from "react-hot-toast";
 
 interface WritingStatus {
   allowed: boolean;
@@ -18,33 +39,40 @@ interface WritingStatus {
 const DailyReportTab: React.FC = () => {
   const [reports, setReports] = useState<ConsolidatedReport[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(null);
+  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
-  const [editContent, setEditContent] = useState<string>('');
+  const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
-  const { authFetch, user } = useAuth();
-  
+  const { authFetch } = useAuth();
+
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAllAi, setIsGeneratingAllAi] = useState(false);
   const [generatingAiFor, setGeneratingAiFor] = useState<number | null>(null);
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
-  const [newRecord, setNewRecord] = useState<Partial<WorkRecordCreate>>({ content: '', project_id: undefined, files: [] });
+  const [newRecord, setNewRecord] = useState<Partial<WorkRecordCreate>>({
+    content: "",
+    project_id: undefined,
+    files: [],
+  });
   const [isSavingNewRecord, setIsSavingNewRecord] = useState(false);
   const [isUploadingNewFile, setIsUploadingNewFile] = useState(false);
 
   const fetchReports = async () => {
+    if (!authFetch) return;
     setIsLoading(true);
     try {
-      const response = await authFetch('/api/records/consolidated/today');
+      const response = await authFetch("/api/records/consolidated/today");
       if (response.ok) {
         const data: ConsolidatedReport[] = await response.json();
         setReports(data);
-        if (data.some(report => report.ai_content)) {
+        if (data.some((report) => report.ai_content)) {
           setIsAiViewActive(true);
         }
       }
@@ -57,8 +85,9 @@ const DailyReportTab: React.FC = () => {
   };
 
   const fetchWritingStatus = async () => {
+    if (!authFetch) return;
     try {
-      const response = await authFetch('/api/records/writing-status');
+      const response = await authFetch("/api/records/writing-status");
       if (response.ok) {
         const status: WritingStatus = await response.json();
         setWritingStatus(status);
@@ -69,34 +98,47 @@ const DailyReportTab: React.FC = () => {
   };
 
   const fetchProjects = async () => {
+    if (!authFetch) return;
     try {
-      const response = await authFetch('/api/projects/');
+      const response = await authFetch("/api/projects/");
       if (response.ok) {
         setProjects(await response.json());
       }
     } catch (error) {
       console.error("無法獲取專案列表:", error);
       toast.error("無法獲取專案列表");
-    } 
+    }
   };
 
   useEffect(() => {
-    fetchReports();
-    fetchProjects();
-    fetchWritingStatus();
-  }, []); // 空依賴數組，只在組件掛載時執行
+    if (authFetch) {
+      fetchReports();
+      fetchProjects();
+      fetchWritingStatus();
+    }
+  }, [authFetch]);
 
   const handleEnhanceOne = async (projectId: number) => {
+    if (!authFetch) return;
     setGeneratingAiFor(projectId);
     try {
-      const response = await authFetch(`/api/records/ai/enhance_one/${projectId}`, { method: 'POST' });
+      const response = await authFetch(
+        `/api/records/ai/enhance_one/${projectId}`,
+        { method: "POST" }
+      );
       if (response.ok) {
         const enhancedReport = await response.json();
-        setReports(prev => prev.map(r => r.project.id === projectId ? enhancedReport : r));
+        setReports((prev) =>
+          prev.map((r) => (r.project.id === projectId ? enhancedReport : r))
+        );
         if (!isAiViewActive) setIsAiViewActive(true);
-        toast.success(`專案 ${enhancedReport.project.plan_subj_c} 已完成 AI 潤飾！`);
+        toast.success(
+          `專案 ${enhancedReport.project.plan_subj_c} 已完成 AI 潤飾！`
+        );
       } else {
-        const err = await response.json().catch(() => ({ detail: 'AI 潤飾此專案時發生錯誤' }));
+        const err = await response
+          .json()
+          .catch(() => ({ detail: "AI 潤飾此專案時發生錯誤" }));
         throw new Error(err.detail);
       }
     } catch (error: any) {
@@ -108,16 +150,19 @@ const DailyReportTab: React.FC = () => {
   };
 
   const handleEnhanceAll = async () => {
+    if (!authFetch) return;
     setIsGeneratingAllAi(true);
     try {
-      const response = await authFetch('/api/records/ai/enhance_all', { method: 'POST' });
+      const response = await authFetch("/api/records/ai/enhance_all", {
+        method: "POST",
+      });
       if (response.ok) {
         const enhancedReports = await response.json();
         setReports(enhancedReports);
         setIsAiViewActive(true);
-        toast.success('所有報告皆已完成 AI 潤飾！');
+        toast.success("所有報告皆已完成 AI 潤飾！");
       } else {
-        throw new Error('AI 服務失敗');
+        throw new Error("AI 服務失敗");
       }
     } catch (error: any) {
       console.error(error);
@@ -126,66 +171,90 @@ const DailyReportTab: React.FC = () => {
       setIsGeneratingAllAi(false);
     }
   };
-  
+
   const startEdit = (report: ConsolidatedReport) => {
     setEditingProjectId(report.project.id);
     setEditContent(report.content);
-    setEditFiles(report.files.map(f => ({ ...f, id: f.id || f.url, is_selected_for_ai: !!f.is_selected_for_ai })));
+    setEditFiles(
+      report.files.map((f) => ({
+        ...f,
+        id: f.id || f.url,
+        is_selected_for_ai: !!f.is_selected_for_ai,
+      }))
+    );
   };
 
   const cancelEdit = () => {
     setEditingProjectId(null);
-    setEditContent('');
+    setEditContent("");
     setEditFiles([]);
   };
 
   const saveEdit = async () => {
-    if (editingProjectId === null) return;
+    if (editingProjectId === null || !authFetch) return;
     setIsSaving(true);
     try {
-      const reportToUpdate = reports.find(r => r.project.id === editingProjectId);
+      const reportToUpdate = reports.find(
+        (r) => r.project.id === editingProjectId
+      );
       if (!reportToUpdate) throw new Error("找不到原始報告");
-      
-      const response = await authFetch(`/api/records/consolidated/${editingProjectId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ ...reportToUpdate, content: editContent, files: editFiles }),
-      });
 
-      if (!response.ok) throw new Error('更新報告失敗');
-      
-      setReports(prevReports => prevReports.map(r =>
-        r.project.id === editingProjectId
-          ? { ...r, content: editContent, files: editFiles }
-          : r
-      ));
-      toast.success('報告草稿更新成功！');
+      const response = await authFetch(
+        `/api/records/consolidated/${editingProjectId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            ...reportToUpdate,
+            content: editContent,
+            files: editFiles,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error("更新報告失敗");
+
+      setReports((prevReports) =>
+        prevReports.map((r) =>
+          r.project.id === editingProjectId
+            ? {
+                ...r,
+                content: editContent,
+                files: editFiles as FileAttachment[],
+              }
+            : r
+        )
+      );
+      toast.success("報告草稿更新成功！");
       cancelEdit();
-    } catch (error) { 
-      console.error(error); 
-      toast.error('更新失敗，請稍後再試。');
+    } catch (error) {
+      console.error(error);
+      toast.error("更新失敗，請稍後再試。");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSubmitReport = async () => {
+    if (!authFetch) return;
     if (reports.length === 0) {
       toast.error("沒有可提交的報告內容。");
       return;
     }
     if (!window.confirm("確定要提交此版本作為今日的最終日報嗎？")) return;
-    
+
     setIsSubmitting(true);
     try {
-      const response = await authFetch('/api/supervisor/reports/submit', {
-        method: 'POST',
+      const response = await authFetch("/api/supervisor/reports/submit", {
+        method: "POST",
         body: JSON.stringify(reports),
       });
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({ detail: '提交失敗' }));
+        const errData = await response
+          .json()
+          .catch(() => ({ detail: "提交失敗" }));
         throw new Error(errData.detail);
       }
-      toast.success('日報已成功提交，等待主管審核！');
+      toast.success("日報已成功提交，等待主管審核！");
       await fetchReports();
     } catch (error: any) {
       console.error(error);
@@ -196,72 +265,124 @@ const DailyReportTab: React.FC = () => {
   };
 
   const handleEditFileUpload = async (filesToUpload: FileList) => {
-    if (!filesToUpload || filesToUpload.length === 0) return;
-    // isUploading state is managed by the manager now, so we don't set it here.
+    if (!filesToUpload || filesToUpload.length === 0 || !authFetch) return;
     const uploadPromises = Array.from(filesToUpload).map(async (file) => {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
       try {
-        const response = await authFetch('/api/records/upload', { method: 'POST', body: formData });
+        const response = await authFetch("/api/records/upload", {
+          method: "POST",
+          body: formData,
+        });
         if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
         const uploadedFile: FileAttachment = await response.json();
-        const newFile: FileForUpload = { name: uploadedFile.name, type: uploadedFile.type, size: uploadedFile.size, url: uploadedFile.url, is_selected_for_ai: false };
-        setEditFiles(prev => [...prev, newFile]);
-      } catch (error: any) { console.error(error); toast.error(error.message); }
+        const newFile: FileForUpload = {
+          name: uploadedFile.name,
+          type: uploadedFile.type,
+          size: uploadedFile.size,
+          url: uploadedFile.url,
+          is_selected_for_ai: false,
+        };
+        setEditFiles((prev) => [...prev, newFile]);
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error.message);
+      }
     });
     await Promise.all(uploadPromises);
   };
 
-  const handleEditAiSelectionChange = (fileUrl: string, isSelected: boolean) => {
-    setEditFiles(prev => prev.map(f => f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f));
+  const handleEditAiSelectionChange = (
+    fileUrl: string,
+    isSelected: boolean
+  ) => {
+    setEditFiles((prev) =>
+      prev.map((f) =>
+        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f
+      )
+    );
   };
   const removeEditFile = (fileUrl: string) => {
-    setEditFiles(prev => prev.filter(file => file.url !== fileUrl));
+    setEditFiles((prev) => prev.filter((file) => file.url !== fileUrl));
   };
 
   const handleNewRecordUpload = async (filesToUpload: FileList) => {
-    if (!filesToUpload || filesToUpload.length === 0) return;
+    if (!filesToUpload || filesToUpload.length === 0 || !authFetch) return;
     setIsUploadingNewFile(true);
     const uploadPromises = Array.from(filesToUpload).map(async (file) => {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
       try {
-        const response = await authFetch('/api/records/upload', { method: 'POST', body: formData });
+        const response = await authFetch("/api/records/upload", {
+          method: "POST",
+          body: formData,
+        });
         if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
         const uploadedFile: FileAttachment = await response.json();
-        const newFile: FileForUpload = { name: uploadedFile.name, type: uploadedFile.type, size: uploadedFile.size, url: uploadedFile.url, is_selected_for_ai: false };
-        setNewRecord(prev => ({ ...prev, files: [...(prev.files || []), newFile] }));
-      } catch (error: any) { console.error(error); toast.error(error.message); }
+        const newFile: FileForUpload = {
+          name: uploadedFile.name,
+          type: uploadedFile.type,
+          size: uploadedFile.size,
+          url: uploadedFile.url,
+          is_selected_for_ai: false,
+        };
+        setNewRecord((prev) => ({
+          ...prev,
+          files: [...(prev.files || []), newFile],
+        }));
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error.message);
+      }
     });
     await Promise.all(uploadPromises);
     setIsUploadingNewFile(false);
   };
 
-  const handleNewRecordAiSelectionChange = (fileUrl: string, isSelected: boolean) => {
-    setNewRecord(prev => ({ ...prev, files: (prev.files || []).map(f => f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f) }));
+  const handleNewRecordAiSelectionChange = (
+    fileUrl: string,
+    isSelected: boolean
+  ) => {
+    setNewRecord((prev) => ({
+      ...prev,
+      files: (prev.files || []).map((f) =>
+        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f
+      ),
+    }));
   };
   const removeNewRecordFile = (fileUrl: string) => {
-    setNewRecord(prev => ({ ...prev, files: (prev.files || []).filter(file => file.url !== fileUrl) }));
+    setNewRecord((prev) => ({
+      ...prev,
+      files: (prev.files || []).filter((file) => file.url !== fileUrl),
+    }));
   };
 
   const handleSaveNewRecord = async () => {
+    if (!authFetch) return;
     if (!newRecord.project_id) {
-      toast.error('請選擇工作計劃');
+      toast.error("請選擇工作計劃");
       return;
     }
-    if (!newRecord.content?.trim() && (!newRecord.files || newRecord.files.length === 0)) {
-      toast.error('請填寫內容或附加檔案');
+    if (
+      !newRecord.content?.trim() &&
+      (!newRecord.files || newRecord.files.length === 0)
+    ) {
+      toast.error("請填寫內容或附加檔案");
       return;
     }
     setIsSavingNewRecord(true);
     try {
-      const response = await authFetch('/api/records/', {
-        method: 'POST',
-        body: JSON.stringify({ project_id: newRecord.project_id, content: newRecord.content, files: newRecord.files || [] }),
+      const response = await authFetch("/api/records/", {
+        method: "POST",
+        body: JSON.stringify({
+          project_id: newRecord.project_id,
+          content: newRecord.content,
+          files: newRecord.files || [],
+        }),
       });
-      if (!response.ok) throw new Error('儲存新筆記失敗');
-      toast.success('新筆記儲存成功！');
-      setNewRecord({ content: '', project_id: undefined, files: [] });
+      if (!response.ok) throw new Error("儲存新筆記失敗");
+      toast.success("新筆記儲存成功！");
+      setNewRecord({ content: "", project_id: undefined, files: [] });
       setIsAddNoteModalOpen(false);
       await fetchReports();
     } catch (error: any) {
@@ -272,7 +393,16 @@ const DailyReportTab: React.FC = () => {
     }
   };
 
-  if (isLoading) { return <div className="p-6 text-center">載入中...</div>; }
+  const handleApplyAiSuggestion = (aiContent: string) => {
+    // Convert HTML line breaks to plain text newlines for the textarea
+    const plainTextContent = aiContent.replace(/<br \/>/g, "\n");
+    setEditContent(plainTextContent);
+    toast.success("AI 建議已套用至編輯框！");
+  };
+
+  if (isLoading) {
+    return <div className="p-6 text-center">載入中...</div>;
+  }
 
   return (
     <>
@@ -298,74 +428,143 @@ const DailyReportTab: React.FC = () => {
             </button>
             <button
               onClick={handleEnhanceAll}
-              disabled={isGeneratingAllAi || reports.length === 0 || editingProjectId !== null || generatingAiFor !== null}
+              disabled={
+                isGeneratingAllAi ||
+                reports.length === 0 ||
+                editingProjectId !== null ||
+                generatingAiFor !== null
+              }
               className={`inline-flex items-center px-4 py-2 text-sm rounded-lg disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed ${greenButtonStyle}`}
             >
               <Wand2 className="w-4 h-4 mr-2" />
-              {isGeneratingAllAi ? 'AI 處理中...' : 'AI 潤飾全部'}
+              {isGeneratingAllAi ? "AI 處理中..." : "AI 潤飾全部"}
             </button>
-            <button 
-              onClick={handleSubmitReport} 
+            <button
+              onClick={handleSubmitReport}
               disabled={isSubmitting || editingProjectId !== null}
               className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed`}
             >
-              <Upload className="w-4 h-4 mr-2" /> 
-              {isSubmitting ? '提交中...' : '上傳最終版'}
+              <Upload className="w-4 h-4 mr-2" />
+              {isSubmitting ? "提交中..." : "上傳最終版"}
             </button>
           </div>
         </div>
-        
+
         <div className="space-y-8 mt-6">
           {reports.map((report) => (
-            <div key={report.project.id} className={`grid grid-cols-1 ${isAiViewActive ? 'lg:grid-cols-2' : ''} gap-6 items-start bg-gray-50 p-4 rounded-xl border`}>
+            <div
+              key={report.project.id}
+              className={`relative grid grid-cols-1 ${
+                isAiViewActive ? "lg:grid-cols-2" : ""
+              } gap-6 items-start bg-gray-50 p-4 rounded-xl border`}
+            >
+              {/* --- Card 1: Original Report --- */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full flex flex-col h-full">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <div className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
+                    <div
+                      className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                        getProjectColors(report.project.plan_subj_c).tag
+                      }`}
+                    >
                       {report.project.plan_subj_c}
                     </div>
-                    <span className="text-sm text-gray-500">({report.record_count} 筆記錄)</span>
+                    <span className="text-sm text-gray-500">
+                      ({report.record_count} 筆記錄)
+                    </span>
                   </div>
                   {editingProjectId !== report.project.id && (
                     <div className="flex items-center space-x-2">
-                      <button onClick={() => handleEnhanceOne(report.project.id)} disabled={generatingAiFor !== null || isGeneratingAllAi || editingProjectId !== null} className={`inline-flex items-center p-2 text-sm font-medium rounded-lg ${greenButtonStyle} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
-                        {generatingAiFor === report.project.id ? <div className="w-4 h-4 border-2 border-transparent border-t-white rounded-full animate-spin"></div> : <Wand2 className="w-4 h-4" />}
+                      <button
+                        onClick={() => handleEnhanceOne(report.project.id)}
+                        disabled={
+                          generatingAiFor !== null ||
+                          isGeneratingAllAi ||
+                          editingProjectId !== null
+                        }
+                        className={`inline-flex items-center p-2 text-sm font-medium rounded-lg ${greenButtonStyle} disabled:bg-gray-300 disabled:cursor-not-allowed`}
+                      >
+                        {generatingAiFor === report.project.id ? (
+                          <div className="w-4 h-4 border-2 border-transparent border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                          <Wand2 className="w-4 h-4" />
+                        )}
                       </button>
-                      <button onClick={() => startEdit(report)} disabled={generatingAiFor !== null || isGeneratingAllAi} className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${getProjectColors(report.project.plan_subj_c).button} disabled:bg-gray-300 disabled:cursor-not-allowed`}>
+                      <button
+                        onClick={() => startEdit(report)}
+                        disabled={generatingAiFor !== null || isGeneratingAllAi}
+                        className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                          getProjectColors(report.project.plan_subj_c).button
+                        } disabled:bg-gray-300 disabled:cursor-not-allowed`}
+                      >
                         <Edit className="w-4 h-4 mr-1" /> 編輯
                       </button>
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex-grow">
                   {editingProjectId === report.project.id ? (
                     <div className="space-y-4">
-                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full min-h-[200px] p-4 border rounded-lg" />
-                      <AttachedFilesManager 
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="w-full min-h-[200px] p-4 border rounded-lg"
+                      />
+                      <AttachedFilesManager
                         files={editFiles}
                         onFileUpload={handleEditFileUpload}
                         onRemoveFile={removeEditFile}
                         onAiSelectionChange={handleEditAiSelectionChange}
-                        isUploading={false} // This is now handled inside the manager
+                        isUploading={false}
                       />
                       <div className="flex space-x-3">
-                        <button onClick={saveEdit} disabled={isSaving} className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200`}>
-                            <Save className="w-4 h-4 mr-2" />
-                            {isSaving ? '儲存中...' : '儲存草稿'}
+                        <button
+                          onClick={saveEdit}
+                          disabled={isSaving}
+                          className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200`}
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          {isSaving ? "儲存中..." : "儲存草稿"}
                         </button>
-                        <button onClick={cancelEdit} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">取消</button>
+                        <button
+                          onClick={cancelEdit}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300"
+                        >
+                          取消
+                        </button>
                       </div>
                     </div>
-                  ) : ( 
+                  ) : (
                     <div>
-                      <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">{report.content}</p>
+                      <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">
+                        {report.content}
+                      </p>
                       <AttachedFilesDisplay files={report.files} />
                     </div>
                   )}
                 </div>
               </div>
 
+              {/* --- Apply AI Suggestion Button (RWD & Style Updated) --- */}
+              {editingProjectId === report.project.id &&
+                isAiViewActive &&
+                report.ai_content && (
+                  <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <button
+                      onClick={() =>
+                        handleApplyAiSuggestion(report.ai_content!)
+                      }
+                      className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg hover:bg-gray-100 border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-all duration-200 ease-in-out transform hover:scale-110"
+                      title="套用 AI 建議"
+                    >
+                      <ArrowUp className="w-6 h-6 lg:hidden" />
+                      <ArrowLeft className="w-6 h-6 hidden lg:block" />
+                    </button>
+                  </div>
+                )}
+
+              {/* --- Card 2: AI Reference --- */}
               {isAiViewActive && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full h-full">
                   <div className="flex items-center space-x-3 mb-4">
@@ -374,19 +573,27 @@ const DailyReportTab: React.FC = () => {
                     </div>
                   </div>
                   {generatingAiFor === report.project.id ? (
-                     <p className="text-sm text-gray-500 italic">AI 正在為此專案生成潤飾內容...</p>
+                    <p className="text-sm text-gray-500 italic">
+                      AI 正在為此專案生成潤飾內容...
+                    </p>
                   ) : report.ai_content ? (
                     <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">
-                      <div dangerouslySetInnerHTML={{ __html: report.ai_content.replace(/\n/g, '<br />') }} />
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: report.ai_content.replace(/\n/g, "<br />"),
+                        }}
+                      />
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400 italic">此專案無 AI 潤飾內容。點擊魔法棒按鈕開始生成。</p>
+                    <p className="text-sm text-gray-400 italic">
+                      此專案無 AI 潤飾內容。點擊魔法棒按鈕開始生成。
+                    </p>
                   )}
                 </div>
               )}
             </div>
           ))}
-          
+
           {reports.length === 0 && !isLoading && (
             <div className="text-center py-12 text-gray-500">
               <p>今天還沒有記錄，點擊右上角「新增筆記」來開始。</p>
@@ -400,35 +607,55 @@ const DailyReportTab: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out animate-fade-in">
           <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl m-4 transform transition-all duration-300 ease-in-out scale-95 animate-fade-in-scale">
             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">新增筆記到今日報告</h3>
-                <button onClick={() => setIsAddNoteModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-6 h-6" />
-                </button>
+              <h3 className="text-xl font-semibold text-gray-900">
+                新增筆記到今日報告
+              </h3>
+              <button
+                onClick={() => setIsAddNoteModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">工作計劃</label>
-                <select 
-                  value={newRecord.project_id || ''} 
-                  onChange={(e) => setNewRecord({ ...newRecord, project_id: parseInt(e.target.value, 10) || undefined })} 
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  工作計劃
+                </label>
+                <select
+                  value={newRecord.project_id || ""}
+                  onChange={(e) =>
+                    setNewRecord({
+                      ...newRecord,
+                      project_id: parseInt(e.target.value, 10) || undefined,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">請選擇工作計劃</option>
-                  {projects.map((proj) => (<option key={proj.id} value={proj.id}>{proj.plan_subj_c}</option>))}
+                  {projects.map((proj) => (
+                    <option key={proj.id} value={proj.id}>
+                      {proj.plan_subj_c}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">內容</label>
-                <textarea 
-                  rows={5} 
-                  placeholder="記錄您的想法..." 
-                  value={newRecord.content || ''} 
-                  onChange={(e) => setNewRecord({ ...newRecord, content: e.target.value })} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  內容
+                </label>
+                <textarea
+                  rows={5}
+                  placeholder="記錄您的想法..."
+                  value={newRecord.content || ""}
+                  onChange={(e) =>
+                    setNewRecord({ ...newRecord, content: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
-              <AttachedFilesManager 
+
+              <AttachedFilesManager
                 files={newRecord.files || []}
                 onFileUpload={handleNewRecordUpload}
                 onRemoveFile={removeNewRecordFile}
@@ -449,7 +676,7 @@ const DailyReportTab: React.FC = () => {
                   className={`w-32 py-2 px-4 rounded-lg flex items-center justify-center ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400`}
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  {isSavingNewRecord ? '儲存中...' : '新增筆記'}
+                  {isSavingNewRecord ? "儲存中..." : "新增筆記"}
                 </button>
               </div>
             </div>

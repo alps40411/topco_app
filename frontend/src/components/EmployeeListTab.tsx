@@ -115,7 +115,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">日報審核</h2>
+          <h2 className="text-2xl font-bold text-gray-900">日報審閱</h2>
           <p className="text-sm text-gray-600 mt-1">
             預設顯示前一天的日報，因為員工填寫時間到隔天8:30截止
           </p>
@@ -182,7 +182,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                     {report.employee.name || report.employee.empnamec}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {report.employee.department_name || report.employee.department_no}
+                    {report.employee.department_name ||
+                      report.employee.department_no}
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
@@ -206,11 +207,14 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                           <span className="text-sm font-medium">已審核</span>
                         </div>
                       );
-                    } else { // Fallback for unexpected statuses, should ideally not happen with current backend logic
+                    } else {
+                      // Fallback for unexpected statuses, should ideally not happen with current backend logic
                       return (
                         <div className="flex items-center space-x-1 text-orange-600">
                           <Clock className="w-4 h-4" />
-                          <span className="text-sm font-medium">待審核 (未知狀態)</span>
+                          <span className="text-sm font-medium">
+                            待審核 (未知狀態)
+                          </span>
                         </div>
                       );
                     }
