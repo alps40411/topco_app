@@ -8,8 +8,6 @@ import {
   Wand2,
   Plus,
   X,
-  Copy,
-  ArrowBigLeftDash,
   ArrowUp,
   ArrowLeft,
 } from "lucide-react";
@@ -456,7 +454,7 @@ const DailyReportTab: React.FC = () => {
               key={report.project.id}
               className={`relative grid grid-cols-1 ${
                 isAiViewActive ? "lg:grid-cols-2" : ""
-              } gap-6 items-start bg-gray-50 p-4 rounded-xl border`}
+              } gap-x-6 gap-y-12 items-stretch bg-gray-50 p-4 rounded-xl border`}
             >
               {/* --- Card 1: Original Report --- */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full flex flex-col h-full">
@@ -546,24 +544,6 @@ const DailyReportTab: React.FC = () => {
                 </div>
               </div>
 
-              {/* --- Apply AI Suggestion Button (RWD & Style Updated) --- */}
-              {editingProjectId === report.project.id &&
-                isAiViewActive &&
-                report.ai_content && (
-                  <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <button
-                      onClick={() =>
-                        handleApplyAiSuggestion(report.ai_content!)
-                      }
-                      className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg hover:bg-gray-100 border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-all duration-200 ease-in-out transform hover:scale-110"
-                      title="套用 AI 建議"
-                    >
-                      <ArrowUp className="w-6 h-6 lg:hidden" />
-                      <ArrowLeft className="w-6 h-6 hidden lg:block" />
-                    </button>
-                  </div>
-                )}
-
               {/* --- Card 2: AI Reference --- */}
               {isAiViewActive && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full h-full">
@@ -591,6 +571,24 @@ const DailyReportTab: React.FC = () => {
                   )}
                 </div>
               )}
+
+              {/* --- Apply AI Suggestion Button (FINAL - Corrected Position) --- */}
+              {editingProjectId === report.project.id &&
+                isAiViewActive &&
+                report.ai_content && (
+                  <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <button
+                      onClick={() =>
+                        handleApplyAiSuggestion(report.ai_content!)
+                      }
+                      className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg hover:bg-gray-100 border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-all duration-200 ease-in-out transform hover:scale-110"
+                      title="套用 AI 建議"
+                    >
+                      <ArrowUp className="w-6 h-6 lg:hidden" />
+                      <ArrowLeft className="w-6 h-6 hidden lg:block" />
+                    </button>
+                  </div>
+                )}
             </div>
           ))}
 
