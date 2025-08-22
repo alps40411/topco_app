@@ -26,7 +26,9 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import AttachedFilesManager from "./AttachedFilesManager";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
+import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import { toast } from "react-hot-toast";
+import { formatMinutesToHours } from "../utils/timeUtils";
 
 interface WritingStatus {
   allowed: boolean;
@@ -58,6 +60,7 @@ const DailyReportTab: React.FC = () => {
     content: "",
     project_id: undefined,
     files: [],
+    execution_time_minutes: 0,
   });
   const [isSavingNewRecord, setIsSavingNewRecord] = useState(false);
   const [isUploadingNewFile, setIsUploadingNewFile] = useState(false);
@@ -368,6 +371,10 @@ const DailyReportTab: React.FC = () => {
       toast.error("請填寫內容或附加檔案");
       return;
     }
+    if (!newRecord.execution_time_minutes || newRecord.execution_time_minutes === 0) {
+      toast.error("請設定執行時間");
+      return;
+    }
     setIsSavingNewRecord(true);
     try {
       const response = await authFetch("/api/records/", {
@@ -376,11 +383,12 @@ const DailyReportTab: React.FC = () => {
           project_id: newRecord.project_id,
           content: newRecord.content,
           files: newRecord.files || [],
+          execution_time_minutes: newRecord.execution_time_minutes,
         }),
       });
       if (!response.ok) throw new Error("儲存新筆記失敗");
       toast.success("新筆記儲存成功！");
-      setNewRecord({ content: "", project_id: undefined, files: [] });
+      setNewRecord({ content: "", project_id: undefined, files: [], execution_time_minutes: 0 });
       setIsAddNoteModalOpen(false);
       await fetchReports();
     } catch (error: any) {
@@ -432,10 +440,18 @@ const DailyReportTab: React.FC = () => {
                 editingProjectId !== null ||
                 generatingAiFor !== null
               }
-              className={`inline-flex items-center px-4 py-2 text-sm rounded-lg disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed ${greenButtonStyle}`}
+              className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
             >
-              <Wand2 className="w-4 h-4 mr-2" />
-              {isGeneratingAllAi ? "AI 處理中..." : "AI 潤飾全部"}
+              <span className="inline-flex items-center">
+                {isGeneratingAllAi ? (
+                  <div className="w-3 h-3 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-1"></div>
+                ) : (
+                  <Wand2 className="w-3 h-3 mr-1" />
+                )}
+                <span className="whitespace-nowrap">
+                  {isGeneratingAllAi ? "AI 處理中..." : "✨ AI 潤飾全部"}
+                </span>
+              </span>
             </button>
             <button
               onClick={handleSubmitReport}
@@ -470,6 +486,11 @@ const DailyReportTab: React.FC = () => {
                     <span className="text-sm text-gray-500">
                       ({report.record_count} 筆記錄)
                     </span>
+                    {report.total_execution_time_minutes !== undefined && report.total_execution_time_minutes > 0 && (
+                      <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                        {formatMinutesToHours(report.total_execution_time_minutes)}
+                      </span>
+                    )}
                   </div>
                   {editingProjectId !== report.project.id && (
                     <div className="flex items-center space-x-2">
@@ -480,13 +501,16 @@ const DailyReportTab: React.FC = () => {
                           isGeneratingAllAi ||
                           editingProjectId !== null
                         }
-                        className={`inline-flex items-center p-2 text-sm font-medium rounded-lg ${greenButtonStyle} disabled:bg-gray-300 disabled:cursor-not-allowed`}
+                        className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
                       >
-                        {generatingAiFor === report.project.id ? (
-                          <div className="w-4 h-4 border-2 border-transparent border-t-white rounded-full animate-spin"></div>
-                        ) : (
-                          <Wand2 className="w-4 h-4" />
-                        )}
+                        <span className="inline-flex items-center">
+                          {generatingAiFor === report.project.id ? (
+                            <div className="w-3 h-3 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-1"></div>
+                          ) : (
+                            <Wand2 className="w-3 h-3 mr-1" />
+                          )}
+                          <span className="whitespace-nowrap">✨ 潤飾</span>
+                        </span>
                       </button>
                       <button
                         onClick={() => startEdit(report)}
@@ -652,6 +676,14 @@ const DailyReportTab: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              <ExecutionTimeSelector
+                totalMinutes={newRecord.execution_time_minutes || 0}
+                onChange={(minutes) => 
+                  setNewRecord({ ...newRecord, execution_time_minutes: minutes })
+                }
+                required
+              />
 
               <AttachedFilesManager
                 files={newRecord.files || []}

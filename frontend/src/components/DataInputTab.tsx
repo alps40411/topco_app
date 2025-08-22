@@ -7,7 +7,9 @@ import { getProjectColors, blueButtonStyle } from '../utils/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import AttachedFilesDisplay from './AttachedFilesDisplay';
 import AttachedFilesManager from './AttachedFilesManager';
+import ExecutionTimeSelector from './ExecutionTimeSelector';
 import { toast } from 'react-hot-toast';
+import { formatMinutesToHours } from '../utils/timeUtils';
 
 const DataInputTab: React.FC = () => {
   const [consolidatedRecords, setConsolidatedRecords] = useState<ConsolidatedReport[]>([]);
@@ -16,6 +18,7 @@ const DataInputTab: React.FC = () => {
     content: '',
     project_id: undefined,
     files: [],
+    execution_time_minutes: 0,
   });
   const [projects, setProjects] = useState<Project[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -62,6 +65,10 @@ const DataInputTab: React.FC = () => {
       toast.error('請填寫內容或附加檔案');
       return;
     }
+    if (!currentRecord.execution_time_minutes || currentRecord.execution_time_minutes === 0) {
+      toast.error('請設定執行時間');
+      return;
+    }
     setIsSaving(true);
     try {
       const response = await authFetch('/api/records/', {
@@ -70,11 +77,12 @@ const DataInputTab: React.FC = () => {
           project_id: currentRecord.project_id,
           content: currentRecord.content,
           files: currentRecord.files || [],
+          execution_time_minutes: currentRecord.execution_time_minutes,
         }),
       });
       if (!response.ok) throw new Error('儲存筆記失敗');
       await fetchConsolidatedToday(); // Re-fetch consolidated records
-      setCurrentRecord({ content: '', project_id: undefined, files: [] });
+      setCurrentRecord({ content: '', project_id: undefined, files: [], execution_time_minutes: 0 });
       toast.success('記錄儲存成功！');
     } catch (error) {
       console.error("儲存筆記時發生錯誤:", error);
@@ -139,6 +147,14 @@ const DataInputTab: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">內容</label>
               <textarea rows={4} placeholder="記錄您的想法..." value={currentRecord.content || ''} onChange={(e) => setCurrentRecord({ ...currentRecord, content: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            <ExecutionTimeSelector
+              totalMinutes={currentRecord.execution_time_minutes || 0}
+              onChange={(minutes) => 
+                setCurrentRecord({ ...currentRecord, execution_time_minutes: minutes })
+              }
+              required
+            />
             
             <AttachedFilesManager 
               files={currentRecord.files || []}
@@ -169,8 +185,15 @@ const DataInputTab: React.FC = () => {
               consolidatedRecords.map((report) => (
                 <div key={report.project.id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
                   <div className="flex items-start justify-between mb-2">
-                    <div className={`inline-flex items-center px-2 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
-                      {report.project.plan_subj_c}
+                    <div className="flex items-center space-x-2">
+                      <div className={`inline-flex items-center px-2 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
+                        {report.project.plan_subj_c}
+                      </div>
+                      {report.total_execution_time_minutes !== undefined && report.total_execution_time_minutes > 0 && (
+                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                          {formatMinutesToHours(report.total_execution_time_minutes)}
+                        </span>
+                      )}
                     </div>
                     <span className="text-xs text-gray-500">{report.record_count} 筆記錄</span>
                   </div>

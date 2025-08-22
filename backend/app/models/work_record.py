@@ -22,6 +22,9 @@ class WorkRecord(Base):
     ai_content = Column(Text, nullable=True) 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
+    # 執行時間（以分鐘為單位存儲，便於計算）
+    execution_time_minutes = Column(Integer, nullable=False, default=0)
+    
     employee_id = Column(Integer, ForeignKey("employees.id"))
 
     files = relationship("FileAttachment", back_populates="work_record")

@@ -9,7 +9,7 @@ from app.schemas.supervisor import EmployeeForList, DailyReportDetail, ReportRev
 from app.schemas.employee import Employee as EmployeeDetailSchema
 from app.schemas.work_record import ConsolidatedReport
 from app.schemas.report_approval import SupervisorApprovalInfo
-from app.services import supervisor_service
+from app.services import supervisor_service, ai_suggestion_service
 from app.core import deps
 from app.models.user import User
 
@@ -163,3 +163,75 @@ async def get_employee_editing_status(
         employee_id=current_user.employee.id
     )
     return editing_status
+
+@router.post("/reports/{report_id}/ai-suggestions")
+async def get_ai_reply_suggestions(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    根據日報內容生成AI建議回覆選項
+    """
+    # 檢查是否為主管
+    if not current_user.is_supervisor or not current_user.employee:
+        raise HTTPException(
+            status_code=403, 
+            detail="Only supervisors can access AI suggestions"
+        )
+    
+    try:
+        # 獲取日報詳情
+        report = await supervisor_service.get_report_by_id(db=db, report_id=report_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+        
+        # 檢查主管是否有權限審核這個員工的報告
+        can_review = await supervisor_service.can_supervisor_review_employee(
+            db, current_user.employee.id, report.employee_id
+        )
+        if not can_review:
+            raise HTTPException(
+                status_code=403, 
+                detail="No permission to review this employee's report"
+            )
+        
+        # 構建報告內容
+        report_content = ""
+        if report.consolidated_content:
+            for project_report in report.consolidated_content:
+                project_name = project_report.get("project", {}).get("plan_subj_c", "未知專案")
+                content = project_report.get("content", "")
+                report_content += f"**{project_name}**:\n{content}\n\n"
+        
+        # 獲取員工名稱
+        employee_name = "員工"
+        if report.employee and hasattr(report.employee, 'empnamec'):
+            employee_name = report.employee.empnamec
+        elif report.employee and hasattr(report.employee, 'name'):
+            employee_name = report.employee.name
+        
+        # TODO: 可以在此處添加獲取最近兩天報告的邏輯作為上下文
+        recent_context = None
+        
+        # 生成AI建議
+        suggestions = await ai_suggestion_service.generate_supervisor_reply_suggestions(
+            report_content=report_content,
+            employee_name=employee_name,
+            recent_context=recent_context
+        )
+        
+        return {"suggestions": suggestions}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Error generating AI suggestions: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        
+        # 返回備用建議而不是錯誤
+        from app.services.ai_suggestion_service import _get_fallback_suggestions
+        fallback_suggestions = _get_fallback_suggestions()
+        return {"suggestions": fallback_suggestions}

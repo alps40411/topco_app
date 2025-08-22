@@ -14,6 +14,7 @@ import { useAuth } from "../contexts/AuthContext";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
+import { formatMinutesToHours } from "../utils/timeUtils";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];
@@ -164,6 +165,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 員工姓名
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                執行時間
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 狀態
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -188,11 +192,24 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {(() => {
+                    const totalExecutionTime = (report.consolidated_content || []).reduce(
+                      (total: number, project: any) => total + (project.total_execution_time_minutes || 0), 
+                      0
+                    );
+                    return totalExecutionTime > 0 ? (
+                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-600 rounded-full">
+                        {formatMinutesToHours(totalExecutionTime)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">未設定</span>
+                    );
+                  })()}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {(() => {
                     const myApproval = report.approvals?.find(
                       (approval) => approval.supervisor_id === currentUserId
                     );
-                    console.log(myApproval);
-                    console.log(currentUserId);
                     if (!myApproval || myApproval.status === "pending") {
                       return (
                         <div className="flex items-center space-x-1 text-orange-600">

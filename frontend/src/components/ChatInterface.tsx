@@ -1,7 +1,7 @@
 // frontend/src/components/ChatInterface.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { User, Crown, MessageCircle } from "lucide-react";
+import { User, Crown, MessageCircle, Sparkles, Loader2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 
@@ -29,6 +29,12 @@ export interface Comment {
   parent_comment_id?: number;
   rating?: number; // 評分（如果是審閱留言）
   replies: Comment[];
+}
+
+interface AISuggestion {
+  type: string;
+  title: string;
+  content: string;
 }
 
 interface ChatInterfaceProps {
@@ -61,6 +67,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [selectedRating, setSelectedRating] = useState<number>(3); // 預設評分為「普通」(5分制)
   const [reviewComment, setReviewComment] = useState("");
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
+
+  // AI建議相關狀態
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
 
   const { authFetch, user } = useAuth();
 
@@ -171,6 +182,40 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const handleGetAISuggestions = async () => {
+    if (!authFetch) return;
+    setIsLoadingAI(true);
+    try {
+      const response = await authFetch(
+        `/api/supervisor/reports/${reportId}/ai-suggestions`,
+        {
+          method: "POST",
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setAiSuggestions(data.suggestions || []);
+        setShowAISuggestions(true);
+        toast.success("AI 建議已生成！");
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "獲取 AI 建議失敗");
+      }
+    } catch (error: any) {
+      console.error("獲取 AI 建議失敗:", error);
+      toast.error(error.message || "獲取 AI 建議失敗");
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  const handleSelectAISuggestion = (suggestion: AISuggestion) => {
+    setReviewComment(suggestion.content);
+    // 不關閉 AI 建議，讓用戶可以繼續選擇其他建議
+    // setShowAISuggestions(false);
+    toast.success(`已套用「${suggestion.title}」建議`);
+  };
+
   const formatTime = (timeString: string) => {
     const date = new Date(timeString);
     const now = new Date();
@@ -260,14 +305,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     "謝謝建議，我會改進",
   ];
 
+  // const supervisorSuggestedReplies = [
+  //   "工作內容詳實，執行效果良好，請繼續保持。",
+  //   "報告內容完整，建議在執行細節上可以更加具體。",
+  //   "工作進度符合預期，期待看到更多創新想法。",
+  //   "整體表現良好，建議加強時程管控。",
+  //   "請在下次日報中提供更多執行細節。",
+  //   "表現優秀，值得肯定。",
+  //   "請注意品質管控的細節。",
+  // ];
   const supervisorSuggestedReplies = [
-    "工作內容詳實，執行效果良好，請繼續保持。",
-    "報告內容完整，建議在執行細節上可以更加具體。",
-    "工作進度符合預期，期待看到更多創新想法。",
-    "整體表現良好，建議加強時程管控。",
-    "請在下次日報中提供更多執行細節。",
-    "表現優秀，值得肯定。",
-    "請注意品質管控的細節。",
+    "Good Job !",
+    "Go Ahead !",
+    "Well Done & Thanks !",
+    "內容過於簡單 !",
+    "瞭解 !",
   ];
   if (isLoading) {
     return (
@@ -347,20 +399,66 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                   {/* 建議回復按鈕 - 主管版 */}
                   <div className="mb-3">
-                    <p className="text-xs text-blue-700 mb-2">快速回復建議：</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-blue-700">快速回復建議：</p>
+                      <button
+                        onClick={handleGetAISuggestions}
+                        disabled={isLoadingAI}
+                        className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs rounded-full hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
+                      >
+                        {isLoadingAI ? (
+                          <>
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            生成中...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            AI 產生建議
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {/* AI 建議按鈕 */}
+                      {showAISuggestions &&
+                        aiSuggestions.map((suggestion, index) => (
+                          <button
+                            key={`ai-${index}`}
+                            onClick={() => handleSelectAISuggestion(suggestion)}
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 text-left max-w-full break-words whitespace-normal leading-snug"
+                          >
+                            <span className="inline-flex items-start">
+                              <span className="mr-1 flex-shrink-0">✨</span>
+                              <span className="flex-1">
+                                {suggestion.content}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+
+                      {/* 預設快速回覆按鈕 */}
                       {supervisorSuggestedReplies.map((reply, index) => (
                         <button
-                          key={index}
+                          key={`default-${index}`}
                           onClick={() => setReviewComment(reply)}
-                          className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors border border-blue-200"
+                          className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200 text-left max-w-full break-words whitespace-normal leading-snug"
                         >
-                          {reply.length > 25
-                            ? reply.substring(0, 25) + "..."
-                            : reply}
+                          {reply}
                         </button>
                       ))}
                     </div>
+
+                    {/* 收起AI建議的小按鈕 */}
+                    {showAISuggestions && aiSuggestions.length > 0 && (
+                      <button
+                        onClick={() => setShowAISuggestions(false)}
+                        className="mt-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        收起 AI 建議
+                      </button>
+                    )}
                   </div>
                   <textarea
                     value={reviewComment}

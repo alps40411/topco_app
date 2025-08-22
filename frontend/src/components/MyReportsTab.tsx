@@ -16,6 +16,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import toast from "react-hot-toast";
 import EmployeeDetailTab from "./EmployeeDetailTab";
+import { formatMinutesToHours } from "../utils/timeUtils";
 
 const MyReportsTab: React.FC = () => {
   const [reports, setReports] = useState<DailyReport[]>([]);
@@ -235,13 +236,20 @@ const MyReportsTab: React.FC = () => {
                       key={index}
                       className="border-l-4 border-gray-200 pl-4"
                     >
-                      <div
-                        className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded mb-1 ${
-                          getProjectColors(projectReport.project.plan_subj_c)
-                            .tag
-                        }`}
-                      >
-                        {projectReport.project.plan_subj_c}
+                      <div className="flex items-center space-x-2 mb-1">
+                        <div
+                          className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
+                            getProjectColors(projectReport.project.plan_subj_c)
+                              .tag
+                          }`}
+                        >
+                          {projectReport.project.plan_subj_c}
+                        </div>
+                        {projectReport.total_execution_time_minutes !== undefined && projectReport.total_execution_time_minutes > 0 && (
+                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                            {formatMinutesToHours(projectReport.total_execution_time_minutes)}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-600 line-clamp-2">
                         {projectReport.content.length > 100

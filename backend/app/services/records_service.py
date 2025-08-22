@@ -16,6 +16,7 @@ async def create(db: AsyncSession, *, obj_in: WorkRecordCreate, employee_id: int
         content=obj_in.content,
         project_id=obj_in.project_id, # <-- 使用 project_id
         employee_id=employee_id,
+        execution_time_minutes=obj_in.execution_time_minutes,
     )
 
     if obj_in.files:
@@ -58,10 +59,10 @@ async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[
     print(f"[INFO] get_consolidated_today 開始 - employee_id: {employee_id}")
     today_records = await get_multi_by_employee_today(db=db, employee_id=employee_id)
     print(f"   [INFO] 從資料庫取得 {len(today_records)} 筆今日記錄")
-    project_groups = defaultdict(lambda: {"content": [], "files": [], "record_count": 0, "project_obj": None, "ai_content": None})
+    project_groups = defaultdict(lambda: {"content": [], "files": [], "record_count": 0, "project_obj": None, "ai_content": None, "total_execution_time": 0})
     
     for i, record in enumerate(today_records):
-        print(f"   [INFO] 處理記錄 {i+1}: project_id={record.project_id}, files={len(record.files)}")
+        print(f"   [INFO] 處理記錄 {i+1}: project_id={record.project_id}, files={len(record.files)}, execution_time={record.execution_time_minutes}min")
         if record.project:
             proj_id = record.project_id
             # 只有在 content 存在且不為純空白時才加入列表
@@ -74,6 +75,7 @@ async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[
             project_groups[proj_id]["files"].extend(record.files)
             project_groups[proj_id]["record_count"] += 1
             project_groups[proj_id]["project_obj"] = record.project
+            project_groups[proj_id]["total_execution_time"] += record.execution_time_minutes
             # 以第一筆紀錄的 ai_content 為主
             if project_groups[proj_id]["ai_content"] is None:
                 project_groups[proj_id]["ai_content"] = record.ai_content
@@ -85,7 +87,7 @@ async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[
             valid_content = [c for c in data["content"] if c]
             final_content = "\n\n".join(valid_content)
 
-            files_schema = [FileAttachmentSchema.from_orm(f) for f in data["files"]]
+            files_schema = [FileAttachmentSchema.model_validate(f) for f in data["files"]]
             consolidated_list.append(
                 ConsolidatedReport(
                     project=data["project_obj"],
@@ -93,6 +95,7 @@ async def get_consolidated_today(db: AsyncSession, *, employee_id: int) -> List[
                     files=files_schema,
                     record_count=data["record_count"],
                     ai_content=data["ai_content"],
+                    total_execution_time_minutes=data["total_execution_time"],
                 )
             )
     return consolidated_list
@@ -195,7 +198,7 @@ async def enhance_one_today(db: AsyncSession, *, employee_id: int, project_id: i
     report = ConsolidatedReport(
         project=project_obj,
         content="\n\n".join(content_list),
-        files=[FileAttachmentSchema.from_orm(f) for f in files_list],
+        files=[FileAttachmentSchema.model_validate(f) for f in files_list],
         record_count=len(today_records),
         ai_content=today_records[0].ai_content # 使用第一筆的 ai_content
     )

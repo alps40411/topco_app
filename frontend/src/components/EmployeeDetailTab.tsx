@@ -8,6 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ChatInterface from "./ChatInterface";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
+import { formatMinutesToHours } from "../utils/timeUtils";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];
@@ -166,7 +167,24 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
       {/* 上方 - 日報內容 */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">日報內容</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">日報內容</h3>
+          {(() => {
+            const totalExecutionTime = (reportDetail.consolidated_content || []).reduce(
+              (total, project) => total + (project.total_execution_time_minutes || 0), 
+              0
+            );
+            return totalExecutionTime > 0 ? (
+              <span className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full font-medium border border-green-200">
+                總執行時間: {formatMinutesToHours(totalExecutionTime)}
+              </span>
+            ) : (
+              <span className="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full font-medium border border-gray-200">
+                總執行時間: 0 小時
+              </span>
+            );
+          })()}
+        </div>
         <div className="space-y-4">
           {(reportDetail.consolidated_content || []).map(
             (projectReport, index) => (
@@ -174,12 +192,23 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                 key={index}
                 className="border border-gray-100 rounded-lg p-4"
               >
-                <div
-                  className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md mb-3 ${
-                    getProjectColors(projectReport.project.plan_subj_c).tag
-                  }`}
-                >
-                  {projectReport.project.plan_subj_c}
+                <div className="flex items-center space-x-2 mb-3">
+                  <div
+                    className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                      getProjectColors(projectReport.project.plan_subj_c).tag
+                    }`}
+                  >
+                    {projectReport.project.plan_subj_c}
+                  </div>
+                  {projectReport.total_execution_time_minutes !== undefined && projectReport.total_execution_time_minutes > 0 ? (
+                    <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                      執行時間: {formatMinutesToHours(projectReport.total_execution_time_minutes)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400 bg-gray-50 px-2 py-1 rounded font-medium">
+                      執行時間: 未設定
+                    </span>
+                  )}
                 </div>
                 <p className="text-gray-700 whitespace-pre-wrap">
                   {projectReport.content}

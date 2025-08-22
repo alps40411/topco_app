@@ -76,3 +76,28 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
         return ai_content if ai_content else "無法從 AI 服務獲取內容。"
     except Exception as e:
         return "AI 服務暫時無法使用。"
+
+async def get_completion(prompt: str, temperature: float = 0.3, max_tokens: int = 1000) -> str:
+    """
+    使用 Azure OpenAI 獲取通用文本完成回應
+    """
+    client = _build_client()
+    if client is None:
+        raise Exception("AI 服務未啟用或尚未配置")
+    
+    try:
+        response = await client.chat.completions.create(
+            model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        ai_content = response.choices[0].message.content
+        
+        return ai_content if ai_content else "無法從 AI 服務獲取內容"
+    except Exception as e:
+        error_msg = f"Azure AI API error: {str(e)}"
+        print(error_msg)
+        raise Exception(f"AI 服務調用失敗: {str(e)}")

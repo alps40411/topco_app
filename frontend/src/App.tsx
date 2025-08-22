@@ -42,6 +42,7 @@ export interface WorkRecord {
   created_at: string;
   project: Project;
   files: FileAttachment[];
+  execution_time_minutes: number;
 }
 export interface FileForUpload extends Omit<FileAttachment, "id"> {
   is_selected_for_ai: boolean;
@@ -50,6 +51,7 @@ export interface WorkRecordCreate {
   content: string;
   project_id?: number;
   files: FileForUpload[];
+  execution_time_minutes: number;
 }
 export interface ConsolidatedReport {
   project: Project;
@@ -57,6 +59,7 @@ export interface ConsolidatedReport {
   files: FileAttachment[];
   record_count: number;
   ai_content: string | null;
+  total_execution_time_minutes?: number;
 }
 export interface EmployeeInList {
   id: number;

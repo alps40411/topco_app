@@ -28,6 +28,7 @@ class FileAttachment(FileAttachmentInDB):
 class WorkRecordBase(BaseModel):
     content: str
     project_id: int
+    execution_time_minutes: int
 
 class WorkRecordCreate(WorkRecordBase):
     files: List[FileAttachmentCreate] = []
@@ -55,6 +56,7 @@ class WorkRecordInList(BaseModel):
     project: 'Project' # <-- 關鍵修正：使用字串 'Project'
     files: List[FileAttachment] = []
     ai_content: Optional[str] = None
+    execution_time_minutes: int
 
     class Config:
         from_attributes = True
@@ -66,6 +68,7 @@ class ConsolidatedReport(BaseModel):
     files: List[FileAttachment] = []
     record_count: int
     ai_content: Optional[str] = None
+    total_execution_time_minutes: Optional[int] = 0
 
     class Config:
         from_attributes = True
