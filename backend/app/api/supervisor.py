@@ -145,3 +145,21 @@ async def get_report_approval_status(
     獲取指定日報的所有主管審核狀態
     """
     return await supervisor_service.get_report_approval_status(db=db, report_id=report_id)
+
+@router.get("/employee-editing-status")
+async def get_employee_editing_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    檢查員工是否還可以編輯和提交今日的日報
+    判斷條件：是否有主管已經審核過今日的日報
+    """
+    if not current_user.employee:
+        raise HTTPException(status_code=404, detail="該用戶不是員工")
+    
+    editing_status = await supervisor_service.check_employee_editing_permissions(
+        db=db, 
+        employee_id=current_user.employee.id
+    )
+    return editing_status

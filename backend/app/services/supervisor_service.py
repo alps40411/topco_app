@@ -383,3 +383,51 @@ async def get_report_approval_status(db: AsyncSession, report_id: int) -> List[S
         ))
     
     return approval_info
+
+async def check_employee_editing_permissions(db: AsyncSession, employee_id: int) -> dict:
+    """
+    檢查員工是否還可以編輯和提交今日的日報
+    判斷條件：是否有主管已經審核過今日的日報
+    """
+    today = datetime.date.today()
+    
+    # 查找員工今日的日報
+    query = select(DailyReport).where(
+        DailyReport.employee_id == employee_id,
+        DailyReport.date == today
+    ).options(
+        selectinload(DailyReport.approvals)
+    )
+    
+    result = await db.execute(query)
+    today_report = result.scalar_one_or_none()
+    
+    # 如果沒有今日日報，允許編輯和提交
+    if not today_report:
+        return {
+            "can_edit_records": True,
+            "can_edit_reports": True,
+            "can_submit_report": True,
+            "message": "今日尚未提交日報，可以進行所有操作"
+        }
+    
+    # 檢查是否有主管已經審核過
+    has_approved_reviews = any(
+        approval.status == ApprovalStatus.approved 
+        for approval in today_report.approvals
+    )
+    
+    if has_approved_reviews:
+        return {
+            "can_edit_records": False,
+            "can_edit_reports": False,
+            "can_submit_report": False,
+            "message": "主管已審核完畢，無法再進行編輯或提交"
+        }
+    else:
+        return {
+            "can_edit_records": True,
+            "can_edit_reports": True,
+            "can_submit_report": True,
+            "message": "日報已提交但尚未審核，仍可進行編輯"
+        }

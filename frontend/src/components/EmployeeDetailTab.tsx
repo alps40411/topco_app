@@ -17,12 +17,14 @@ interface EmployeeDetailTabProps {
   employee: EmployeeInList;
   reportId: number; // Correctly added prop
   onBack: () => void;
+  onReviewCompleted?: () => void; // 主管評分完成後的回調
 }
 
 const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   employee: initialEmployee,
   reportId,
   onBack,
+  onReviewCompleted,
 }) => {
   const [reportDetail, setReportDetail] = useState<ReportWithApprovals | null>(
     null
@@ -198,6 +200,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           reportStatus={reportDetail.status}
           approvals={reportDetail.approvals || []}
           onReviewSubmitted={fetchReportDetails}
+          onReviewCompleted={onReviewCompleted}
         />
       </div>
     </div>

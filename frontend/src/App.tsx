@@ -1,6 +1,6 @@
 // frontend/src/App.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Edit3, FileText, LogOut } from "lucide-react";
 import DataInputTab from "./components/DataInputTab";
 import DailyReportTab from "./components/DailyReportTab";
@@ -12,6 +12,13 @@ import EmployeeDetailTab from "./components/EmployeeDetailTab";
 import { useAuth } from "./contexts/AuthContext";
 import { useHasSubordinates } from "./hooks/useHasSubordinates";
 import { Toaster } from "react-hot-toast";
+
+interface EmployeeEditingStatus {
+  can_edit_records: boolean;
+  can_edit_reports: boolean;
+  can_submit_report: boolean;
+  message: string;
+}
 // --- Interface Definitions ---
 export interface Project {
   id: number;
@@ -98,27 +105,77 @@ export interface User {
   employee?: EmployeeForUser;
 }
 function App() {
-  const { user, logout } = useAuth();
+  const { user, logout, authFetch } = useAuth();
   const { hasSubordinates, loading: subordinatesLoading } =
     useHasSubordinates();
-  const [mainTab, setMainTab] = useState<"employee" | "supervisor">("employee");
   const [activeTab, setActiveTab] = useState<
-    "input" | "daily" | "myreports" | "ai" | "comprehensive"
-  >("input");
+    "input" | "daily" | "myreports" | "supervisor" | "ai" | "comprehensive"
+  >("input"); // 預設為隨筆紀錄
 
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeInList | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
+  const [editingStatus, setEditingStatus] = useState<EmployeeEditingStatus | null>(null);
 
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
     setSelectedEmployee(employee);
     setSelectedReportId(reportId);
+    setActiveTab("supervisor"); // 切換到審閱模式
   };
 
   const handleBackFromDetail = () => {
     setSelectedEmployee(null);
     setSelectedReportId(null);
+    // 保持在supervisor標籤
   };
+
+  const handleReviewCompleted = () => {
+    // 主管評分完成後，跳轉回審閱列表
+    setSelectedEmployee(null);
+    setSelectedReportId(null);
+    // 刷新編輯狀態，因為主管審核會影響員工的編輯權限
+    fetchEditingStatus();
+  };
+
+  const fetchEditingStatus = async () => {
+    if (!authFetch || !user?.employee) return;
+    
+    try {
+      const response = await authFetch('/api/supervisor/employee-editing-status');
+      if (response.ok) {
+        const status: EmployeeEditingStatus = await response.json();
+        setEditingStatus(status);
+      }
+    } catch (error) {
+      console.error('獲取編輯狀態失敗:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (authFetch && user?.employee) {
+      fetchEditingStatus();
+    }
+  }, [authFetch, user?.employee]);
+
+  // 當編輯狀態變化時，確保當前活動標籤是可用的
+  useEffect(() => {
+    if (editingStatus) {
+      // 如果當前在不可編輯的標籤，切換到可用標籤
+      if (activeTab === "input" && !editingStatus.can_edit_records) {
+        if (editingStatus.can_edit_reports) {
+          setActiveTab("daily");
+        } else {
+          setActiveTab("myreports");
+        }
+      } else if (activeTab === "daily" && !editingStatus.can_edit_reports) {
+        if (editingStatus.can_edit_records) {
+          setActiveTab("input");
+        } else {
+          setActiveTab("myreports");
+        }
+      }
+    }
+  }, [editingStatus, activeTab]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -154,24 +211,68 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex space-x-1">
+                {/* 隨筆紀錄 */}
+                {editingStatus?.can_edit_records && (
+                  <button
+                    onClick={() => {
+                      setActiveTab("input");
+                      setSelectedEmployee(null);
+                      setSelectedReportId(null);
+                    }}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === "input"
+                        ? "bg-green-100 text-green-700"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    隨筆紀錄
+                  </button>
+                )}
+                
+                {/* 日報編輯 */}
+                {editingStatus?.can_edit_reports && (
+                  <button
+                    onClick={() => {
+                      setActiveTab("daily");
+                      setSelectedEmployee(null);
+                      setSelectedReportId(null);
+                    }}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === "daily"
+                        ? "bg-green-100 text-green-700"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    日報編輯
+                  </button>
+                )}
+                
+                {/* 我的日報 */}
                 <button
                   onClick={() => {
-                    setMainTab("employee");
+                    setActiveTab("myreports");
                     setSelectedEmployee(null);
+                    setSelectedReportId(null);
                   }}
                   className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    mainTab === "employee"
+                    activeTab === "myreports"
                       ? "bg-green-100 text-green-700"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
-                  日報填寫
+                  我的日報
                 </button>
+                
+                {/* 日報審閱 (僅主管) */}
                 {!subordinatesLoading && hasSubordinates && (
                   <button
-                    onClick={() => setMainTab("supervisor")}
+                    onClick={() => {
+                      setActiveTab("supervisor");
+                      setSelectedEmployee(null);
+                      setSelectedReportId(null);
+                    }}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      mainTab === "supervisor"
+                      activeTab === "supervisor"
                         ? "bg-green-100 text-green-700"
                         : "text-gray-600 hover:bg-gray-100"
                     }`}
@@ -203,79 +304,39 @@ function App() {
         </div>
       </header>
 
-      {mainTab === "employee" && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="border-b border-gray-200 bg-white">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab("input")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "input"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <Edit3 className="w-4 h-4" />
-                  <span>資料輸入</span>
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab("daily")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "daily"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <FileText className="w-4 h-4" />
-                  <span>日報編輯</span>
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab("myreports")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "myreports"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <FileText className="w-4 h-4" />
-                  <span>我的日報</span>
-                </div>
-              </button>
-              {/* <button onClick={() => setActiveTab('ai')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'ai' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                <div className="flex items-center space-x-2"><Wand2 className="w-4 h-4" /><span>AI日報編輯</span></div>
-              </button>
-              <button onClick={() => setActiveTab('comprehensive')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'comprehensive' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                <div className="flex items-center space-x-2"><Columns className="w-4 h-4" /><span>綜合編輯</span></div>
-              </button> */}
-            </nav>
-          </div>
-        </div>
-      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
-        {mainTab === "employee" && (
-          <>
-            {activeTab === "input" && <DataInputTab />}
-            {activeTab === "daily" && <DailyReportTab />}
-            {activeTab === "myreports" && <MyReportsTab />}
-            {/* {activeTab === 'ai' && <AIDailyReportTab />}
-                {activeTab === 'comprehensive' && <ComprehensiveEditTab />} */}
-          </>
+        {/* 顯示編輯狀態消息 */}
+        {editingStatus && !editingStatus.can_edit_records && !editingStatus.can_edit_reports && (
+          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">{editingStatus.message}</p>
+              </div>
+            </div>
+          </div>
         )}
-
-        {mainTab === "supervisor" && !selectedEmployee && (
+        
+        {/* 內容區域 */}
+        {activeTab === "input" && editingStatus?.can_edit_records && <DataInputTab />}
+        {activeTab === "daily" && editingStatus?.can_edit_reports && <DailyReportTab />}
+        {activeTab === "myreports" && <MyReportsTab />}
+        
+        {/* 主管審閱區域 */}
+        {activeTab === "supervisor" && !selectedEmployee && (
           <EmployeeListTab onSelectEmployee={handleSelectEmployee} />
         )}
-        {mainTab === "supervisor" && selectedEmployee && selectedReportId && (
+        {activeTab === "supervisor" && selectedEmployee && selectedReportId && (
           <EmployeeDetailTab
             employee={selectedEmployee}
             reportId={selectedReportId}
             onBack={handleBackFromDetail}
+            onReviewCompleted={handleReviewCompleted}
           />
         )}
       </main>

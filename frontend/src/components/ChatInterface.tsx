@@ -38,6 +38,7 @@ interface ChatInterfaceProps {
   reportStatus?: string;
   approvals: SupervisorApprovalInfo[];
   onReviewSubmitted?: () => void;
+  onReviewCompleted?: () => void; // 主管評分完成後的回調
   isReadOnly?: boolean; // 新增只讀模式屬性
 }
 
@@ -48,6 +49,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // reportStatus, // 暫時未使用
   approvals, // Added prop
   onReviewSubmitted,
+  onReviewCompleted,
   isReadOnly = false, // 預設為 false
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -74,6 +76,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [approvals, user]);
 
   const fetchComments = useCallback(async () => {
+    if (!authFetch) return;
     try {
       setIsLoading(true);
       const response = await authFetch(`/api/reports/${reportId}/comments`);
@@ -89,14 +92,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [reportId]);
+  }, [reportId, authFetch]);
 
   useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    if (authFetch) {
+      fetchComments();
+    }
+  }, [fetchComments, authFetch]);
 
   const handleSubmitMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !authFetch) return;
     setIsSubmitting(true);
     try {
       const response = await authFetch(`/api/reports/${reportId}/comments`, {
@@ -123,6 +128,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       toast.error("請輸入審核意見");
       return;
     }
+    if (!authFetch) return;
     setIsSubmitting(true);
     try {
       const response = await authFetch(
@@ -140,6 +146,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         setHasSubmittedReview(true);
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();
+        // 評分完成後跳轉回審閱列表
+        if (onReviewCompleted) {
+          setTimeout(() => {
+            onReviewCompleted();
+          }, 1500); // 延遲1.5秒讓用戶看到成功訊息
+        }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交審核失敗");
@@ -176,15 +188,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     });
   };
 
+  const ratingOptions = [
+    { value: 1, label: "很差" },
+    { value: 2, label: "差" },
+    { value: 3, label: "普通" },
+    { value: 4, label: "好" },
+    { value: 5, label: "很好" },
+  ];
+
   const getRatingText = (rating: number) => {
-    const labels: { [key: number]: string } = {
-      1: "很差",
-      2: "差",
-      3: "普通",
-      4: "好",
-      5: "很好",
-    };
-    return labels[rating] || "未評分";
+    return ratingOptions.find((r) => r.value === rating)?.label || "未評分";
   };
 
   const flattenComments = (comments: Comment[]): Comment[] => {
@@ -303,24 +316,35 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     <Crown className="w-4 h-4 mr-2" />
                     主管評分與回饋
                   </h4>
-                  <div className="flex items-center space-x-4 mb-3">
-                    <span className="text-sm font-medium text-gray-700">
+                  <div className="mb-4">
+                    <span className="text-sm font-medium text-gray-700 mr-4">
                       評分:
                     </span>
-                    <select
-                      value={selectedRating}
-                      onChange={(e) =>
-                        setSelectedRating(Number(e.target.value))
-                      }
-                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    <div
+                      className="inline-flex rounded-md shadow-sm"
+                      role="group"
                     >
-                      <option value={1}>很差</option>
-                      <option value={2}>差</option>
-                      <option value={3}>普通</option>
-                      <option value={4}>好</option>
-                      <option value={5}>很好</option>
-                    </select>
+                      {ratingOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setSelectedRating(option.value)}
+                          className={`px-4 py-2 text-sm font-medium border transition-colors
+                            ${
+                              selectedRating === option.value
+                                ? "bg-blue-500 text-white border-blue-500 z-10"
+                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                            }
+                            ${option.value === 1 ? "rounded-l-lg" : ""}
+                            ${option.value === 5 ? "rounded-r-lg" : ""}
+                          `}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
                   {/* 建議回復按鈕 - 主管版 */}
                   <div className="mb-3">
                     <p className="text-xs text-blue-700 mb-2">快速回復建議：</p>
