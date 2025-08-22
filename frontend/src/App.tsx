@@ -115,7 +115,8 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeInList | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
-  const [editingStatus, setEditingStatus] = useState<EmployeeEditingStatus | null>(null);
+  const [editingStatus, setEditingStatus] =
+    useState<EmployeeEditingStatus | null>(null);
 
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
     setSelectedEmployee(employee);
@@ -133,21 +134,23 @@ function App() {
     // 主管評分完成後，跳轉回審閱列表
     setSelectedEmployee(null);
     setSelectedReportId(null);
-    // 刷新編輯狀態，因為主管審核會影響員工的編輯權限
+    // 刷新編輯狀態，因為主管審閱會影響員工的編輯權限
     fetchEditingStatus();
   };
 
   const fetchEditingStatus = async () => {
     if (!authFetch || !user?.employee) return;
-    
+
     try {
-      const response = await authFetch('/api/supervisor/employee-editing-status');
+      const response = await authFetch(
+        "/api/supervisor/employee-editing-status"
+      );
       if (response.ok) {
         const status: EmployeeEditingStatus = await response.json();
         setEditingStatus(status);
       }
     } catch (error) {
-      console.error('獲取編輯狀態失敗:', error);
+      console.error("獲取編輯狀態失敗:", error);
     }
   };
 
@@ -228,7 +231,7 @@ function App() {
                     隨筆紀錄
                   </button>
                 )}
-                
+
                 {/* 日報編輯 */}
                 {editingStatus?.can_edit_reports && (
                   <button
@@ -246,7 +249,7 @@ function App() {
                     日報編輯
                   </button>
                 )}
-                
+
                 {/* 我的日報 */}
                 <button
                   onClick={() => {
@@ -262,7 +265,7 @@ function App() {
                 >
                   我的日報
                 </button>
-                
+
                 {/* 日報審閱 (僅主管) */}
                 {!subordinatesLoading && hasSubordinates && (
                   <button
@@ -304,29 +307,44 @@ function App() {
         </div>
       </header>
 
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
         {/* 顯示編輯狀態消息 */}
-        {editingStatus && !editingStatus.can_edit_records && !editingStatus.can_edit_reports && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700">{editingStatus.message}</p>
+        {editingStatus &&
+          !editingStatus.can_edit_records &&
+          !editingStatus.can_edit_reports && (
+            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-yellow-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    {editingStatus.message}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        
+          )}
+
         {/* 內容區域 */}
-        {activeTab === "input" && editingStatus?.can_edit_records && <DataInputTab />}
-        {activeTab === "daily" && editingStatus?.can_edit_reports && <DailyReportTab />}
+        {activeTab === "input" && editingStatus?.can_edit_records && (
+          <DataInputTab />
+        )}
+        {activeTab === "daily" && editingStatus?.can_edit_reports && (
+          <DailyReportTab />
+        )}
         {activeTab === "myreports" && <MyReportsTab />}
-        
+
         {/* 主管審閱區域 */}
         {activeTab === "supervisor" && !selectedEmployee && (
           <EmployeeListTab onSelectEmployee={handleSelectEmployee} />

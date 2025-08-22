@@ -27,7 +27,7 @@ export interface Comment {
     email: string;
   };
   parent_comment_id?: number;
-  rating?: number; // 評分（如果是審核留言）
+  rating?: number; // 評分（如果是審閱留言）
   replies: Comment[];
 }
 
@@ -57,7 +57,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 審核相關狀態
+  // 審閱相關狀態
   const [selectedRating, setSelectedRating] = useState<number>(3); // 預設評分為「普通」(5分制)
   const [reviewComment, setReviewComment] = useState("");
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
@@ -125,7 +125,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleSubmitReview = async () => {
     if (!reviewComment.trim()) {
-      toast.error("請輸入審核意見");
+      toast.error("請輸入審閱意見");
       return;
     }
     if (!authFetch) return;
@@ -142,7 +142,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
       );
       if (response.ok) {
-        toast.success("審核已提交");
+        toast.success("審閱已提交");
         setHasSubmittedReview(true);
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();
@@ -154,11 +154,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "提交審核失敗");
+        throw new Error(errorData.detail || "提交審閱失敗");
       }
     } catch (error) {
-      console.error("提交審核失敗:", error);
-      toast.error(error instanceof Error ? error.message : "提交審核失敗");
+      console.error("提交審閱失敗:", error);
+      toast.error(error instanceof Error ? error.message : "提交審閱失敗");
     } finally {
       setIsSubmitting(false);
     }
@@ -365,7 +365,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <textarea
                     value={reviewComment}
                     onChange={(e) => setReviewComment(e.target.value)}
-                    placeholder="請輸入您的審核意見..."
+                    placeholder="請輸入您的審閱意見..."
                     className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
                     rows={4}
                     disabled={isSubmitting}
@@ -399,7 +399,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <div className="mb-4">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <p className="text-sm text-green-800">
-                    ✅ 您已完成此日報的評分
+                    ✅ 您已完成此日報的審閱
                   </p>
                 </div>
               </div>

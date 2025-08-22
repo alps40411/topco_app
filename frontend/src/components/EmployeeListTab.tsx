@@ -29,7 +29,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   const [reports, setReports] = useState<ReportWithApprovals[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // 主管審核頁面預設顯示前一天的日報，因為當天的日報通常隔天才審核
+  // 主管審閱頁面預設顯示前一天的日報，因為當天的日報通常隔天才審閱
   const getDefaultDate = () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -60,7 +60,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         if (response.ok) {
           const reportsData = await response.json();
 
-          // 為每個報告獲取審核狀態
+          // 為每個報告獲取審閱狀態
           const reportsWithApprovals = await Promise.all(
             reportsData.map(async (report: DailyReport) => {
               try {
@@ -72,7 +72,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                   return { ...report, approvals };
                 }
               } catch (error) {
-                console.error(`無法獲取報告 ${report.id} 的審核狀態:`, error);
+                console.error(`無法獲取報告 ${report.id} 的審閱狀態:`, error);
               }
               return { ...report, approvals: [] };
             })
@@ -197,14 +197,14 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                       return (
                         <div className="flex items-center space-x-1 text-orange-600">
                           <Clock className="w-4 h-4" />
-                          <span className="text-sm font-medium">待審核</span>
+                          <span className="text-sm font-medium">待審閱</span>
                         </div>
                       );
                     } else if (myApproval.status === "approved") {
                       return (
                         <div className="flex items-center space-x-1 text-green-600">
                           <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm font-medium">已審核</span>
+                          <span className="text-sm font-medium">已審閱</span>
                         </div>
                       );
                     } else {
@@ -213,7 +213,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                         <div className="flex items-center space-x-1 text-orange-600">
                           <Clock className="w-4 h-4" />
                           <span className="text-sm font-medium">
-                            待審核 (未知狀態)
+                            待審閱 (未知狀態)
                           </span>
                         </div>
                       );

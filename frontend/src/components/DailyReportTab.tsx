@@ -252,7 +252,7 @@ const DailyReportTab: React.FC = () => {
           .catch(() => ({ detail: "提交失敗" }));
         throw new Error(errData.detail);
       }
-      toast.success("日報已成功提交，等待主管審核！");
+      toast.success("日報已成功提交，等待主管審閱！");
       await fetchReports();
     } catch (error: any) {
       console.error(error);

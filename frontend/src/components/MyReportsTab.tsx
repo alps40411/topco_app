@@ -102,7 +102,7 @@ const MyReportsTab: React.FC = () => {
       day: "numeric",
     });
 
-  // 當選取某一筆日報時，直接沿用主管審核的詳情頁 UI
+  // 當選取某一筆日報時，直接沿用主管審閱的詳情頁 UI
   if (selectedReport) {
     const backToList = () => setSelectedReport(null);
     const employeeForDetail = {
@@ -190,14 +190,14 @@ const MyReportsTab: React.FC = () => {
                         return (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                             <MessageCircle className="w-3 h-3 mr-1" />
-                            待審核
+                            待審閱
                           </span>
                         );
                       case "reviewed":
                         return (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <Eye className="w-3 h-3 mr-1" />
-                            已審核
+                            已審閱
                           </span>
                         );
                       default:
