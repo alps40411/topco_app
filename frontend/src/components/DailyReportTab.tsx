@@ -27,6 +27,9 @@ import { useAuth } from "../contexts/AuthContext";
 import AttachedFilesManager from "./AttachedFilesManager";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
+import CascadingWorkSelector from "./CascadingWorkSelector";
+import ServiceSelector from "./ServiceSelector";
+import WorkDetailsDisplay from "./WorkDetailsDisplay";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 
@@ -59,6 +62,10 @@ const DailyReportTab: React.FC = () => {
   const [newRecord, setNewRecord] = useState<Partial<WorkRecordCreate>>({
     content: "",
     project_id: undefined,
+    execution_work_id: undefined,
+    work_item_id: undefined,
+    service_company_id: undefined,
+    service_target_id: undefined,
     files: [],
     execution_time_minutes: 0,
   });
@@ -364,6 +371,22 @@ const DailyReportTab: React.FC = () => {
       toast.error("請選擇工作計劃");
       return;
     }
+    if (!newRecord.execution_work_id) {
+      toast.error("請選擇執行工作");
+      return;
+    }
+    if (!newRecord.work_item_id) {
+      toast.error("請選擇工作項目");
+      return;
+    }
+    if (!newRecord.service_company_id) {
+      toast.error("請選擇服務公司");
+      return;
+    }
+    if (!newRecord.service_target_id) {
+      toast.error("請選擇服務對象");
+      return;
+    }
     if (
       !newRecord.content?.trim() &&
       (!newRecord.files || newRecord.files.length === 0)
@@ -371,7 +394,10 @@ const DailyReportTab: React.FC = () => {
       toast.error("請填寫內容或附加檔案");
       return;
     }
-    if (!newRecord.execution_time_minutes || newRecord.execution_time_minutes === 0) {
+    if (
+      !newRecord.execution_time_minutes ||
+      newRecord.execution_time_minutes === 0
+    ) {
       toast.error("請設定執行時間");
       return;
     }
@@ -381,6 +407,10 @@ const DailyReportTab: React.FC = () => {
         method: "POST",
         body: JSON.stringify({
           project_id: newRecord.project_id,
+          execution_work_id: newRecord.execution_work_id,
+          work_item_id: newRecord.work_item_id,
+          service_company_id: newRecord.service_company_id,
+          service_target_id: newRecord.service_target_id,
           content: newRecord.content,
           files: newRecord.files || [],
           execution_time_minutes: newRecord.execution_time_minutes,
@@ -388,7 +418,16 @@ const DailyReportTab: React.FC = () => {
       });
       if (!response.ok) throw new Error("儲存新筆記失敗");
       toast.success("新筆記儲存成功！");
-      setNewRecord({ content: "", project_id: undefined, files: [], execution_time_minutes: 0 });
+      setNewRecord({
+        content: "",
+        project_id: undefined,
+        execution_work_id: undefined,
+        work_item_id: undefined,
+        service_company_id: undefined,
+        service_target_id: undefined,
+        files: [],
+        execution_time_minutes: 0,
+      });
       setIsAddNoteModalOpen(false);
       await fetchReports();
     } catch (error: any) {
@@ -413,24 +452,25 @@ const DailyReportTab: React.FC = () => {
   return (
     <>
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 sm:mb-6 space-y-4 lg:space-y-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">日報編輯</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">日報編輯</h2>
             {writingStatus && (
-              <div className="flex items-center mt-1 text-sm text-gray-600">
-                <span className="mr-2">🕐 {writingStatus.current_time}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center mt-1 text-sm text-gray-600">
+                <span className="mr-0 sm:mr-2">🕐 {writingStatus.current_time}</span>
                 <span className="text-blue-600">{writingStatus.message}</span>
               </div>
             )}
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
               disabled={editingProjectId !== null || generatingAiFor !== null}
-              className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed`}
+              className={`inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed`}
             >
               <Plus className="w-4 h-4 mr-2" />
-              新增筆記
+              <span className="hidden sm:inline">新增筆記</span>
+              <span className="sm:hidden">新增</span>
             </button>
             <button
               onClick={handleEnhanceAll}
@@ -440,42 +480,46 @@ const DailyReportTab: React.FC = () => {
                 editingProjectId !== null ||
                 generatingAiFor !== null
               }
-              className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
             >
-              <span className="inline-flex items-center">
-                {isGeneratingAllAi ? (
-                  <div className="w-3 h-3 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-1"></div>
-                ) : (
-                  <Wand2 className="w-3 h-3 mr-1" />
+              {isGeneratingAllAi ? (
+                <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
+              ) : (
+                <Wand2 className="w-4 h-4 mr-2" />
+              )}
+              <span className="whitespace-nowrap">
+                {isGeneratingAllAi ? "AI 處理中..." : (
+                  <>
+                    <span className="hidden sm:inline">✨ AI 潤飾全部</span>
+                    <span className="sm:hidden">AI 潤飾</span>
+                  </>
                 )}
-                <span className="whitespace-nowrap">
-                  {isGeneratingAllAi ? "AI 處理中..." : "✨ AI 潤飾全部"}
-                </span>
               </span>
             </button>
             <button
               onClick={handleSubmitReport}
               disabled={isSubmitting || editingProjectId !== null}
-              className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed`}
+              className={`inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed`}
             >
               <Upload className="w-4 h-4 mr-2" />
-              {isSubmitting ? "提交中..." : "上傳最終版"}
+              <span className="hidden sm:inline">{isSubmitting ? "提交中..." : "上傳最終版"}</span>
+              <span className="sm:hidden">{isSubmitting ? "提交中..." : "上傳"}</span>
             </button>
           </div>
         </div>
 
-        <div className="space-y-8 mt-6">
+        <div className="space-y-6 sm:space-y-8 mt-6">
           {reports.map((report) => (
             <div
               key={report.project.id}
               className={`relative grid grid-cols-1 ${
-                isAiViewActive ? "lg:grid-cols-2" : ""
-              } gap-x-6 gap-y-12 items-stretch bg-gray-50 p-4 rounded-xl border`}
+                isAiViewActive ? "xl:grid-cols-2" : ""
+              } gap-x-4 sm:gap-x-6 gap-y-6 sm:gap-y-12 items-stretch bg-gray-50 p-3 sm:p-4 rounded-xl border`}
             >
               {/* --- Card 1: Original Report --- */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full flex flex-col h-full">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 w-full flex flex-col h-full">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
+                  <div className="flex flex-wrap items-center gap-2 sm:space-x-3">
                     <div
                       className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
                         getProjectColors(report.project.plan_subj_c).tag
@@ -486,14 +530,17 @@ const DailyReportTab: React.FC = () => {
                     <span className="text-sm text-gray-500">
                       ({report.record_count} 筆記錄)
                     </span>
-                    {report.total_execution_time_minutes !== undefined && report.total_execution_time_minutes > 0 && (
-                      <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
-                        {formatMinutesToHours(report.total_execution_time_minutes)}
-                      </span>
-                    )}
+                    {report.total_execution_time_minutes !== undefined &&
+                      report.total_execution_time_minutes > 0 && (
+                        <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                          {formatMinutesToHours(
+                            report.total_execution_time_minutes
+                          )}
+                        </span>
+                      )}
                   </div>
                   {editingProjectId !== report.project.id && (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                       <button
                         onClick={() => handleEnhanceOne(report.project.id)}
                         disabled={
@@ -501,21 +548,19 @@ const DailyReportTab: React.FC = () => {
                           isGeneratingAllAi ||
                           editingProjectId !== null
                         }
-                        className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
+                        className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
                       >
-                        <span className="inline-flex items-center">
-                          {generatingAiFor === report.project.id ? (
-                            <div className="w-3 h-3 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-1"></div>
-                          ) : (
-                            <Wand2 className="w-3 h-3 mr-1" />
-                          )}
-                          <span className="whitespace-nowrap">✨ 潤飾</span>
-                        </span>
+                        {generatingAiFor === report.project.id ? (
+                          <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
+                        ) : (
+                          <Wand2 className="w-4 h-4 mr-2" />
+                        )}
+                        <span className="whitespace-nowrap">潤飾</span>
                       </button>
                       <button
                         onClick={() => startEdit(report)}
                         disabled={generatingAiFor !== null || isGeneratingAllAi}
-                        className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                        className={`inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg ${
                           getProjectColors(report.project.plan_subj_c).button
                         } disabled:bg-gray-300 disabled:cursor-not-allowed`}
                       >
@@ -540,29 +585,41 @@ const DailyReportTab: React.FC = () => {
                         onAiSelectionChange={handleEditAiSelectionChange}
                         isUploading={false}
                       />
-                      <div className="flex space-x-3">
+                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                         <button
                           onClick={saveEdit}
                           disabled={isSaving}
-                          className={`inline-flex items-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200`}
+                          className={`inline-flex items-center justify-center px-4 py-2 text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 order-1`}
                         >
                           <Save className="w-4 h-4 mr-2" />
                           {isSaving ? "儲存中..." : "儲存草稿"}
                         </button>
                         <button
                           onClick={cancelEdit}
-                          className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300"
+                          className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 order-2"
                         >
                           取消
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div>
-                      <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">
-                        {report.content}
-                      </p>
-                      <AttachedFilesDisplay files={report.files} />
+                    <div className="space-y-4">
+                      {/* 工作詳情顯示 */}
+                      <WorkDetailsDisplay
+                        projectName={report.project.plan_subj_c}
+                        executionWorkName={report.execution_work_name}
+                        workItemName={report.work_item_name}
+                        serviceCompanyName={report.service_company_name}
+                        serviceTargetName={report.service_target_name}
+                      />
+                      
+                      {/* 報告內容 */}
+                      <div>
+                        <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">
+                          {report.content}
+                        </p>
+                        <AttachedFilesDisplay files={report.files} />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -572,7 +629,7 @@ const DailyReportTab: React.FC = () => {
               {isAiViewActive && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full h-full">
                   <div className="flex items-center space-x-3 mb-4">
-                    <div className="flex items-center px-2 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-md">
+                    <div className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 border border-purple-200">
                       <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
                     </div>
                   </div>
@@ -626,42 +683,68 @@ const DailyReportTab: React.FC = () => {
 
       {/* --- Add New Note Modal --- */}
       {isAddNoteModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out animate-fade-in">
-          <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl m-4 transform transition-all duration-300 ease-in-out scale-95 animate-fade-in-scale">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">
-                新增筆記到今日報告
-              </h3>
-              <button
-                onClick={() => setIsAddNoteModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  工作計劃
-                </label>
-                <select
-                  value={newRecord.project_id || ""}
-                  onChange={(e) =>
-                    setNewRecord({
-                      ...newRecord,
-                      project_id: parseInt(e.target.value, 10) || undefined,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out animate-fade-in p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto transform transition-all duration-300 ease-in-out scale-95 animate-fade-in-scale">
+            <div className="p-4 sm:p-6 lg:p-8">
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+                  新增筆記到今日報告
+                </h3>
+                <button
+                  onClick={() => setIsAddNoteModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600"
                 >
-                  <option value="">請選擇工作計劃</option>
-                  {projects.map((proj) => (
-                    <option key={proj.id} value={proj.id}>
-                      {proj.plan_subj_c}
-                    </option>
-                  ))}
-                </select>
+                  <X className="w-6 h-6" />
+                </button>
               </div>
+              <div className="space-y-4 sm:space-y-6">
+              {/* 級聯工作選擇器 */}
+              <CascadingWorkSelector
+                selectedProjectId={newRecord.project_id}
+                selectedExecutionWorkId={newRecord.execution_work_id}
+                selectedWorkItemId={newRecord.work_item_id}
+                onProjectChange={(projectId) =>
+                  setNewRecord({
+                    ...newRecord,
+                    project_id: projectId,
+                    execution_work_id: undefined,
+                    work_item_id: undefined,
+                  })
+                }
+                onExecutionWorkChange={(executionWorkId) =>
+                  setNewRecord({
+                    ...newRecord,
+                    execution_work_id: executionWorkId,
+                    work_item_id: undefined,
+                  })
+                }
+                onWorkItemChange={(workItemId) =>
+                  setNewRecord({
+                    ...newRecord,
+                    work_item_id: workItemId,
+                  })
+                }
+                required
+              />
+
+              {/* 服務選擇器 */}
+              <ServiceSelector
+                selectedCompanyId={newRecord.service_company_id}
+                selectedTargetId={newRecord.service_target_id}
+                onCompanyChange={(companyId) =>
+                  setNewRecord({
+                    ...newRecord,
+                    service_company_id: companyId,
+                  })
+                }
+                onTargetChange={(targetId) =>
+                  setNewRecord({
+                    ...newRecord,
+                    service_target_id: targetId,
+                  })
+                }
+                required
+              />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   內容
@@ -679,8 +762,11 @@ const DailyReportTab: React.FC = () => {
 
               <ExecutionTimeSelector
                 totalMinutes={newRecord.execution_time_minutes || 0}
-                onChange={(minutes) => 
-                  setNewRecord({ ...newRecord, execution_time_minutes: minutes })
+                onChange={(minutes) =>
+                  setNewRecord({
+                    ...newRecord,
+                    execution_time_minutes: minutes,
+                  })
                 }
                 required
               />
@@ -693,21 +779,22 @@ const DailyReportTab: React.FC = () => {
                 isUploading={isUploadingNewFile}
               />
 
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={() => setIsAddNoteModalOpen(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleSaveNewRecord}
-                  disabled={isUploadingNewFile || isSavingNewRecord}
-                  className={`w-32 py-2 px-4 rounded-lg flex items-center justify-center ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400`}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {isSavingNewRecord ? "儲存中..." : "新增筆記"}
-                </button>
+                <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
+                  <button
+                    onClick={() => setIsAddNoteModalOpen(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 order-2 sm:order-1"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleSaveNewRecord}
+                    disabled={isUploadingNewFile || isSavingNewRecord}
+                    className={`w-full sm:w-32 py-2 px-4 rounded-lg flex items-center justify-center ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 order-1 sm:order-2`}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {isSavingNewRecord ? "儲存中..." : "新增筆記"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

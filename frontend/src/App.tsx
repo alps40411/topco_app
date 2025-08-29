@@ -50,11 +50,19 @@ export interface FileForUpload extends Omit<FileAttachment, "id"> {
 export interface WorkRecordCreate {
   content: string;
   project_id?: number;
+  execution_work_id?: number;
+  work_item_id?: number;
+  service_company_id?: number;
+  service_target_id?: number;
   files: FileForUpload[];
   execution_time_minutes: number;
 }
 export interface ConsolidatedReport {
   project: Project;
+  execution_work_name?: string;
+  work_item_name?: string;
+  service_company_name?: string;
+  service_target_name?: string;
   content: string;
   files: FileAttachment[];
   record_count: number;
@@ -97,6 +105,33 @@ export interface EmployeeForUser {
   empnamec: string;
   dutyscript?: string; // 職稱
   deptabbv?: string; // 部門簡稱
+}
+
+export interface ExecutionWork {
+  id: number;
+  name: string;
+  project_id: number;
+  is_active: boolean;
+}
+
+export interface WorkItem {
+  id: number;
+  name: string;
+  execution_work_id: number;
+  is_active: boolean;
+}
+
+export interface ServiceCompany {
+  id: number;
+  name: string;
+  is_active: boolean;
+}
+
+export interface ServiceTarget {
+  id: number;
+  name: string;
+  company_id?: number;
+  is_active: boolean;
 }
 
 export interface User {

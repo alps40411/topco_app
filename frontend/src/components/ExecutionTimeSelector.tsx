@@ -42,13 +42,13 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
         </label>
       </div>
       
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-3">
         {/* 小時選擇器 */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <select 
             value={hours}
             onChange={(e) => handleHoursChange(parseInt(e.target.value))}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           >
             {Array.from({ length: 9 }, (_, i) => (
               <option key={i} value={i}>
@@ -59,11 +59,11 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
         </div>
 
         {/* 分鐘選擇器 */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <select 
             value={minutes}
             onChange={(e) => handleMinutesChange(parseInt(e.target.value))}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           >
             {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
               <option key={minute} value={minute}>
@@ -75,7 +75,7 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
       </div>
 
       {/* 總時間顯示 */}
-      <div className={`text-sm font-medium p-2 rounded ${
+      <div className={`text-sm font-medium px-3 py-2 rounded-lg ${
         totalMinutes === 0 
           ? 'text-red-600 bg-red-50 border border-red-200' 
           : 'text-blue-600 bg-blue-50 border border-blue-200'

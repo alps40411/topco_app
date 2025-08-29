@@ -1,13 +1,16 @@
 // frontend/src/components/DataInputTab.tsx
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Save, FileText } from 'lucide-react';
-import type { ConsolidatedReport, WorkRecordCreate, Project, FileForUpload } from '../App';
+import type { ConsolidatedReport, WorkRecordCreate, FileForUpload } from '../App';
 import { getProjectColors, blueButtonStyle } from '../utils/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import AttachedFilesDisplay from './AttachedFilesDisplay';
 import AttachedFilesManager from './AttachedFilesManager';
 import ExecutionTimeSelector from './ExecutionTimeSelector';
+import CascadingWorkSelector from './CascadingWorkSelector';
+import ServiceSelector from './ServiceSelector';
+import WorkDetailsDisplay from './WorkDetailsDisplay';
 import { toast } from 'react-hot-toast';
 import { formatMinutesToHours } from '../utils/timeUtils';
 
@@ -17,10 +20,13 @@ const DataInputTab: React.FC = () => {
   const [currentRecord, setCurrentRecord] = useState<Partial<WorkRecordCreate>>({
     content: '',
     project_id: undefined,
+    execution_work_id: undefined,
+    work_item_id: undefined,
+    service_company_id: undefined,
+    service_target_id: undefined,
     files: [],
     execution_time_minutes: 0,
   });
-  const [projects, setProjects] = useState<Project[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const { authFetch } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
@@ -40,25 +46,29 @@ const DataInputTab: React.FC = () => {
     }
   }, []); // 移除authFetch依賴
 
-  const fetchProjects = useCallback(async () => {
-    try {
-      const response = await authFetch('/api/projects/');
-      if (response.ok) {
-        setProjects(await response.json());
-      }
-    } catch (error) {
-      console.error("無法獲取專案列表:", error);
-    }
-  }, []); // 移除authFetch依賴
-
   useEffect(() => {
     fetchConsolidatedToday();
-    fetchProjects();
-  }, [fetchConsolidatedToday, fetchProjects]);
+  }, [fetchConsolidatedToday]);
 
   const onSave = async () => {
     if (!currentRecord.project_id) {
       toast.error('請選擇工作計劃');
+      return;
+    }
+    if (!currentRecord.execution_work_id) {
+      toast.error('請選擇執行工作');
+      return;
+    }
+    if (!currentRecord.work_item_id) {
+      toast.error('請選擇工作項目');
+      return;
+    }
+    if (!currentRecord.service_company_id) {
+      toast.error('請選擇服務公司');
+      return;
+    }
+    if (!currentRecord.service_target_id) {
+      toast.error('請選擇服務對象');
       return;
     }
     if (!currentRecord.content?.trim() && (!currentRecord.files || currentRecord.files.length === 0)) {
@@ -75,6 +85,10 @@ const DataInputTab: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({
           project_id: currentRecord.project_id,
+          execution_work_id: currentRecord.execution_work_id,
+          work_item_id: currentRecord.work_item_id,
+          service_company_id: currentRecord.service_company_id,
+          service_target_id: currentRecord.service_target_id,
           content: currentRecord.content,
           files: currentRecord.files || [],
           execution_time_minutes: currentRecord.execution_time_minutes,
@@ -82,7 +96,16 @@ const DataInputTab: React.FC = () => {
       });
       if (!response.ok) throw new Error('儲存筆記失敗');
       await fetchConsolidatedToday(); // Re-fetch consolidated records
-      setCurrentRecord({ content: '', project_id: undefined, files: [], execution_time_minutes: 0 });
+      setCurrentRecord({ 
+        content: '', 
+        project_id: undefined, 
+        execution_work_id: undefined,
+        work_item_id: undefined,
+        service_company_id: undefined,
+        service_target_id: undefined,
+        files: [], 
+        execution_time_minutes: 0 
+      });
       toast.success('記錄儲存成功！');
     } catch (error) {
       console.error("儲存筆記時發生錯誤:", error);
@@ -131,18 +154,58 @@ const DataInputTab: React.FC = () => {
   };
 
   return (
-    <div className="flex gap-6 p-6">
-      <div className="w-1/2">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
+      <div className="w-full lg:w-1/2">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">記錄新筆記</h2>
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">工作計劃</label>
-              <select value={currentRecord.project_id || ''} onChange={(e) => setCurrentRecord({ ...currentRecord, project_id: parseInt(e.target.value, 10) || undefined })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                <option value="">請選擇工作計劃</option>
-                {projects.map((proj) => (<option key={proj.id} value={proj.id}>{proj.plan_subj_c}</option>))}
-              </select>
-            </div>
+            {/* 級聯工作選擇器 */}
+            <CascadingWorkSelector
+              selectedProjectId={currentRecord.project_id}
+              selectedExecutionWorkId={currentRecord.execution_work_id}
+              selectedWorkItemId={currentRecord.work_item_id}
+              onProjectChange={(projectId) =>
+                setCurrentRecord({
+                  ...currentRecord,
+                  project_id: projectId,
+                  execution_work_id: undefined,
+                  work_item_id: undefined,
+                })
+              }
+              onExecutionWorkChange={(executionWorkId) =>
+                setCurrentRecord({
+                  ...currentRecord,
+                  execution_work_id: executionWorkId,
+                  work_item_id: undefined,
+                })
+              }
+              onWorkItemChange={(workItemId) =>
+                setCurrentRecord({
+                  ...currentRecord,
+                  work_item_id: workItemId,
+                })
+              }
+              required
+            />
+
+            {/* 服務選擇器 */}
+            <ServiceSelector
+              selectedCompanyId={currentRecord.service_company_id}
+              selectedTargetId={currentRecord.service_target_id}
+              onCompanyChange={(companyId) =>
+                setCurrentRecord({
+                  ...currentRecord,
+                  service_company_id: companyId,
+                })
+              }
+              onTargetChange={(targetId) =>
+                setCurrentRecord({
+                  ...currentRecord,
+                  service_target_id: targetId,
+                })
+              }
+              required
+            />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">內容</label>
               <textarea rows={4} placeholder="記錄您的想法..." value={currentRecord.content || ''} onChange={(e) => setCurrentRecord({ ...currentRecord, content: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
@@ -175,18 +238,18 @@ const DataInputTab: React.FC = () => {
           </div>
         </div>
       </div>
-      <div className="w-1/2">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="w-full lg:w-1/2">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">今日彙整預覽 ({consolidatedRecords.length})</h2>
-          <div className="space-y-4 h-[600px] overflow-y-auto pr-2">
+          <div className="space-y-4 h-[400px] sm:h-[600px] overflow-y-auto pr-2">
             {isLoading ? ( <div className="text-center py-8 text-gray-500">載入中...</div> ) 
             : consolidatedRecords.length === 0 ? ( <div className="text-center py-8 text-gray-500"><FileText className="w-12 h-12 mx-auto mb-2 opacity-50" /><p>今天還沒有記錄，開始您的工作吧！</p></div> ) 
             : (
               consolidatedRecords.map((report) => (
-                <div key={report.project.id} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <div className={`inline-flex items-center px-2 py-1 text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
+                <div key={report.project.id} className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-100 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-2 space-y-2 sm:space-y-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className={`inline-flex items-center px-2 py-1 text-xs sm:text-sm font-medium rounded-md ${getProjectColors(report.project.plan_subj_c).tag}`}>
                         {report.project.plan_subj_c}
                       </div>
                       {report.total_execution_time_minutes !== undefined && report.total_execution_time_minutes > 0 && (
@@ -195,8 +258,20 @@ const DataInputTab: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-500">{report.record_count} 筆記錄</span>
+                    <span className="text-xs text-gray-500 self-start sm:self-auto">{report.record_count} 筆記錄</span>
                   </div>
+                  
+                  {/* 工作詳情顯示 */}
+                  {(report.execution_work_name || report.work_item_name || report.service_company_name || report.service_target_name) && (
+                    <WorkDetailsDisplay
+                      executionWorkName={report.execution_work_name}
+                      workItemName={report.work_item_name}
+                      serviceCompanyName={report.service_company_name}
+                      serviceTargetName={report.service_target_name}
+                      className="text-xs"
+                    />
+                  )}
+                  
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{report.content}</p>
                   <AttachedFilesDisplay files={report.files} />
                 </div>
