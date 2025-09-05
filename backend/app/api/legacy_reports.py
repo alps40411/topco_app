@@ -203,104 +203,7 @@ async def save_attachment(
         logger.error(f"Error saving attachment: {str(e)}")
         raise HTTPException(status_code=500, detail=f"附件保存失敗: {str(e)}")
 
-@router.post("/submit", response_model=SubmitResponse)
-async def submit_report(
-    submit_data: ReportSubmitRequest,
-    db: Session = Depends(get_legacy_db)
-):
-    """正式提交日報到 tdr_master, tdr_detail1, tdr_detail2"""
-    try:
-        daily_no = LegacyReportServiceV2.submit_report(
-            db=db,
-            daily_no=submit_data.daily_no,
-            empno=submit_data.empno,
-            cocode=submit_data.cocode,
-            deptno=submit_data.deptno,
-            doc_date=submit_data.doc_date,
-            emergency=submit_data.emergency,
-            classify=submit_data.classify,
-            leader=submit_data.leader,
-            g_deptno=submit_data.g_deptno,
-            empnamec=submit_data.empnamec,
-            deptnamec=submit_data.deptnamec,
-            sop_desc_c=submit_data.sop_desc_c,
-            word_count=submit_data.word_count,
-            att_file1=submit_data.att_file1,
-            att_file2=submit_data.att_file2,
-            work_items=submit_data.work_items
-        )
-        
-        return SubmitResponse(
-            daily_no=daily_no,
-            status="submitted",
-            message="日報提交成功"
-        )
-    except Exception as e:
-        logger.error(f"Error submitting report: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"日報提交失敗: {str(e)}")
-
-@router.post("/submit-draft/{draft_id}")
-async def submit_draft_to_final(
-    draft_id: str,
-    db: Session = Depends(get_legacy_db)
-):
-    """將暫存提交為正式日報"""
-    try:
-        # 取得暫存資料
-        draft_sql = text("""
-            SELECT DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_CONTENT
-            FROM tdr_draft
-            WHERE DAILY_NO = :daily_no AND STATUS = 'A'
-        """)
-        
-        draft_result = db.execute(draft_sql, {"daily_no": draft_id}).fetchone()
-        if not draft_result:
-            raise HTTPException(status_code=404, detail="找不到指定的暫存資料")
-        
-        draft_content = json.loads(draft_result[4])
-        empno = draft_result[1]
-        cocode = draft_result[2]
-        doc_date = draft_result[3]
-        
-        # 使用暫存的 daily_no（不需要重新取得）
-        daily_no = draft_result[0]  # 使用暫存中的 daily_no
-        
-        # 提交到正式日報表
-        LegacyReportServiceV2.submit_draft_to_final(
-            db=db,
-            daily_no=daily_no,
-            empno=empno,
-            cocode=cocode,
-            doc_date=doc_date,
-            draft_content=draft_content
-        )
-        
-        # 標記暫存為已提交
-        update_draft_sql = text("""
-            UPDATE tdr_draft 
-            SET STATUS = 'S', UPDATED_DATE = :updated_date, UPDATED_TIME = :updated_time
-            WHERE DAILY_NO = :daily_no
-        """)
-        
-        from datetime import datetime
-        now = datetime.now()
-        db.execute(update_draft_sql, {
-            "daily_no": daily_no,  # 使用相同的 daily_no
-            "updated_date": now.strftime('%Y%m%d'),
-            "updated_time": now.strftime('%H:%M:%S')
-        })
-        
-        db.commit()
-        
-        return SubmitResponse(
-            daily_no=daily_no,
-            status="submitted",
-            message="暫存提交成功"
-        )
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error submitting draft: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"暫存提交失敗: {str(e)}")
+# 舊的提交端點已移除，請使用 /upload-daily-report 端點
 
 # === 查詢相關 API ===
 
@@ -323,9 +226,13 @@ async def get_drafts(
             params["draft_type"] = draft_type
         
         sql = text(f"""
-            SELECT DRAFT_ID, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE, DRAFT_CONTENT,
-                   CREATED_DATE, CREATED_TIME, UPDATED_DATE, UPDATED_TIME
-            FROM tdr_draft
+            SELECT DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE, 
+                   PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C, WORK_ITEM_SEQ,
+                   SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
+                   CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
+                   ATT_FILE1, ATT_FILE2, FILES,
+                   CREATED_DATE, CREATED_TIME, UPDATED_DATE, UPDATED_TIME, STATUS
+            FROM jps.tdr_draft
             {where_clause}
             ORDER BY UPDATED_DATE DESC, UPDATED_TIME DESC
         """)
@@ -334,11 +241,41 @@ async def get_drafts(
         
         drafts = []
         for row in result.fetchall():
-            draft = dict(zip(result.keys(), row))
-            # 解析 JSON 內容
-            if draft['draft_content']:
-                import json
-                draft['draft_content'] = json.loads(draft['draft_content'])
+            # 解析檔案清單
+            files = []
+            if row[19]:  # FILES 欄位
+                try:
+                    files = json.loads(row[19])
+                except:
+                    files = []
+            
+            draft = {
+                "daily_no": row[0],
+                "empno": row[1],
+                "cocode": row[2],
+                "doc_date": row[3],
+                "draft_type": row[4],
+                "planno": row[5],
+                "plan_subj_c": row[6],
+                "sopno": row[7],
+                "sop_desc_c": row[8],
+                "work_item_seq": row[9],
+                "service_cocode": row[10],
+                "service_empno": row[11],
+                "service_empnamec": row[12],
+                "service_deptno": row[13],
+                "content": row[14],
+                "execution_time_minutes": row[15],
+                "word_count": row[16],
+                "att_file1": row[17],
+                "att_file2": row[18],
+                "files": files,
+                "created_date": row[20],
+                "created_time": row[21],
+                "updated_date": row[22],
+                "updated_time": row[23],
+                "status": row[24]
+            }
             drafts.append(draft)
         
         return drafts
@@ -769,7 +706,7 @@ async def get_consolidated_today(
             daily_no = row[0]
             content = row[1] or ""
             planno = row[2] or ""
-            plan_subj_c = row[3] or "未指定工作計畫"
+            plan_subj_c = row[3] or "基本工作項目"
             sopno = row[4] or ""
             sop_desc_c = row[5] or ""
             work_item_seq = row[6] or ""
@@ -1025,6 +962,295 @@ async def create_record(
         raise HTTPException(status_code=500, detail=f"創建記錄失敗: {str(e)}")
 
 # === Comments API removed - now handled by /api/reports/ ===
+
+@router.post("/upload-daily-report")
+async def upload_daily_report(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """上傳日報到正式表 - 每天五點後開放，支援多次提交"""
+    try:
+        if not current_user.employee:
+            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+        
+        # 檢查時間限制：每天五點後才開放上傳
+        now = datetime.now()
+        # current_hour = now.hour
+        # if current_hour < 17:  # 17:00 = 5 PM
+        #     raise HTTPException(
+        #         status_code=403, 
+        #         detail=f"上傳功能僅在每天下午5點後開放，目前時間：{now.strftime('%H:%M')}"
+        #     )
+        
+        empno = current_user.employee.empno
+        cocode = current_user.employee.cocode or 'A'
+        doc_date = now.strftime('%Y%m%d')
+        
+        # 查詢今日所有暫存資料
+        draft_sql = text("""
+            SELECT DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE,
+                   PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C, WORK_ITEM_SEQ,
+                   SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
+                   CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
+                   ATT_FILE1, ATT_FILE2, FILES, STATUS
+            FROM jps.tdr_draft 
+            WHERE EMPNO = :empno AND COCODE = :cocode AND DOC_DATE = :doc_date
+            AND STATUS = 'A'
+            ORDER BY CREATED_DATE, CREATED_TIME
+        """)
+        
+        draft_results = db.execute(draft_sql, {
+            "empno": empno, 
+            "cocode": cocode, 
+            "doc_date": doc_date
+        }).fetchall()
+        
+        if not draft_results:
+            raise HTTPException(status_code=400, detail="沒有可上傳的暫存資料")
+        
+        # 取得第一個暫存記錄的daily_no作為正式日報編號
+        daily_no = draft_results[0][0]
+        logger.info(f"上傳日報 daily_no: {daily_no}")
+        
+        # 檢查是否已被主管審閱
+        review_check_sql = text("""
+            SELECT STATUS FROM jps.tdr_master 
+            WHERE DAILY_NO = :daily_no
+        """)
+        review_result = db.execute(review_check_sql, {"daily_no": daily_no}).fetchone()
+        
+        if review_result and review_result[0] in ['Y', 'A']:  # Y=已審閱, A=已核准
+            raise HTTPException(
+                status_code=403, 
+                detail="此日報已被主管審閱，無法再進行修改"
+            )
+        
+        # 查詢員工詳細資訊
+        emp_sql = text("""
+            SELECT e.empnamec, e.deptno, d.deptnamec, e.g_deptno, e.leader
+            FROM jps.dcd003$master e
+            LEFT JOIN jps.dcd002$master d ON e.deptno = d.deptno AND e.cocode = d.cocode
+            WHERE e.empno = :empno AND e.cocode = :cocode
+        """)
+        emp_result = db.execute(emp_sql, {"empno": empno, "cocode": cocode}).fetchone()
+        
+        if not emp_result:
+            raise HTTPException(status_code=400, detail="找不到員工資訊")
+        
+        empnamec, deptno, deptnamec, g_deptno, leader = emp_result
+        
+        # 計算總字數和合併檔案
+        total_word_count = 0
+        all_files = []
+        all_att_file1 = None
+        all_att_file2 = None
+        
+        for draft in draft_results:
+            total_word_count += draft[16] or 0  # WORD_COUNT
+            if draft[19]:  # FILES
+                try:
+                    files = json.loads(draft[19])
+                    all_files.extend(files)
+                except:
+                    pass
+            if not all_att_file1 and draft[17]:  # ATT_FILE1
+                all_att_file1 = draft[17]
+            if not all_att_file2 and draft[18]:  # ATT_FILE2
+                all_att_file2 = draft[18]
+        
+        # 取得執行工作描述
+        main_sop_desc_c = ''
+        first_sopno = draft_results[0][7] if len(draft_results) > 0 and draft_results[0][7] else None
+        if first_sopno:
+            try:
+                sop_sql = text("SELECT sop_desc_c FROM jps.tpm_sop WHERE sopno = :sopno")
+                sop_result = db.execute(sop_sql, {"sopno": first_sopno}).fetchone()
+                if sop_result and sop_result[0]:
+                    main_sop_desc_c = sop_result[0]
+                    if len(main_sop_desc_c) > 50:
+                        main_sop_desc_c = main_sop_desc_c[:47] + '...'
+            except Exception as e:
+                logger.warning(f"無法取得 sopno {first_sopno} 的執行工作描述: {str(e)}")
+                main_sop_desc_c = draft_results[0][8] if draft_results[0][8] else ''
+                if len(main_sop_desc_c) > 50:
+                    main_sop_desc_c = main_sop_desc_c[:47] + '...'
+        
+        current_date = now.strftime('%Y%m%d')
+        current_time = now.strftime('%H:%M:%S')
+        
+        # 檢查是否為重新提交（tdr_master 已存在）
+        check_master_sql = text("""
+            SELECT COUNT(*) FROM jps.tdr_master 
+            WHERE daily_no = :daily_no
+        """)
+        master_exists = db.execute(check_master_sql, {"daily_no": daily_no}).scalar() > 0
+        
+        if master_exists:
+            logger.info(f"重新提交日報 {daily_no}，更新 master 資料")
+            
+            # 更新 master 資料
+            update_master_sql = text("""
+                UPDATE jps.tdr_master SET 
+                    WORD_COUNT = :word_count,
+                    XDATE = :current_date,
+                    XTIME = :current_time,
+                    ATT_FILE1 = :att_file1,
+                    ATT_FILE2 = :att_file2,
+                    SOP_DESC_C = :sop_desc_c
+                WHERE daily_no = :daily_no
+            """)
+            
+            db.execute(update_master_sql, {
+                "word_count": total_word_count,
+                "att_file1": all_att_file1,
+                "att_file2": all_att_file2,
+                "sop_desc_c": main_sop_desc_c,
+                "current_date": current_date,
+                "current_time": current_time,
+                "daily_no": daily_no
+            })
+            
+            # 刪除現有的 detail1 和 detail2 資料
+            delete_detail1_sql = text("DELETE FROM jps.tdr_detail1 WHERE daily_no = :daily_no")
+            delete_detail2_sql = text("DELETE FROM jps.tdr_detail2 WHERE daily_no = :daily_no")
+            
+            db.execute(delete_detail1_sql, {"daily_no": daily_no})
+            db.execute(delete_detail2_sql, {"daily_no": daily_no})
+            
+        else:
+            logger.info(f"首次提交日報 {daily_no}，創建新的 master 資料")
+            
+            # 插入新的 tdr_master
+            insert_master_sql = text("""
+                INSERT INTO jps.tdr_master (
+                    DAILY_NO, COCODE, EMPNO, DEPTNO, DOC_DATE, EMERGENCY, 
+                    CLASSIFY, SCORE, XUSER, XDATE, XTIME, STATUS, LEADER, G_DEPTNO, EMPNAMEC, 
+                    DEPTNAMEC, UPLOAD_SITE, EMPNAMEC_N, WFINBOX_STATUS, SOP_DESC_C, CUST_ENAME1, 
+                    CUST_COMP_ABBV1, WORD_COUNT, ATT_FILE1, ATT_FILE2, openpath, openwebpage
+                ) VALUES (
+                    :daily_no, :cocode, :empno, :deptno, :doc_date, NULL, 
+                    NULL, 0, :empno, :current_date, :current_time, 'N', :leader, :g_deptno, :empnamec, 
+                    :deptnamec, 'D', :empnamec, 'N', :sop_desc_c, NULL, 
+                    NULL, :word_count, :att_file1, :att_file2, '/MyReport/', 'viewed.aspx'
+                )
+            """)
+            
+            db.execute(insert_master_sql, {
+                "daily_no": daily_no,
+                "cocode": cocode,
+                "empno": empno,
+                "deptno": deptno,
+                "doc_date": doc_date,
+                "leader": leader,
+                "g_deptno": g_deptno,
+                "empnamec": empnamec,
+                "deptnamec": deptnamec,
+                "sop_desc_c": main_sop_desc_c,
+                "word_count": total_word_count,
+                "att_file1": all_att_file1,
+                "att_file2": all_att_file2,
+                "current_date": current_date,
+                "current_time": current_time
+            })
+        
+        # 插入 tdr_detail1 (只插入一次)
+        insert_detail1_sql = text("""
+            INSERT INTO jps.tdr_detail1 (
+                DAILY_NO, DAILY_SUB_NOS, XUSER, XDATE, XTIME, CUNO1, COMP_SERNO1
+            ) VALUES (
+                :daily_no, 1, :empno, :current_date, :current_time, NULL, NULL
+            )
+        """)
+        
+        db.execute(insert_detail1_sql, {
+            "daily_no": daily_no,
+            "empno": empno,
+            "current_date": current_date,
+            "current_time": current_time
+        })
+        
+        # 插入 tdr_detail2 (每個工作計畫一條記錄)
+        for i, draft in enumerate(draft_results, 1):
+            # 取得工作項目中文名稱
+            work_item_names = []
+            if draft[9] and draft[7]:  # WORK_ITEM_SEQ 和 SOPNO
+                seq_parts = str(draft[9]).split('/')
+                for seq in seq_parts:
+                    if seq.strip():
+                        work_item_sql = text("""
+                            SELECT name FROM jps.tpm_sop_detail 
+                            WHERE sopno = :sopno AND seq = :seq
+                        """)
+                        work_item_result = db.execute(work_item_sql, {
+                            "sopno": draft[7],
+                            "seq": seq.strip()
+                        }).fetchone()
+                        
+                        if work_item_result and work_item_result[0]:
+                            work_item_names.append(work_item_result[0])
+                        else:
+                            work_item_names.append(f"工作項目 {seq}")
+            
+            work_item_name = " / ".join(work_item_names) if work_item_names else str(draft[9])
+            
+            insert_detail2_sql = text("""
+                INSERT INTO jps.tdr_detail2 (
+                    DAILY_NO, DAILY_SUB_NOS, DAILY_JOB_NOS, COCODE, EMPNO, SOP_CODE, STATUS,
+                    XUSER, XDATE, XTIME, ITEMDESC1, PROD_CATE, EXETIME, ESTIMATE, ATTITUDE,
+                    PROD_NO, SOLUT_SUBJ, SOLUT_STATUS, EMPNAME1, EMPNAME2, EMPNAME3, EMPNAME4, EMPNAME5,
+                    PPS_SERVECOCODE, PPS_EMPNO, PPS_COCODE, PPS_DEPTNO, MEMO_COLLECT, MEMO,
+                    PPS_EMPNAMEC, PLANNO, SOPNO
+                ) VALUES (
+                    :daily_no, 1, :daily_job_nos, :cocode, :empno, :work_item_name, 'N',
+                    :empnamec, :current_date, :current_time, :content, NULL, :execution_time_minutes, NULL, NULL,
+                    NULL, NULL, NULL, '0', NULL, NULL, NULL, NULL,
+                    :service_cocode, :service_empno, :service_cocode, :service_deptno, '1', :content,
+                    :service_empnamec, :planno, :sopno
+                )
+            """)
+            
+            db.execute(insert_detail2_sql, {
+                "daily_no": daily_no,
+                "daily_job_nos": i,
+                "cocode": cocode,
+                "empno": empno,
+                "work_item_name": work_item_name,
+                "empnamec": empnamec,
+                "content": draft[14],  # CONTENT
+                "execution_time_minutes": draft[15],  # EXECUTION_TIME_MINUTES
+                "service_cocode": draft[10],  # SERVICE_COCODE
+                "service_empno": draft[11],   # SERVICE_EMPNO
+                "service_deptno": draft[13],  # SERVICE_DEPTNO
+                "service_empnamec": draft[12], # SERVICE_EMPNAMEC
+                "planno": draft[5] or '0',  # PLANNO
+                "sopno": draft[7],   # SOPNO
+                "current_date": current_date,
+                "current_time": current_time
+            })
+        
+        # 更新所有暫存狀態為已提交
+        update_draft_sql = text("""
+            UPDATE jps.tdr_draft SET STATUS = 'S' WHERE DAILY_NO = :daily_no
+        """)
+        db.execute(update_draft_sql, {"daily_no": daily_no})
+        
+        db.commit()
+        logger.info(f"日報 {daily_no} 上傳成功，包含 {len(draft_results)} 個工作項目")
+        
+        return {
+            "success": True,
+            "daily_no": daily_no,
+            "message": "日報上傳成功",
+            "work_items_count": len(draft_results),
+            "upload_time": f"{current_date} {current_time}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"上傳日報失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"日報上傳失敗: {str(e)}")
 
 @router.get("/execution-works")
 async def get_execution_works(

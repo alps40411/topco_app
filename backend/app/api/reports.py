@@ -316,10 +316,11 @@ async def get_report_comments(
                 "id": row[0],  # reply_nos
                 "content": row[3] or "",  # memo
                 "created_at": f"{row[4]} {row[5]}" if row[4] and row[5] else "",
+                "user_id": row[1],  # empno
                 "author": {
-                    "id": 0,
+                    "id": row[1],  # empno
                     "name": row[2] or row[1],  # xuser 或 empno
-                    "empno": row[1]
+                    "email": f"{row[1]}@employee"  # 添加 email 欄位
                 },
                 "rating": row[6],  # score
                 "replies": []

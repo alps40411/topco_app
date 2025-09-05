@@ -444,7 +444,7 @@ async def get_today_consolidated_records(
             consolidated_records.append({
                 "project": {
                     "id": row[2],  # planno
-                    "plan_subj_c": row[3] or "未指定工作計畫"
+                    "plan_subj_c": row[3] or "基本工作項目"
                 },
                 "execution_work_name": row[5] or "",  # sop_desc_c
                 "work_item_name": row[14] or row[6] or "",  # work_item_name 或 work_item_seq

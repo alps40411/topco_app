@@ -267,9 +267,11 @@ const DailyReportTab: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await authFetch("/api/supervisor/reports/submit", {
+      const response = await authFetch("/api/legacy/upload-daily-report", {
         method: "POST",
-        body: JSON.stringify(reports),
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
       if (!response.ok) {
         const errData = await response
@@ -277,11 +279,12 @@ const DailyReportTab: React.FC = () => {
           .catch(() => ({ detail: "提交失敗" }));
         throw new Error(errData.detail);
       }
-      toast.success("日報已成功提交，等待主管審閱！");
+      const result = await response.json();
+      toast.success(`日報已成功上傳！日報編號: ${result.daily_no}`);
       await fetchReports();
     } catch (error: any) {
       console.error(error);
-      toast.error(`提交日報時發生錯誤: ${error.message}`);
+      toast.error(`上傳日報時發生錯誤: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }

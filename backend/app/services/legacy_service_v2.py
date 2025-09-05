@@ -89,12 +89,12 @@ class LegacyReportServiceV2:
             att_file1 = files[0].get('name') if len(files) > 0 and isinstance(files[0], dict) else (files[0] if len(files) > 0 else None)
             att_file2 = files[1].get('name') if len(files) > 1 and isinstance(files[1], dict) else (files[1] if len(files) > 1 else None)
             
-            # 使用提供的 daily_no 或取得新的 daily_no
+            # 處理 daily_no 邏輯
             if daily_no:
                 # 使用前端提供的 daily_no
                 logger.info(f"使用前端提供的 daily_no: {daily_no}")
             else:
-                # 查找現有的 daily_no 或創建新的
+                # 查找今天是否已經有暫存記錄
                 existing_daily_sql = text("""
                     SELECT DAILY_NO
                     FROM jps.tdr_draft
@@ -112,19 +112,21 @@ class LegacyReportServiceV2:
                 }).fetchone()
                 
                 if existing_daily_result:
-                    # 使用現有的 daily_no
+                    # 今天已經有暫存記錄，使用現有的 daily_no
                     daily_no = existing_daily_result[0]
-                    logger.info(f"使用現有 daily_no: {daily_no}")
+                    logger.info(f"今天已有暫存記錄，使用現有 daily_no: {daily_no}")
                 else:
-                    # 第一次填寫，取得新的 daily_no
+                    # 今天第一次填寫，取得新的 daily_no
                     try:
-                        daily_no_sql = text("SELECT nextval('seq_tdr_master')")
+                        # 嘗試使用 Oracle 序列
+                        daily_no_sql = text("SELECT seq_tdr_master.nextval FROM dual")
                         daily_no_result = db.execute(daily_no_sql).fetchone()
                         daily_no = str(daily_no_result[0])
-                    except:
-                        # 如果序列不存在，使用時間戳記
+                    except Exception as e:
+                        # 如果序列不存在或出錯，使用時間戳記
+                        logger.warning(f"無法使用序列取得 daily_no: {str(e)}，使用時間戳記")
                         daily_no = f"DR{current_date}{current_time.replace(':', '')}"
-                    logger.info(f"創建新 daily_no: {daily_no}")
+                    logger.info(f"今天第一次填寫，創建新 daily_no: {daily_no}")
             
             # 檢查是否已存在相同 planno + sopno + work_item_seq 組合的記錄
             existing_exact_match_sql = text("""
@@ -263,49 +265,15 @@ class LegacyReportServiceV2:
                     
                     logger.info(f"去重後的工作項目序列: {final_work_item_seq}")
                     
-                    # 更新第一個匹配的記錄，合併工作項目序列、內容和檔案
+                    # 更新第一個匹配的記錄，合併工作項目序列
                     first_match_id = existing_partial_matches[0][0]
-                    
-                    # 先取得現有記錄的內容和檔案資訊
-                    get_existing_sql = text("""
-                        SELECT CONTENT, EXECUTION_TIME_MINUTES, FILES
-                        FROM jps.tdr_draft
-                        WHERE RECORD_ID = :record_id
-                    """)
-                    
-                    existing_record = db.execute(get_existing_sql, {"record_id": first_match_id}).fetchone()
-                    existing_content = existing_record[0] or ""
-                    existing_time = existing_record[1] or 0
-                    existing_files = existing_record[2] or "[]"
-                    
-                    # 合併內容
-                    merged_content = f"{existing_content}\n{content}".strip() if existing_content else content
-                    
-                    # 累加執行時間
-                    total_time = existing_time + draft_content.get('execution_time_minutes', 0)
-                    
-                    # 合併檔案
-                    if files_json and files_json != "[]":
-                        try:
-                            existing_files_list = json.loads(existing_files) if existing_files != "[]" else []
-                            new_files_list = json.loads(files_json)
-                            merged_files_list = existing_files_list + new_files_list
-                            merged_files = json.dumps(merged_files_list)
-                        except:
-                            merged_files = files_json
-                    else:
-                        merged_files = existing_files
-                    
-                    # 計算新的字數
-                    merged_word_count = len(merged_content) if merged_content else 0
                     
                     update_partial_sql = text("""
                         UPDATE jps.tdr_draft 
                         SET WORK_ITEM_SEQ = :work_item_seq,
-                            CONTENT = :content,
-                            EXECUTION_TIME_MINUTES = :execution_time_minutes,
-                            WORD_COUNT = :word_count,
-                            FILES = :files,
+                            CONTENT = COALESCE(CONTENT, '') || CASE WHEN COALESCE(CONTENT, '') = '' THEN '' ELSE '\n' END || :new_content,
+                            EXECUTION_TIME_MINUTES = COALESCE(EXECUTION_TIME_MINUTES, 0) + :additional_time,
+                            WORD_COUNT = CHAR_LENGTH(COALESCE(CONTENT, '') || CASE WHEN COALESCE(CONTENT, '') = '' THEN '' ELSE '\n' END || :new_content),
                             UPDATED_DATE = :updated_date,
                             UPDATED_TIME = :updated_time
                         WHERE RECORD_ID = :record_id
@@ -313,10 +281,8 @@ class LegacyReportServiceV2:
                     
                     db.execute(update_partial_sql, {
                         "work_item_seq": final_work_item_seq,
-                        "content": merged_content,
-                        "execution_time_minutes": total_time,
-                        "word_count": merged_word_count,
-                        "files": merged_files,
+                        "new_content": content,
+                        "additional_time": draft_content.get('execution_time_minutes', 0),
                         "updated_date": current_date,
                         "updated_time": current_time,
                         "record_id": first_match_id
@@ -325,9 +291,9 @@ class LegacyReportServiceV2:
                     db.commit()
                     logger.info(f"合併工作項目序列完成，最終序列: {final_work_item_seq}")
                     return daily_no
-                
-                # 完全不同的工作計畫+執行工作：新增一筆記錄
-                logger.info(f"完全不同的 planno({planno})+sopno({sopno}) 組合，新增記錄（daily_no: {daily_no}）")
+                else:
+                    # 完全不同的工作計畫+執行工作：新增一筆記錄
+                    logger.info(f"完全不同的 planno({planno})+sopno({sopno}) 組合，新增記錄（daily_no: {daily_no}）")
                 
                 insert_sql = text("""
                     INSERT INTO jps.tdr_draft (
@@ -1001,14 +967,4 @@ class LegacyReportServiceV2:
         logger.warning("save_attachment not implemented in V2, returning empty string")
         return ""
     
-    @staticmethod
-    def submit_report(
-        db: Session, 
-        empno: str, 
-        cocode: str, 
-        doc_date: str, 
-        report_data: Dict[str, Any]
-    ) -> str:
-        """提交報告 - 暫時返回空字串"""
-        logger.warning("submit_report not implemented in V2, returning empty string")
-        return ""
+# submit_report 方法已移除，請使用新的上傳邏輯

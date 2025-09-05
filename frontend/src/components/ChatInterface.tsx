@@ -106,14 +106,34 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       setIsLoading(true);
       const response = await authFetch(`/api/reports/${reportId}/comments`);
       if (response.ok) {
-        const commentsData = await response.json();
-        setComments(commentsData);
+        const responseData = await response.json();
+        // 處理 API 返回的資料結構
+        let commentsData;
+        if (responseData.success && responseData.data) {
+          // 後端返回 { success: true, data: [...] } 格式
+          commentsData = responseData.data;
+        } else if (Array.isArray(responseData)) {
+          // 直接返回陣列格式
+          commentsData = responseData;
+        } else {
+          console.warn("Unexpected API response format:", responseData);
+          commentsData = [];
+        }
+
+        // 確保 commentsData 是陣列
+        if (Array.isArray(commentsData)) {
+          setComments(commentsData);
+        } else {
+          console.warn("API returned non-array comments data:", commentsData);
+          setComments([]);
+        }
       } else {
         setComments([]);
       }
     } catch (error) {
       console.error("獲取留言失敗:", error);
       toast.error("載入留言失敗");
+      setComments([]);
     } finally {
       setIsLoading(false);
     }
@@ -331,10 +351,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const flattenComments = (comments: Comment[]): Comment[] => {
+    // 確保 comments 是陣列
+    if (!Array.isArray(comments)) {
+      console.warn("comments is not an array:", comments);
+      return [];
+    }
+
     const result: Comment[] = [];
     const addComment = (comment: Comment) => {
       result.push(comment);
-      if (comment.replies && comment.replies.length > 0) {
+      if (
+        comment.replies &&
+        Array.isArray(comment.replies) &&
+        comment.replies.length > 0
+      ) {
         comment.replies.forEach(addComment);
       }
     };
