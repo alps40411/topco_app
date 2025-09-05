@@ -40,6 +40,7 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
   required = false,
   className = "",
 }) => {
+  // ===== 狀態定義 (無變更) =====
   const [workPlans, setWorkPlans] = useState<
     Array<{ planno: string; plan_subj_c: string }>
   >([]);
@@ -73,154 +74,132 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
 
   const { user } = useAuth();
 
-  // 載入所有工作資料
-  const fetchAllWorkData = useCallback(async () => {
-    if (!user?.employee?.empno) {
-      toast.error("無法獲取用戶員工號碼");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const workData = await LegacyApi.getAllWorkData(user.employee.empno);
-      console.log("=== API 返回資料 ===");
-      console.log("workData:", workData);
-      console.log("basic_execution_works:", workData.basic_execution_works);
-      if (
-        workData.basic_execution_works &&
-        workData.basic_execution_works.length > 0
-      ) {
-        console.log("第一個執行工作:", workData.basic_execution_works[0]);
-        console.log(
-          "第一個執行工作的項目:",
-          workData.basic_execution_works[0].work_items
-        );
-      }
-      setWorkPlans(workData.work_plans || []);
-      setBasicExecutionWorks(workData.basic_execution_works || []);
-      setProjectExecutionWorks(workData.project_execution_works || {});
-
-      // 將服務資料傳遞給父組件
-      if (onServiceDataLoaded) {
-        onServiceDataLoaded(
-          workData.service_companies || [],
-          workData.service_targets || []
-        );
+  // ===== 修改 #1: useEffect 用於初始化資料獲取 =====
+  // 這個 Effect 只會在 user.employee.empno 存在且變更時執行一次。
+  // 它負責獲取所有需要的資料，並設定初始狀態。
+  useEffect(() => {
+    const fetchAllWorkData = async () => {
+      if (!user?.employee?.empno) {
+        toast.error("無法獲取用戶員工號碼");
+        return;
       }
 
-      // 預設選擇基本工作事項（空字符串代表基本工作事項）
-      if (!selectedProjectId) {
-        onProjectChange("");
-        setCurrentExecutionWorks(workData.basic_execution_works || []);
+      setIsLoading(true);
+      try {
+        const workData = await LegacyApi.getAllWorkData(user.employee.empno);
+        console.log("=== API 已呼叫並返回資料 (只會執行一次) ===", workData);
 
-        // 預設選擇第一個執行工作
-        if (
-          workData.basic_execution_works &&
-          workData.basic_execution_works.length > 0
-        ) {
-          const firstExecutionWork = workData.basic_execution_works[0];
-          onExecutionWorkChange(firstExecutionWork.sopno);
-          setCurrentWorkItems(firstExecutionWork.work_items || []);
+        // 1. 設定從 API 獲取的原始資料
+        setWorkPlans(workData.work_plans || []);
+        const basicWorks = workData.basic_execution_works || [];
+        setBasicExecutionWorks(basicWorks);
+        setProjectExecutionWorks(workData.project_execution_works || {});
+
+        // 2. 將服務資料傳遞給父組件
+        if (onServiceDataLoaded) {
+          onServiceDataLoaded(
+            workData.service_companies || [],
+            workData.service_targets || []
+          );
         }
-      }
 
-      setIsInitialized(true);
-    } catch (error) {
-      console.error("無法獲取工作資料:", error);
-      toast.error("載入工作資料失敗");
-    } finally {
-      setIsLoading(false);
+        // 3. 設定初始下拉選單的狀態
+        // 如果外部沒有傳入 selectedProjectId，就預設為「基本工作事項」
+        if (!selectedProjectId) {
+          setCurrentExecutionWorks(basicWorks);
+          if (basicWorks.length > 0) {
+            const firstExecutionWork = basicWorks[0];
+            onExecutionWorkChange(firstExecutionWork.sopno);
+            // 注意：這裡的 setCurrentWorkItems 會被後面的 useEffect 覆蓋，是正常的
+          }
+        }
+
+        setIsInitialized(true);
+      } catch (error) {
+        console.error("無法獲取工作資料:", error);
+        toast.error("載入工作資料失敗");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user?.employee?.empno && !isInitialized) {
+      fetchAllWorkData();
     }
   }, [
     user?.employee?.empno,
     onServiceDataLoaded,
-    onProjectChange,
-    onExecutionWorkChange,
+    isInitialized,
     selectedProjectId,
+    onExecutionWorkChange,
   ]);
 
-  // 初始化載入所有工作資料（只執行一次）
+  // ===== 修改 #2: 依賴 selectedProjectId 的 useEffect =====
+  // 這個 Effect 現在只負責根據已有的資料，在「工作計畫」變更時，更新「執行工作」的列表。
+  // 它不再需要關心 API 呼叫。
   useEffect(() => {
-    if (user?.employee?.empno) {
-      fetchAllWorkData();
-    }
-  }, [user?.employee?.empno, fetchAllWorkData]);
+    if (!isInitialized) return; // 等待初始化資料載入完成
 
-  // 當選擇工作計畫時，切換對應的執行工作
-  useEffect(() => {
-    if (!isInitialized) return; // 等待初始化完成
+    let executionWorks: typeof basicExecutionWorks = [];
 
-    if (selectedProjectId === "" || selectedProjectId === undefined) {
-      // 選擇基本工作事項
-      setCurrentExecutionWorks(basicExecutionWorks);
-      // 自動選擇第一個執行工作
-      if (basicExecutionWorks.length > 0) {
-        const firstExecutionWork = basicExecutionWorks[0];
-        onExecutionWorkChange(firstExecutionWork.sopno);
-        setCurrentWorkItems(firstExecutionWork.work_items || []);
-      }
+    if (selectedProjectId && projectExecutionWorks[selectedProjectId]) {
+      // 選擇了某個工作計畫
+      executionWorks = projectExecutionWorks[selectedProjectId];
     } else {
-      // 選擇特定工作計畫
-      const executionWorks = projectExecutionWorks[selectedProjectId] || [];
-      setCurrentExecutionWorks(executionWorks);
-      // 自動選擇第一個執行工作
-      if (executionWorks.length > 0) {
-        const firstExecutionWork = executionWorks[0];
-        onExecutionWorkChange(firstExecutionWork.sopno);
-        setCurrentWorkItems(firstExecutionWork.work_items || []);
-      }
+      // 選擇了「基本工作事項」(selectedProjectId 為 "" 或 undefined)
+      executionWorks = basicExecutionWorks;
     }
+
+    setCurrentExecutionWorks(executionWorks);
+
+    // 當工作計畫改變時，自動選擇第一個執行工作，並清空工作項目
+    if (executionWorks.length > 0) {
+      const firstExecutionWork = executionWorks[0];
+      onExecutionWorkChange(firstExecutionWork.sopno);
+    } else {
+      onExecutionWorkChange(undefined);
+    }
+    // 清空工作項目，讓下一個 effect 來處理
+    onWorkItemChange([]);
   }, [
     selectedProjectId,
     basicExecutionWorks,
     projectExecutionWorks,
     onExecutionWorkChange,
+    onWorkItemChange, // 新增依賴
     isInitialized,
   ]);
 
-  // 當選擇執行工作時，切換對應的工作項目
+  // ===== 修改 #3: 依賴 selectedExecutionWorkId 的 useEffect =====
+  // 這個 Effect 保持不變，它的邏輯是正確的。
+  // 負責在「執行工作」變更時，更新「工作項目」的列表。
   useEffect(() => {
-    console.log("=== 工作項目更新檢查 ===");
-    console.log("selectedExecutionWorkId:", selectedExecutionWorkId);
-    console.log("currentExecutionWorks.length:", currentExecutionWorks.length);
-    console.log("currentExecutionWorks:", currentExecutionWorks);
+    if (!isInitialized) return;
 
-    if (selectedExecutionWorkId && currentExecutionWorks.length > 0) {
+    if (selectedExecutionWorkId) {
       const selectedWork = currentExecutionWorks.find(
         (work) => String(work.sopno) === String(selectedExecutionWorkId)
       );
-      console.log("找到的執行工作:", selectedWork);
       if (selectedWork) {
-        console.log("工作項目:", selectedWork.work_items);
         setCurrentWorkItems(selectedWork.work_items || []);
       } else {
-        console.log("未找到對應的執行工作");
-        console.log("嘗試匹配的 sopno 類型:", typeof selectedExecutionWorkId);
-        console.log(
-          "currentExecutionWorks 中的 sopno 類型:",
-          typeof currentExecutionWorks[0]?.sopno
-        );
         setCurrentWorkItems([]);
       }
     } else {
-      console.log("條件不滿足，清空工作項目");
       setCurrentWorkItems([]);
     }
-  }, [selectedExecutionWorkId, currentExecutionWorks]);
+  }, [selectedExecutionWorkId, currentExecutionWorks, isInitialized]);
 
+  // ===== 事件處理函式 (Handlers) 調整 =====
   const handleProjectChange = (value: string) => {
-    const planno = value === "" ? undefined : value;
-    onProjectChange(planno);
-    onExecutionWorkChange(undefined);
-    onWorkItemChange([]);
-    // 清空當前的工作項目狀態，讓 useEffect 重新設置
-    setCurrentWorkItems([]);
+    // 當工作計畫改變時，我們只需要呼叫 onProjectChange
+    // 相關的狀態更新會由上面的 useEffect 自動處理
+    onProjectChange(value === "" ? undefined : value);
   };
 
   const handleExecutionWorkChange = (value: string) => {
-    const sopno = value || undefined;
-    onExecutionWorkChange(sopno);
-    // 不要在這裡清空工作項目，讓 useEffect 來處理
+    // 同樣，只需要呼叫 onExecutionWorkChange
+    onExecutionWorkChange(value || undefined);
   };
 
   const handleWorkItemChange = (value: string[] | string) => {
@@ -228,6 +207,7 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
     onWorkItemChange(workItemSeq);
   };
 
+  // ===== JSX (無變更) =====
   return (
     <div className={`space-y-4 ${className}`}>
       {/* 工作計畫選擇 */}
@@ -266,11 +246,15 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
             value={selectedExecutionWorkId || ""}
             onChange={(e) => handleExecutionWorkChange(e.target.value)}
             className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white disabled:bg-gray-50 disabled:text-gray-500"
-            disabled={isLoading || currentExecutionWorks.length === 0}
+            disabled={
+              isLoading || !isInitialized || currentExecutionWorks.length === 0
+            }
           >
             <option value="">
               {isLoading
                 ? "載入中..."
+                : !isInitialized
+                ? "等待資料載入..."
                 : currentExecutionWorks.length === 0
                 ? "暫無執行工作"
                 : "請選擇執行工作"}
@@ -299,7 +283,9 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
         <InlineMultiSelect
           label="工作項目"
           options={currentWorkItems.map((item, index) => ({
-            id: item.unique_id || `${selectedExecutionWorkId}_${item.seq}_${index}`, // 確保唯一性
+            id:
+              item.unique_id ||
+              `${selectedExecutionWorkId}_${item.seq}_${index}`,
             name: item.name,
           }))}
           selectedValues={
@@ -310,24 +296,27 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
                       (item) => item.seq === seq
                     );
                     return item
-                      ? item.unique_id || `${selectedExecutionWorkId}_${seq}_${currentWorkItems.findIndex(i => i.seq === seq)}`
+                      ? item.unique_id ||
+                          `${selectedExecutionWorkId}_${seq}_${currentWorkItems.findIndex(
+                            (i) => i.seq === seq
+                          )}`
                       : "";
                   })
                   .filter(Boolean)
               : []
           }
           onSelectionChange={(values) => {
-            // 將唯一 id 轉換回原始的 seq 值
             const originalSeqs = values
               .map((uniqueId) => {
                 const item = currentWorkItems.find(
                   (item, index) =>
                     (item.unique_id ||
-                      `${selectedExecutionWorkId}_${item.seq}_${index}`) === uniqueId
+                      `${selectedExecutionWorkId}_${item.seq}_${index}`) ===
+                    uniqueId
                 );
                 return item?.seq;
               })
-              .filter(Boolean);
+              .filter((seq): seq is string => !!seq); // 確保類型正確
             handleWorkItemChange(originalSeqs);
           }}
           placeholder="暫無工作項目"
