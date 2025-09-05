@@ -57,7 +57,13 @@ const MyReportsTab: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const dateString = selectedDate.toISOString().split("T")[0];
+      // 確保使用本地日期，避免時區問題
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const day = String(selectedDate.getDate()).padStart(2, "0");
+      const dateString = `${year}-${month}-${day}`;
+      console.log("Fetching reports for date:", dateString); // 除錯用
+
       // 使用新的優化API端點，直接獲取當前用戶的日報
       const response = await authFetch(
         `/api/supervisor/my-reports-by-date?date=${dateString}`
@@ -127,7 +133,9 @@ const MyReportsTab: React.FC = () => {
     <div className="p-6">
       {/* 標題和日期選擇器 */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">我的日報</h2>
+        <h2 className="text-2xl font-bold text-gray-900 h-8 flex items-center">
+          我的日報
+        </h2>
         <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-1">
           <button
             onClick={() => changeDate(-1)}
@@ -236,7 +244,7 @@ const MyReportsTab: React.FC = () => {
                       key={index}
                       className="border-l-4 border-gray-200 pl-4"
                     >
-                      <div className="flex items-center space-x-2 mb-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
                         <div
                           className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
                             getProjectColors(projectReport.project.plan_subj_c)
@@ -245,11 +253,25 @@ const MyReportsTab: React.FC = () => {
                         >
                           {projectReport.project.plan_subj_c}
                         </div>
-                        {projectReport.total_execution_time_minutes !== undefined && projectReport.total_execution_time_minutes > 0 && (
-                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
-                            {formatMinutesToHours(projectReport.total_execution_time_minutes)}
-                          </span>
+                        {projectReport.execution_work_name && (
+                          <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+                            {projectReport.execution_work_name}
+                          </div>
                         )}
+                        {projectReport.work_item_name && (
+                          <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-800">
+                            {projectReport.work_item_name}
+                          </div>
+                        )}
+                        {projectReport.total_execution_time_minutes !==
+                          undefined &&
+                          projectReport.total_execution_time_minutes > 0 && (
+                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                              {formatMinutesToHours(
+                                projectReport.total_execution_time_minutes
+                              )}
+                            </span>
+                          )}
                       </div>
                       <p className="text-sm text-gray-600 line-clamp-2">
                         {projectReport.content.length > 100

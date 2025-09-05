@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
     SOURCE_DB_USER: str = ""
     SOURCE_DB_PASSWORD: str = ""
+    
+    # Legacy PostgreSQL Database settings
+    LEGACY_DB_URL: str = ""
+    LEGACY_DB_USER: str = ""
+    LEGACY_DB_PASSWORD: str = ""
+    LEGACY_DB_HOST: str = ""
+    LEGACY_DB_PORT: str = "5432"
+    LEGACY_DB_SERVICE: str = ""  # database name
 
     # Azure OpenAI settings
     AZURE_OPENAI_KEY: str = ""

@@ -14,7 +14,6 @@ import { useAuth } from "../contexts/AuthContext";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
-import { formatMinutesToHours } from "../utils/timeUtils";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];
@@ -28,7 +27,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   onSelectEmployee,
 }) => {
   const [reports, setReports] = useState<ReportWithApprovals[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // 主管審閱頁面預設顯示前一天的日報，因為當天的日報通常隔天才審閱
   const getDefaultDate = () => {
@@ -43,8 +42,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   const { authFetch, user } = useAuth();
 
   useEffect(() => {
-    if (user?.employee?.id) {
-      setCurrentUserId(user.employee.id);
+    if (user?.employee?.empno) {
+      setCurrentUserEmpno(user.employee.empno);
     }
   }, [user]);
 
@@ -53,7 +52,12 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
     const fetchReportsByDate = async () => {
       setIsLoading(true);
-      const dateString = selectedDate.toISOString().split("T")[0];
+      // 確保使用本地日期，避免時區問題
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const day = String(selectedDate.getDate()).padStart(2, "0");
+      const dateString = `${year}-${month}-${day}`;
+      console.log("Fetching reports for date:", dateString); // 除錯用
       try {
         const response = await authFetch(
           `/api/supervisor/reports-by-date?date=${dateString}`
@@ -70,7 +74,11 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 );
                 if (approvalResponse.ok) {
                   const approvals = await approvalResponse.json();
-                  return { ...report, approvals };
+                  // 確保 approvals 是數組
+                  return {
+                    ...report,
+                    approvals: Array.isArray(approvals) ? approvals : [],
+                  };
                 }
               } catch (error) {
                 console.error(`無法獲取報告 ${report.id} 的審閱狀態:`, error);
@@ -83,8 +91,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         } else {
           setReports([]);
         }
-      } catch (error) {
-        console.error("無法獲取日報列表:", error);
+      } catch {
+        console.error("無法獲取日報列表");
         setReports([]);
       } finally {
         setIsLoading(false);
@@ -165,9 +173,6 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 員工姓名
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                執行時間
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 狀態
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -182,8 +187,10 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
             {reports.map((report) => (
               <tr key={report.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
-                    {report.employee.name || report.employee.empnamec}
+                  <div className="flex items-center">
+                    <div className="text-sm font-medium text-gray-900">
+                      {report.employee.name || report.employee.empnamec}
+                    </div>
                   </div>
                   <div className="text-sm text-gray-500">
                     {report.employee.department_name ||
@@ -192,23 +199,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {(() => {
-                    const totalExecutionTime = (report.consolidated_content || []).reduce(
-                      (total: number, project: any) => total + (project.total_execution_time_minutes || 0), 
-                      0
-                    );
-                    return totalExecutionTime > 0 ? (
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-600 rounded-full">
-                        {formatMinutesToHours(totalExecutionTime)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">未設定</span>
-                    );
-                  })()}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  {(() => {
                     const myApproval = report.approvals?.find(
-                      (approval) => approval.supervisor_id === currentUserId
+                      (approval) =>
+                        approval.supervisor_empno === currentUserEmpno
                     );
                     if (!myApproval || myApproval.status === "pending") {
                       return (
@@ -241,7 +234,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                   <div className="flex items-center space-x-1">
                     <MessageCircle className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-600">
-                      {report.comments_count || 0} 則
+                      {report.reply_count || 0} 則
                     </span>
                   </div>
                 </td>

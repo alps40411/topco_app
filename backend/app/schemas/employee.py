@@ -32,14 +32,10 @@ class EmployeeUpdate(EmployeeBase):
 class Employee(EmployeeBase):
     id: int
     user_id: Optional[int] = None
-    reports: List['DailyReportDetail'] = []
+    reports: List = []  # 簡化，移除對已刪除 schema 的依賴
 
     class Config:
         from_attributes = True
-
-# --- Forward Reference Resolution --- 
-from .supervisor import DailyReportDetail
-Employee.model_rebuild()
 
 # --- Schema for User object --- 
 class EmployeeForUser(BaseModel):
@@ -48,6 +44,7 @@ class EmployeeForUser(BaseModel):
     empnamec: str # Made empnamec optional
     dutyscript: Optional[str] = None  # 職稱
     deptabbv: Optional[str] = None    # 部門簡稱
+    cocode: Optional[str] = None      # 公司代碼
 
     class Config:
         from_attributes = True

@@ -1,14 +1,14 @@
-// frontend/src/components/SearchableDropdown.tsx
+// frontend/src/components/SimpleDropdown.tsx
 
-import React, { useState, useEffect, useRef } from "react";
-import { ChevronDown, Search, X } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { ChevronDown, X } from "lucide-react";
 
 interface Option {
   id: string | number;
   name: string;
 }
 
-interface SearchableDropdownProps {
+interface SimpleDropdownProps {
   label: string;
   placeholder: string;
   options: Option[];
@@ -20,7 +20,7 @@ interface SearchableDropdownProps {
   disabled?: boolean;
 }
 
-const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
+const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   label,
   placeholder,
   options,
@@ -32,18 +32,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filteredOptions, setFilteredOptions] = useState<Option[]>(options);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setFilteredOptions(
-      options.filter((option) =>
-        option.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
-  }, [options, searchTerm]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -52,7 +41,6 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
-        setSearchTerm("");
       }
     };
 
@@ -65,23 +53,16 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   const handleOptionSelect = (option: Option) => {
     onSelectionChange(option.id);
     setIsOpen(false);
-    setSearchTerm("");
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelectionChange(undefined);
-    setSearchTerm("");
   };
 
   const handleToggle = () => {
     if (disabled || isLoading) return;
     setIsOpen(!isOpen);
-    if (!isOpen) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
-    }
   };
 
   return (
@@ -123,49 +104,34 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-hidden">
-          <div className="p-2 border-b border-gray-200">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-3 w-3 text-gray-400" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="搜尋..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-gray-500 text-center text-sm">
+              沒有可選項目
             </div>
-          </div>
-
-          <div className="max-h-32 overflow-y-auto">
-            {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-gray-500 text-center text-sm">
-                沒有找到相符的選項
+          ) : (
+            options.map((option) => (
+              <div
+                key={option.id}
+                onClick={() => handleOptionSelect(option)}
+                className={`
+                  px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm
+                  ${
+                    selectedValue === option.id
+                      ? "bg-blue-100 text-blue-800"
+                      : "text-gray-900"
+                  }
+                `}
+              >
+                {option.name}
               </div>
-            ) : (
-              filteredOptions.map((option) => (
-                <div
-                  key={option.id}
-                  onClick={() => handleOptionSelect(option)}
-                  className={`
-                    px-3 py-1.5 cursor-pointer hover:bg-blue-50 text-sm
-                    ${
-                      selectedValue === option.id
-                        ? "bg-blue-100 text-blue-800"
-                        : "text-gray-900"
-                    }
-                  `}
-                >
-                  {option.name}
-                </div>
-              ))
-            )}
-          </div>
+            ))
+          )}
         </div>
       )}
     </div>
   );
 };
 
-export default SearchableDropdown;
+export default SimpleDropdown;
+

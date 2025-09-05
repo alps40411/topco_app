@@ -29,7 +29,6 @@ import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import ServiceSelector from "./ServiceSelector";
-import WorkDetailsDisplay from "./WorkDetailsDisplay";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 
@@ -51,7 +50,7 @@ const DailyReportTab: React.FC = () => {
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAllAi, setIsGeneratingAllAi] = useState(false);
@@ -127,31 +126,47 @@ const DailyReportTab: React.FC = () => {
   }, [authFetch]);
 
   const handleEnhanceOne = async (projectId: number) => {
-    if (!authFetch) return;
+    if (!authFetch || !user?.employee?.empno) return;
     setGeneratingAiFor(projectId);
     try {
+      // 找到對應的報告
+      const report = reports.find((r) => r.project.id === projectId);
+      if (!report) {
+        throw new Error("找不到對應的報告");
+      }
+
+      // 生成唯一的 daily_no
+      // 使用新的 AI 潤飾 API - 直接更新 tdr_draft 表
       const response = await authFetch(
         `/api/records/ai/enhance_one/${projectId}`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
-      if (response.ok) {
-        const enhancedReport = await response.json();
-        setReports((prev) =>
-          prev.map((r) => (r.project.id === projectId ? enhancedReport : r))
-        );
-        if (!isAiViewActive) setIsAiViewActive(true);
-        toast.success(
-          `專案 ${enhancedReport.project.plan_subj_c} 已完成 AI 潤飾！`
-        );
-      } else {
-        const err = await response
-          .json()
-          .catch(() => ({ detail: "AI 潤飾此專案時發生錯誤" }));
-        throw new Error(err.detail);
+
+      if (!response.ok) {
+        throw new Error("AI 潤飾失敗");
       }
+
+      const enhancedReport = await response.json();
+
+      // 更新報告內容
+      setReports((prev) =>
+        prev.map((r) =>
+          r.project.id === projectId
+            ? { ...r, ai_content: enhancedReport.ai_content }
+            : r
+        )
+      );
+
+      if (!isAiViewActive) setIsAiViewActive(true);
+      toast.success(`專案 ${report.project.plan_subj_c} 已完成 AI 潤飾！`);
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message);
+      toast.error(error.message || "AI 潤飾此專案時發生錯誤");
     } finally {
       setGeneratingAiFor(null);
     }
@@ -454,19 +469,23 @@ const DailyReportTab: React.FC = () => {
       <div className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 sm:mb-6 space-y-4 lg:space-y-0">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">日報編輯</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 h-6 sm:h-8 flex items-center">
+              日報編輯
+            </h2>
             {writingStatus && (
               <div className="flex flex-col sm:flex-row sm:items-center mt-1 text-sm text-gray-600">
-                <span className="mr-0 sm:mr-2">🕐 {writingStatus.current_time}</span>
+                <span className="mr-0 sm:mr-2">
+                  🕐 {writingStatus.current_time}
+                </span>
                 <span className="text-blue-600">{writingStatus.message}</span>
               </div>
             )}
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <div className="flex flex-row items-center gap-3">
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
               disabled={editingProjectId !== null || generatingAiFor !== null}
-              className={`inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed`}
+              className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
             >
               <Plus className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">新增筆記</span>
@@ -480,7 +499,7 @@ const DailyReportTab: React.FC = () => {
                 editingProjectId !== null ||
                 generatingAiFor !== null
               }
-              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
+              className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300 flex-shrink-0"
             >
               {isGeneratingAllAi ? (
                 <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
@@ -488,7 +507,9 @@ const DailyReportTab: React.FC = () => {
                 <Wand2 className="w-4 h-4 mr-2" />
               )}
               <span className="whitespace-nowrap">
-                {isGeneratingAllAi ? "AI 處理中..." : (
+                {isGeneratingAllAi ? (
+                  "AI 處理中..."
+                ) : (
                   <>
                     <span className="hidden sm:inline">✨ AI 潤飾全部</span>
                     <span className="sm:hidden">AI 潤飾</span>
@@ -499,11 +520,15 @@ const DailyReportTab: React.FC = () => {
             <button
               onClick={handleSubmitReport}
               disabled={isSubmitting || editingProjectId !== null}
-              className={`inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed`}
+              className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
             >
               <Upload className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">{isSubmitting ? "提交中..." : "上傳最終版"}</span>
-              <span className="sm:hidden">{isSubmitting ? "提交中..." : "上傳"}</span>
+              <span className="hidden sm:inline">
+                {isSubmitting ? "提交中..." : "上傳最終版"}
+              </span>
+              <span className="sm:hidden">
+                {isSubmitting ? "提交中..." : "上傳"}
+              </span>
             </button>
           </div>
         </div>
@@ -518,54 +543,74 @@ const DailyReportTab: React.FC = () => {
             >
               {/* --- Card 1: Original Report --- */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 w-full flex flex-col h-full">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
-                  <div className="flex flex-wrap items-center gap-2 sm:space-x-3">
-                    <div
-                      className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
-                        getProjectColors(report.project.plan_subj_c).tag
-                      }`}
-                    >
-                      {report.project.plan_subj_c}
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      ({report.record_count} 筆記錄)
-                    </span>
-                    {report.total_execution_time_minutes !== undefined &&
-                      report.total_execution_time_minutes > 0 && (
-                        <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
-                          {formatMinutesToHours(
-                            report.total_execution_time_minutes
-                          )}
-                        </span>
-                      )}
-                  </div>
-                  {editingProjectId !== report.project.id && (
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                      <button
-                        onClick={() => handleEnhanceOne(report.project.id)}
-                        disabled={
-                          generatingAiFor !== null ||
-                          isGeneratingAllAi ||
-                          editingProjectId !== null
-                        }
-                        className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
+                <div className="mb-4">
+                  {/* 第一行：工作計畫 + 按鈕 */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                          getProjectColors(report.project.plan_subj_c).tag
+                        }`}
                       >
-                        {generatingAiFor === report.project.id ? (
-                          <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
-                        ) : (
-                          <Wand2 className="w-4 h-4 mr-2" />
+                        {report.project.plan_subj_c}
+                      </div>
+                      {report.total_execution_time_minutes !== undefined &&
+                        report.total_execution_time_minutes > 0 && (
+                          <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                            {formatMinutesToHours(
+                              report.total_execution_time_minutes
+                            )}
+                          </span>
                         )}
-                        <span className="whitespace-nowrap">潤飾</span>
-                      </button>
-                      <button
-                        onClick={() => startEdit(report)}
-                        disabled={generatingAiFor !== null || isGeneratingAllAi}
-                        className={`inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg ${
-                          getProjectColors(report.project.plan_subj_c).button
-                        } disabled:bg-gray-300 disabled:cursor-not-allowed`}
-                      >
-                        <Edit className="w-4 h-4 mr-1" /> 編輯
-                      </button>
+                    </div>
+                    {editingProjectId !== report.project.id && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEnhanceOne(report.project.id)}
+                          disabled={
+                            generatingAiFor !== null ||
+                            isGeneratingAllAi ||
+                            editingProjectId !== null
+                          }
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
+                        >
+                          {generatingAiFor === report.project.id ? (
+                            <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
+                          ) : (
+                            <Wand2 className="w-4 h-4 mr-2" />
+                          )}
+                          <span className="whitespace-nowrap">潤飾</span>
+                        </button>
+                        <button
+                          onClick={() => startEdit(report)}
+                          disabled={
+                            generatingAiFor !== null || isGeneratingAllAi
+                          }
+                          className={`inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg ${
+                            getProjectColors(report.project.plan_subj_c).button
+                          } disabled:bg-gray-300 disabled:cursor-not-allowed`}
+                        >
+                          <Edit className="w-4 h-4 mr-2" /> 編輯
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 第二行：執行工作 */}
+                  {report.execution_work_name && (
+                    <div className="mb-2">
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-800">
+                        {report.execution_work_name}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 第三行：工作項目 */}
+                  {report.work_item_name && (
+                    <div>
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-purple-100 text-purple-800">
+                        {report.work_item_name}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -604,15 +649,6 @@ const DailyReportTab: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* 工作詳情顯示 */}
-                      <WorkDetailsDisplay
-                        projectName={report.project.plan_subj_c}
-                        executionWorkName={report.execution_work_name}
-                        workItemName={report.work_item_name}
-                        serviceCompanyName={report.service_company_name}
-                        serviceTargetName={report.service_target_name}
-                      />
-                      
                       {/* 報告內容 */}
                       <div>
                         <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">
@@ -698,86 +734,86 @@ const DailyReportTab: React.FC = () => {
                 </button>
               </div>
               <div className="space-y-4 sm:space-y-6">
-              {/* 級聯工作選擇器 */}
-              <CascadingWorkSelector
-                selectedProjectId={newRecord.project_id}
-                selectedExecutionWorkId={newRecord.execution_work_id}
-                selectedWorkItemId={newRecord.work_item_id}
-                onProjectChange={(projectId) =>
-                  setNewRecord({
-                    ...newRecord,
-                    project_id: projectId,
-                    execution_work_id: undefined,
-                    work_item_id: undefined,
-                  })
-                }
-                onExecutionWorkChange={(executionWorkId) =>
-                  setNewRecord({
-                    ...newRecord,
-                    execution_work_id: executionWorkId,
-                    work_item_id: undefined,
-                  })
-                }
-                onWorkItemChange={(workItemId) =>
-                  setNewRecord({
-                    ...newRecord,
-                    work_item_id: workItemId,
-                  })
-                }
-                required
-              />
-
-              {/* 服務選擇器 */}
-              <ServiceSelector
-                selectedCompanyId={newRecord.service_company_id}
-                selectedTargetId={newRecord.service_target_id}
-                onCompanyChange={(companyId) =>
-                  setNewRecord({
-                    ...newRecord,
-                    service_company_id: companyId,
-                  })
-                }
-                onTargetChange={(targetId) =>
-                  setNewRecord({
-                    ...newRecord,
-                    service_target_id: targetId,
-                  })
-                }
-                required
-              />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  內容
-                </label>
-                <textarea
-                  rows={5}
-                  placeholder="記錄您的想法..."
-                  value={newRecord.content || ""}
-                  onChange={(e) =>
-                    setNewRecord({ ...newRecord, content: e.target.value })
+                {/* 級聯工作選擇器 */}
+                <CascadingWorkSelector
+                  selectedProjectId={newRecord.project_id}
+                  selectedExecutionWorkId={newRecord.execution_work_id}
+                  selectedWorkItemId={newRecord.work_item_id}
+                  onProjectChange={(projectId) =>
+                    setNewRecord({
+                      ...newRecord,
+                      project_id: projectId,
+                      execution_work_id: undefined,
+                      work_item_id: undefined,
+                    })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  onExecutionWorkChange={(executionWorkId) =>
+                    setNewRecord({
+                      ...newRecord,
+                      execution_work_id: executionWorkId,
+                      work_item_id: undefined,
+                    })
+                  }
+                  onWorkItemChange={(workItemId) =>
+                    setNewRecord({
+                      ...newRecord,
+                      work_item_id: workItemId,
+                    })
+                  }
+                  required
                 />
-              </div>
 
-              <ExecutionTimeSelector
-                totalMinutes={newRecord.execution_time_minutes || 0}
-                onChange={(minutes) =>
-                  setNewRecord({
-                    ...newRecord,
-                    execution_time_minutes: minutes,
-                  })
-                }
-                required
-              />
+                {/* 服務選擇器 */}
+                <ServiceSelector
+                  selectedCompanyId={newRecord.service_company_id}
+                  selectedTargetId={newRecord.service_target_id}
+                  onCompanyChange={(companyId) =>
+                    setNewRecord({
+                      ...newRecord,
+                      service_company_id: companyId,
+                    })
+                  }
+                  onTargetChange={(targetId) =>
+                    setNewRecord({
+                      ...newRecord,
+                      service_target_id: targetId,
+                    })
+                  }
+                  required
+                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    內容
+                  </label>
+                  <textarea
+                    rows={5}
+                    placeholder="記錄您的想法..."
+                    value={newRecord.content || ""}
+                    onChange={(e) =>
+                      setNewRecord({ ...newRecord, content: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-              <AttachedFilesManager
-                files={newRecord.files || []}
-                onFileUpload={handleNewRecordUpload}
-                onRemoveFile={removeNewRecordFile}
-                onAiSelectionChange={handleNewRecordAiSelectionChange}
-                isUploading={isUploadingNewFile}
-              />
+                <ExecutionTimeSelector
+                  totalMinutes={newRecord.execution_time_minutes || 0}
+                  onChange={(minutes) =>
+                    setNewRecord({
+                      ...newRecord,
+                      execution_time_minutes: minutes,
+                    })
+                  }
+                  required
+                />
+
+                <AttachedFilesManager
+                  files={newRecord.files || []}
+                  onFileUpload={handleNewRecordUpload}
+                  onRemoveFile={removeNewRecordFile}
+                  onAiSelectionChange={handleNewRecordAiSelectionChange}
+                  isUploading={isUploadingNewFile}
+                />
 
                 <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
                   <button

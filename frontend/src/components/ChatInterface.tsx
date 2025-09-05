@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { User, Crown, MessageCircle, Sparkles, Loader2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
+import ForwardSelector from "./ForwardSelector";
 
 // Duplicating from EmployeeDetailTab, should be centralized
 interface SupervisorApprovalInfo {
@@ -67,6 +68,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [selectedRating, setSelectedRating] = useState<number>(3); // 預設評分為「普通」(5分制)
   const [reviewComment, setReviewComment] = useState("");
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
+  const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>(
+    []
+  );
 
   // AI建議相關狀態
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -77,14 +81,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // This effect now correctly determines if the current user has reviewed
   useEffect(() => {
-    if (user?.employee?.id && approvals) {
+    if (user?.employee?.empno && approvals && Array.isArray(approvals)) {
       const myApproval = approvals.find(
-        (approval) => approval.supervisor_id === user.employee.id
+        (approval) => approval.supervisor_empno === user.employee.empno
       );
       // A review is considered submitted if the status is no longer pending.
       setHasSubmittedReview(!!myApproval && myApproval.status !== "pending");
+    } else {
+      setHasSubmittedReview(false);
     }
   }, [approvals, user]);
+
+  // 檢查當前用戶是否為此報告的主管
+  const isReportSupervisor =
+    user?.employee?.empno && approvals && Array.isArray(approvals)
+      ? approvals.some(
+          (approval) => approval.supervisor_empno === user.employee.empno
+        )
+      : false;
 
   const fetchComments = useCallback(async () => {
     if (!authFetch) return;
@@ -142,21 +156,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!authFetch) return;
     setIsSubmitting(true);
     try {
-      const response = await authFetch(
-        `/api/supervisor/reports/${reportId}/review`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            rating: selectedRating,
-            comment: reviewComment.trim(),
-          }),
-        }
-      );
+      // 使用新的評分回復 API 端點
+      const response = await authFetch("/api/reviews/submit", {
+        method: "POST",
+        body: JSON.stringify({
+          daily_no: reportId.toString(),
+          score: selectedRating,
+          reply_memo: reviewComment.trim(),
+          forward_users:
+            selectedForwardUsers.length > 0 ? selectedForwardUsers : null,
+        }),
+      });
+
       if (response.ok) {
-        toast.success("審閱已提交");
+        const result = await response.json();
+        let message = "審閱已提交";
+        if (selectedForwardUsers.length > 0) {
+          message += `，並已轉寄給 ${selectedForwardUsers.length} 位主管`;
+        }
+        toast.success(message);
+
         setHasSubmittedReview(true);
+        setSelectedForwardUsers([]); // 清空轉寄選擇
+
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();
+
         // 評分完成後跳轉回審閱列表
         if (onReviewCompleted) {
           setTimeout(() => {
@@ -216,8 +241,68 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     toast.success(`已套用「${suggestion.title}」建議`);
   };
 
+  const parseTimeString = (timeString: string): Date => {
+    if (!timeString) return new Date(0);
+
+    // 處理 YYYYMMDD HH:MM:SS 格式 (如: "20250905 11:35:37")
+    if (/^\d{8}\s+\d{2}:\d{2}:\d{2}$/.test(timeString)) {
+      const datePart = timeString.substring(0, 8);
+      const timePart = timeString.substring(9);
+      const year = datePart.substring(0, 4);
+      const month = datePart.substring(4, 6);
+      const day = datePart.substring(6, 8);
+
+      const date = new Date(`${year}-${month}-${day}T${timePart}`);
+      return isNaN(date.getTime()) ? new Date(0) : date;
+    }
+
+    // 處理 YYYYMMDD HHMMSS 格式 (如: "20250905 110903")
+    if (/^\d{8}\s+\d{6}$/.test(timeString)) {
+      const datePart = timeString.substring(0, 8);
+      const timePart = timeString.substring(9, 15);
+      const year = datePart.substring(0, 4);
+      const month = datePart.substring(4, 6);
+      const day = datePart.substring(6, 8);
+      const hour = timePart.substring(0, 2);
+      const minute = timePart.substring(2, 4);
+      const second = timePart.substring(4, 6);
+
+      const date = new Date(
+        `${year}-${month}-${day}T${hour}:${minute}:${second}`
+      );
+      return isNaN(date.getTime()) ? new Date(0) : date;
+    }
+
+    // 處理 YYYYMMDDHHMMSS 格式 (如: "20250905110903")
+    if (/^\d{14}$/.test(timeString)) {
+      const year = timeString.substring(0, 4);
+      const month = timeString.substring(4, 6);
+      const day = timeString.substring(6, 8);
+      const hour = timeString.substring(8, 10);
+      const minute = timeString.substring(10, 12);
+      const second = timeString.substring(12, 14);
+
+      const date = new Date(
+        `${year}-${month}-${day}T${hour}:${minute}:${second}`
+      );
+      return isNaN(date.getTime()) ? new Date(0) : date;
+    }
+
+    // 處理標準 ISO 格式
+    try {
+      const date = new Date(timeString);
+      return isNaN(date.getTime()) ? new Date(0) : date;
+    } catch {
+      return new Date(0);
+    }
+  };
+
   const formatTime = (timeString: string) => {
-    const date = new Date(timeString);
+    if (!timeString) return "無時間";
+
+    const date = parseTimeString(timeString);
+    if (date.getTime() === 0) return "無效時間";
+
     const now = new Date();
     const diffInMinutes = Math.floor(
       (now.getTime() - date.getTime()) / (1000 * 60)
@@ -254,10 +339,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
     };
     comments.forEach(addComment);
-    return result.sort(
-      (a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
+    return result.sort((a, b) => {
+      const timeA = parseTimeString(a.created_at);
+      const timeB = parseTimeString(b.created_at);
+      return timeA.getTime() - timeB.getTime();
+    });
   };
 
   const renderComment = (comment: Comment) => {
@@ -359,7 +445,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
       {!isReadOnly && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
-          {user?.is_supervisor &&
+          {isReportSupervisor &&
             !hasSubmittedReview &&
             user.employee?.id !== reportOwnerId && (
               <div className="mb-4">
@@ -468,6 +554,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     rows={4}
                     disabled={isSubmitting}
                   />
+
+                  {/* 轉寄選擇組件 */}
+                  <div className="mb-3">
+                    <ForwardSelector
+                      selectedForwardUsers={selectedForwardUsers}
+                      onForwardUsersChange={setSelectedForwardUsers}
+                    />
+                  </div>
+
                   <div className="flex space-x-2">
                     <button
                       onClick={handleSubmitReview}
@@ -480,6 +575,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       onClick={() => {
                         setSelectedRating(3); // Reset to default (普通)
                         setReviewComment("");
+                        setSelectedForwardUsers([]); // 清空轉寄選擇
                       }}
                       disabled={isSubmitting}
                       className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
@@ -491,7 +587,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               </div>
             )}
           {/* 已評分提示 */}
-          {user?.is_supervisor &&
+          {isReportSupervisor &&
             hasSubmittedReview &&
             user.employee?.id !== reportOwnerId && (
               <div className="mb-4">
@@ -502,21 +598,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </div>
               </div>
             )}
-          {(!user?.is_supervisor ||
+          {(!isReportSupervisor ||
             hasSubmittedReview ||
             user.employee?.id === reportOwnerId) && (
             <div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-slate-900 mb-3 flex items-center">
                   <User className="w-4 h-4 mr-2" />
-                  {user?.is_supervisor && user.employee?.id !== reportOwnerId
+                  {isReportSupervisor && user.employee?.id !== reportOwnerId
                     ? "追加留言"
                     : "員工回復"}
                 </h4>
                 <div className="mb-3">
                   <p className="text-xs text-slate-700 mb-2">快速回復建議：</p>
                   <div className="flex flex-wrap gap-2">
-                    {(user?.is_supervisor &&
+                    {(isReportSupervisor &&
                     hasSubmittedReview &&
                     user.employee?.id !== reportOwnerId
                       ? supervisorSuggestedReplies

@@ -1,40 +1,75 @@
 # backend/app/services/user_service.py
+
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from typing import Optional
-from sqlalchemy.orm import selectinload
 
 from app.models.user import User
-from app.models.employee import Employee
-from app.schemas.user import UserCreate
-from app.core.security import get_password_hash
+from app.core.security import verify_password
 
 
+async def authenticate_user(
+    db: AsyncSession, 
+    username: str, 
+    password: Optional[str] = None,
+    skip_password_check: bool = False
+) -> Optional[User]:
+    """
+    認證用戶
+    Args:
+        db: 資料庫 session
+        username: 用戶名（可能是 email 或 empno）
+        password: 密碼
+        skip_password_check: 是否跳過密碼檢查（用於暫時的無密碼登入）
+    """
+    # 嘗試用 email 查找
+    result = await db.execute(
+        select(User).where(User.email == username).options(selectinload(User.employee))
+    )
+    user = result.scalar_one_or_none()
+    
+    # 如果用 email 找不到，嘗試用 empno 查找
+    if not user:
+        result = await db.execute(
+            select(User).where(User.employee.has(empno=username)).options(selectinload(User.employee))
+        )
+        user = result.scalar_one_or_none()
+    
+    if not user:
+        return None
+    
+    # 如果跳過密碼檢查，直接返回用戶
+    if skip_password_check:
+        return user
+    
+    # 正常的密碼驗證
+    if password and verify_password(password, user.hashed_password):
+        return user
+    
+    return None
 
-async def get_user_by_empno(db: AsyncSession, *, empno: str) -> Optional[User]:
-    # 直接通過email欄位查找，因為現在email欄位存儲的是員工編號
-    query = select(User).where(User.email == empno).options(selectinload(User.employee))
-    result = await db.execute(query)
+
+async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+    """根據用戶 ID 獲取用戶"""
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(selectinload(User.employee))
+    )
     return result.scalar_one_or_none()
 
-async def create_user(db: AsyncSession, *, obj_in: UserCreate) -> User:
-    hashed_password = get_password_hash(obj_in.password)
-    
-    db_user = User(
-        email=obj_in.email,
-        name=obj_in.empnamec,
-        hashed_password=hashed_password,
-        is_supervisor=obj_in.is_supervisor
+
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    """根據 email 獲取用戶"""
+    result = await db.execute(
+        select(User).where(User.email == email).options(selectinload(User.employee))
     )
-    
-    db_employee = Employee(
-        name=obj_in.empnamec,
-        department=obj_in.department,
-        user=db_user
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_empno(db: AsyncSession, empno: str) -> Optional[User]:
+    """根據員工編號獲取用戶"""
+    result = await db.execute(
+        select(User).where(User.employee.has(empno=empno)).options(selectinload(User.employee))
     )
-    
-    db.add(db_user)
-    db.add(db_employee)
-    await db.commit()
-    await db.refresh(db_user)
-    return db_user
+    return result.scalar_one_or_none()
+

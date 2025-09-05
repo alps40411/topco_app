@@ -9,6 +9,7 @@ import MyReportsTab from "./components/MyReportsTab";
 // import ComprehensiveEditTab from './components/ComprehensiveEditTab';
 import EmployeeListTab from "./components/EmployeeListTab";
 import EmployeeDetailTab from "./components/EmployeeDetailTab";
+import LegacyTestPage from "./pages/LegacyTestPage";
 import { useAuth } from "./contexts/AuthContext";
 import { useHasSubordinates } from "./hooks/useHasSubordinates";
 import { Toaster } from "react-hot-toast";
@@ -79,6 +80,7 @@ export interface EmployeeInList {
 export interface EmployeeSummary {
   id: number;
   name: string;
+  empnamec?: string;
   department_no?: string;
   department_name?: string;
 }
@@ -91,6 +93,7 @@ export interface DailyReport {
   consolidated_content: ConsolidatedReport[];
   employee: EmployeeSummary;
   comments_count?: number;
+  reply_count?: number;
 }
 export interface Employee {
   id: number;
@@ -105,6 +108,7 @@ export interface EmployeeForUser {
   empnamec: string;
   dutyscript?: string; // 職稱
   deptabbv?: string; // 部門簡稱
+  cocode?: string; // 公司代碼
 }
 
 export interface ExecutionWork {
@@ -147,7 +151,13 @@ function App() {
   const { hasSubordinates, loading: subordinatesLoading } =
     useHasSubordinates();
   const [activeTab, setActiveTab] = useState<
-    "input" | "daily" | "myreports" | "supervisor" | "ai" | "comprehensive"
+    | "input"
+    | "daily"
+    | "myreports"
+    | "supervisor"
+    | "ai"
+    | "comprehensive"
+    | "legacy-test"
   >("input"); // 預設為隨筆紀錄
 
   const [selectedEmployee, setSelectedEmployee] =
@@ -321,6 +331,22 @@ function App() {
                     日報審閱
                   </button>
                 )}
+
+                {/* 舊DB測試 (開發用) */}
+                <button
+                  onClick={() => {
+                    setActiveTab("legacy-test");
+                    setSelectedEmployee(null);
+                    setSelectedReportId(null);
+                  }}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    activeTab === "legacy-test"
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  舊DB測試
+                </button>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="text-right">
@@ -395,6 +421,9 @@ function App() {
             onReviewCompleted={handleReviewCompleted}
           />
         )}
+
+        {/* 舊資料庫測試頁面 */}
+        {activeTab === "legacy-test" && <LegacyTestPage />}
       </main>
     </div>
   );

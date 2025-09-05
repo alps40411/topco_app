@@ -1,8 +1,8 @@
 // frontend/src/components/EmployeeDetailTab.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, Star } from "lucide-react";
-import type { EmployeeInList, DailyReport } from "../App";
+import type { DailyReport } from "../App";
 import { getProjectColors } from "../utils/colorUtils";
 import { useAuth } from "../contexts/AuthContext";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
@@ -15,14 +15,12 @@ interface ReportWithApprovals extends DailyReport {
 }
 
 interface EmployeeDetailTabProps {
-  employee: EmployeeInList;
   reportId: number; // Correctly added prop
   onBack: () => void;
   onReviewCompleted?: () => void; // 主管評分完成後的回調
 }
 
 const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
-  employee: initialEmployee,
   reportId,
   onBack,
   onReviewCompleted,
@@ -33,7 +31,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const { authFetch } = useAuth();
 
-  const fetchReportDetails = async () => {
+  const fetchReportDetails = useCallback(async () => {
     setIsLoading(true);
     try {
       // Fetch specific report directly by ID instead of fetching all reports
@@ -61,29 +59,37 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [reportId, authFetch]);
 
   useEffect(() => {
     fetchReportDetails();
-  }, [reportId]);
+  }, [reportId, fetchReportDetails]);
 
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("zh-TW", {
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-    });
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "無日期";
 
-  const getRatingLabel = (rating: number | null | undefined) => {
-    if (!rating) return null;
-    const labels: { [key: number]: string } = {
-      1: "很差",
-      2: "差",
-      3: "普通",
-      4: "好",
-      5: "很好",
-    };
-    return labels[rating] || `${rating}`;
+    // 處理 YYYYMMDD 格式
+    if (/^\d{8}$/.test(dateString)) {
+      const year = dateString.substring(0, 4);
+      const month = dateString.substring(4, 6);
+      const day = dateString.substring(6, 8);
+      return `${year}/${month}/${day}`;
+    }
+
+    // 處理其他格式
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return "無效日期";
+      }
+      return date.toLocaleDateString("zh-TW", {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+      });
+    } catch {
+      return "無效日期";
+    }
   };
 
   const renderFiveLevelStars = (rating: number) => (
@@ -118,14 +124,15 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {reportDetail.employee.empnamec || reportDetail.employee.name} -{" "}
+            <h2 className="text-2xl font-bold text-gray-900 h-8 flex items-center">
+              {String(reportDetail.employee.id).padStart(5, "0")}{" "}
+              {reportDetail.employee.empnamec || reportDetail.employee.name}{" "}
               {formatDate(reportDetail.date)} 日報
             </h2>
-            <p className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500">
               {reportDetail.employee.department_name ||
                 reportDetail.employee.department_no}
-            </p>
+            </div>
           </div>
         </div>
         <div className="flex items-center space-x-4">
@@ -152,26 +159,21 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                 </div>
               );
             })()}
-
-          {typeof reportDetail.rating === "number" && (
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">此日報評分:</span>
-              {renderFiveLevelStars(reportDetail.rating)}
-              <span className="text-sm text-gray-700">
-                {getRatingLabel(reportDetail.rating)}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
       {/* 上方 - 日報內容 */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">日報內容</h3>
+          <h3 className="text-lg font-semibold text-gray-900 h-6 flex items-center">
+            日報內容
+          </h3>
           {(() => {
-            const totalExecutionTime = (reportDetail.consolidated_content || []).reduce(
-              (total, project) => total + (project.total_execution_time_minutes || 0), 
+            const totalExecutionTime = (
+              reportDetail.consolidated_content || []
+            ).reduce(
+              (total, project) =>
+                total + (project.total_execution_time_minutes || 0),
               0
             );
             return totalExecutionTime > 0 ? (
@@ -192,7 +194,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                 key={index}
                 className="border border-gray-100 rounded-lg p-4"
               >
-                <div className="flex items-center space-x-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
                   <div
                     className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
                       getProjectColors(projectReport.project.plan_subj_c).tag
@@ -200,9 +202,23 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                   >
                     {projectReport.project.plan_subj_c}
                   </div>
-                  {projectReport.total_execution_time_minutes !== undefined && projectReport.total_execution_time_minutes > 0 ? (
+                  {projectReport.execution_work_name && (
+                    <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-800">
+                      {projectReport.execution_work_name}
+                    </div>
+                  )}
+                  {projectReport.work_item_name && (
+                    <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-purple-100 text-purple-800">
+                      {projectReport.work_item_name}
+                    </div>
+                  )}
+                  {projectReport.total_execution_time_minutes !== undefined &&
+                  projectReport.total_execution_time_minutes > 0 ? (
                     <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
-                      執行時間: {formatMinutesToHours(projectReport.total_execution_time_minutes)}
+                      執行時間:{" "}
+                      {formatMinutesToHours(
+                        projectReport.total_execution_time_minutes
+                      )}
                     </span>
                   ) : (
                     <span className="text-sm text-gray-400 bg-gray-50 px-2 py-1 rounded font-medium">

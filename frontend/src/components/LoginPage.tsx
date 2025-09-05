@@ -7,8 +7,7 @@ import { LogIn } from "lucide-react";
 import { buildApiUrl } from "../config/api";
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [empno, setEmpno] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -21,8 +20,8 @@ const LoginPage: React.FC = () => {
 
     try {
       const formData = new URLSearchParams();
-      formData.append("username", email);
-      formData.append("password", password);
+      formData.append("username", empno);
+      formData.append("password", "dummy"); // 暫時使用固定密碼，後端不驗證
 
       const response = await fetch(buildApiUrl("/api/auth/token"), {
         method: "POST",
@@ -31,7 +30,7 @@ const LoginPage: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error("登入失敗，請檢查您的員工編號或密碼。");
+        throw new Error("登入失敗，請檢查您的員工編號。");
       }
 
       const data = await response.json();
@@ -67,21 +66,8 @@ const LoginPage: React.FC = () => {
             </label>
             <input
               type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="請輸入您的員工編號"
-              required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              密碼
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={empno}
+              onChange={(e) => setEmpno(e.target.value)}
               placeholder="請輸入您的員工編號"
               required
               className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"

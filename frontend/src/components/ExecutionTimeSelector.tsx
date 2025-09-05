@@ -1,7 +1,7 @@
 // frontend/src/components/ExecutionTimeSelector.tsx
 
-import React from 'react';
-import { Clock } from 'lucide-react';
+import React from "react";
+import { Clock } from "lucide-react";
 
 interface ExecutionTimeSelectorProps {
   totalMinutes: number;
@@ -14,7 +14,7 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
   totalMinutes,
   onChange,
   className = "",
-  required = false
+  required = false,
 }) => {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -41,11 +41,11 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
           執行時間 {required && <span className="text-red-500">*</span>}
         </label>
       </div>
-      
+
       <div className="flex items-center space-x-3">
         {/* 小時選擇器 */}
         <div className="flex-1 min-w-0">
-          <select 
+          <select
             value={hours}
             onChange={(e) => handleHoursChange(parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -60,12 +60,12 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
 
         {/* 分鐘選擇器 */}
         <div className="flex-1 min-w-0">
-          <select 
+          <select
             value={minutes}
             onChange={(e) => handleMinutesChange(parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           >
-            {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
+            {Array.from({ length: 4 }, (_, i) => i * 15).map((minute) => (
               <option key={minute} value={minute}>
                 {minute} 分鐘
               </option>
@@ -75,18 +75,18 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
       </div>
 
       {/* 總時間顯示 */}
-      <div className={`text-sm font-medium px-3 py-2 rounded-lg ${
-        totalMinutes === 0 
-          ? 'text-red-600 bg-red-50 border border-red-200' 
-          : 'text-blue-600 bg-blue-50 border border-blue-200'
-      }`}>
+      <div
+        className={`text-sm font-medium px-3 py-2 rounded-lg ${
+          totalMinutes === 0
+            ? "text-red-600 bg-red-50 border border-red-200"
+            : "text-blue-600 bg-blue-50 border border-blue-200"
+        }`}
+      >
         {formatTotalTime()}
       </div>
 
       {required && totalMinutes === 0 && (
-        <div className="text-xs text-red-500">
-          請設定執行時間
-        </div>
+        <div className="text-xs text-red-500">請設定執行時間</div>
       )}
     </div>
   );

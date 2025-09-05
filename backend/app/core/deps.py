@@ -10,14 +10,14 @@ from app.core.database import get_db
 from app.models.user import User
 from app.models.employee import Employee
 from app.schemas.user import TokenData
-from app.services import user_service
+# from app.services import user_service  # 已移除，改用 JPS Legacy 資料庫
 from app.core.security import SECRET_KEY, ALGORITHM
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 async def get_current_user(
-    db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme)
-) -> User:
+    token: str = Depends(oauth2_scheme)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -31,17 +31,50 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     
-    result = await db.execute(
-        select(User).where(User.email == token_data.empno).options(selectinload(User.employee))
-    )
-    user = result.scalar_one_or_none()
+    # 從 JPS Legacy 資料庫查詢用戶資訊
+    from app.core.legacy_database import get_legacy_db
+    from app.schemas.employee import EmployeeForUser
+    from app.schemas.user import User as UserSchema
+    from sqlalchemy import text
     
-    if user is None: raise credentials_exception
+    legacy_db = next(get_legacy_db())
+    
+    user_sql = text("""
+        SELECT a.empno, a.empnamec, a.cocode, a.deptno, a.dutyscript, 
+               a.mailbox, a.pass, b.deptabbv, a.adm_rank, a.sop_role
+        FROM jps.dcd003$master a
+        LEFT JOIN jps.dcd002$master b ON a.cocode = b.cocode AND a.deptno = b.deptno
+        WHERE a.empno = :empno AND a.cocode = 'A'
+    """)
+    
+    result = legacy_db.execute(user_sql, {"empno": empno})
+    user_row = result.fetchone()
+    
+    if not user_row:
+        raise credentials_exception
+    
+    # 創建用戶物件，確保格式與認證 API 一致
+    user = UserSchema(
+        id=1,  # 使用非零 ID，避免前端條件檢查失敗
+        name=user_row[1] or "",
+        email=user_row[5] or "",
+        is_active=True,
+        is_supervisor=False,
+        employee=EmployeeForUser(
+            id=1,  # 使用非零 ID，避免前端條件檢查失敗
+            empno=user_row[0],
+            empnamec=user_row[1] or "",
+            dutyscript=user_row[4] or "",    # dutyscript
+            deptabbv=user_row[7] or "",      # deptabbv from join
+            cocode=user_row[2] or ""         # cocode
+        )
+    )
+    
     return user
 
 async def get_current_user_with_employee(
-    current_user: User = Depends(get_current_user)
-) -> User:
+    current_user = Depends(get_current_user)
+):
     """Get current user ensuring they have an employee relationship"""
     if not current_user.employee:
         raise HTTPException(

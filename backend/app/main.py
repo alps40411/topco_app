@@ -9,7 +9,7 @@ import time
 from fastapi.staticfiles import StaticFiles
 
 # --- 引入所有需要的 API 路由 ---
-from app.api import records, projects, supervisor, users, auth, documents, comments
+from app.api import supervisor, auth, legacy_reports, reviews
 
 app = FastAPI(
     title="TSC 業務日誌 API",
@@ -63,12 +63,12 @@ if missing:
 # 前端透過 Vite 代理將 /api/* 請求轉發到後端
 # 所以後端需要註冊 /api/* 路由
 app.include_router(auth.router, prefix="/api/auth")
-app.include_router(users.router, prefix="/api/users")
-app.include_router(records.router, prefix="/api/records")
-app.include_router(projects.router, prefix="/api/projects")
 app.include_router(supervisor.router, prefix="/api/supervisor")
-app.include_router(documents.router, prefix="/api/documents")
-app.include_router(comments.router, prefix="/api")
+app.include_router(legacy_reports.router, prefix="/api")
+app.include_router(legacy_reports.records_router, prefix="/api")
+app.include_router(legacy_reports.reports_router, prefix="/api")
+app.include_router(legacy_reports.projects_router, prefix="/api")
+app.include_router(reviews.router, prefix="/api")
 
 @app.get("/")
 def read_root():
