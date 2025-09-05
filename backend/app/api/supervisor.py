@@ -1,9 +1,10 @@
 # backend/app/api/supervisor.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional
+from typing import List, Optional, Any
 import logging
+from datetime import datetime
 
 from app.core.legacy_database import get_legacy_db
 from app.core.deps import get_current_user
@@ -835,19 +836,259 @@ async def get_ai_suggestions(
 
 @router.post("/reports/submit")
 async def submit_report(
-    report_data: dict,
+    request: Request,
     current_user: User = Depends(get_current_user)
 ):
-    """提交日報"""
+    """提交最終版日報 - 從tdr_draft讀取暫存資料並正式提交到tdr_master/detail表"""
     try:
         if not current_user.employee:
             raise HTTPException(status_code=404, detail="該用戶不是員工")
         
-        return {"message": "日報提交成功"}
+        # 讀取前端發送的數據
+        request_body = await request.json()
+        logger.info(f"Final report submission request: {type(request_body)} - {len(request_body) if isinstance(request_body, list) else 'not a list'}")
         
+        # 取得 legacy 資料庫連接
+        legacy_db = next(get_legacy_db())
+        
+        # 取得員工基本資訊
+        empno = current_user.employee.empno
+        cocode = current_user.employee.cocode or 'A'
+        doc_date = datetime.now().strftime('%Y%m%d')
+        
+        # 查詢今日所有暫存資料
+        draft_sql = text("""
+            SELECT DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE,
+                   PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C, WORK_ITEM_SEQ,
+                   SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
+                   CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
+                   ATT_FILE1, ATT_FILE2, FILES, STATUS
+            FROM jps.tdr_draft 
+            WHERE EMPNO = :empno AND COCODE = :cocode AND DOC_DATE = :doc_date
+            AND STATUS = 'A'
+            ORDER BY CREATED_DATE, CREATED_TIME
+        """)
+        
+        draft_results = legacy_db.execute(draft_sql, {
+            "empno": empno, 
+            "cocode": cocode, 
+            "doc_date": doc_date
+        }).fetchall()
+        
+        if not draft_results:
+            raise HTTPException(status_code=400, detail="沒有可提交的暫存資料")
+        
+        # 取得第一個暫存記錄的daily_no作為正式日報編號
+        daily_no = draft_results[0][0]
+        logger.info(f"Using daily_no from draft: {daily_no}")
+        
+        # 查詢員工詳細資訊
+        emp_sql = text("""
+            SELECT e.empnamec, e.deptno, d.deptnamec, e.g_deptno, e.leader
+            FROM jps.dcd003$master e
+            LEFT JOIN jps.dcd002$master d ON e.deptno = d.deptno AND e.cocode = d.cocode
+            WHERE e.empno = :empno AND e.cocode = :cocode
+        """)
+        emp_result = legacy_db.execute(emp_sql, {"empno": empno, "cocode": cocode}).fetchone()
+        
+        if not emp_result:
+            raise HTTPException(status_code=404, detail="找不到員工資訊")
+        
+        empnamec, deptno, deptnamec, g_deptno, leader = emp_result
+        
+        # 取得目前日期時間
+        now = datetime.now()
+        current_date = now.strftime('%Y%m%d')
+        current_time = now.strftime('%H:%M:%S')
+        
+        # 計算總字數和處理第一個執行工作描述
+        total_word_count = 0
+        main_sop_desc_c = ""
+        all_att_file1 = None
+        all_att_file2 = None
+        
+        for draft in draft_results:
+            # 計算總字數
+            content = draft[14] or ""  # CONTENT
+            total_word_count += len(content)
+            
+            # 取得第一個執行工作描述
+            if not main_sop_desc_c and draft[8]:  # SOP_DESC_C
+                sop_desc = draft[8]
+                main_sop_desc_c = sop_desc[:50] if sop_desc else ""
+            
+            # 取得附件
+            if not all_att_file1 and draft[17]:  # ATT_FILE1
+                all_att_file1 = draft[17]
+            if not all_att_file2 and draft[18]:  # ATT_FILE2
+                all_att_file2 = draft[18]
+        
+        # 檢查是否已存在 tdr_master 記錄（支援重複上傳）
+        check_master_sql = text("SELECT COUNT(*) FROM jps.tdr_master WHERE daily_no = :daily_no")
+        master_exists = legacy_db.execute(check_master_sql, {"daily_no": daily_no}).scalar() > 0
+        
+        if master_exists:
+            logger.info(f"重新提交日報 {daily_no}，清除現有 detail 資料")
+            
+            # 刪除現有的 detail1 和 detail2 資料
+            delete_detail1_sql = text("DELETE FROM jps.tdr_detail1 WHERE daily_no = :daily_no")
+            delete_detail2_sql = text("DELETE FROM jps.tdr_detail2 WHERE daily_no = :daily_no")
+            
+            legacy_db.execute(delete_detail1_sql, {"daily_no": daily_no})
+            legacy_db.execute(delete_detail2_sql, {"daily_no": daily_no})
+            
+            # 更新 master 資料
+            update_master_sql = text("""
+                UPDATE jps.tdr_master SET 
+                    WORD_COUNT = :word_count,
+                    XDATE = :current_date,
+                    XTIME = :current_time,
+                    SOP_DESC_C = :sop_desc_c,
+                    ATT_FILE1 = :att_file1,
+                    ATT_FILE2 = :att_file2
+                WHERE daily_no = :daily_no
+            """)
+            
+            legacy_db.execute(update_master_sql, {
+                "daily_no": daily_no,
+                "word_count": total_word_count,
+                "current_date": current_date,
+                "current_time": current_time,
+                "sop_desc_c": main_sop_desc_c,
+                "att_file1": all_att_file1,
+                "att_file2": all_att_file2
+            })
+        else:
+            logger.info(f"首次提交日報 {daily_no}，創建新的 master 資料")
+            
+            # 按照用戶提供的指令插入 tdr_master
+            insert_master_sql = text("""
+                INSERT INTO jps.tdr_master (
+                    DAILY_NO, COCODE, EMPNO, DEPTNO, DOC_DATE, EMERGENCY, 
+                    CLASSIFY, SCORE, XUSER, XDATE, XTIME, STATUS, LEADER, G_DEPTNO, EMPNAMEC, 
+                    DEPTNAMEC, UPLOAD_SITE, EMPNAMEC_N, WFINBOX_STATUS, SOP_DESC_C, CUST_ENAME1, 
+                    CUST_COMP_ABBV1, WORD_COUNT, ATT_FILE1, ATT_FILE2, openpath, openwebpage
+                ) VALUES (
+                    :daily_no, :cocode, :empno, :deptno, :doc_date, NULL, 
+                    NULL, 0, :empno, :current_date, :current_time, 'N', :leader, :g_deptno, :empnamec, 
+                    :deptnamec, 'D', :empnamec, 'N', :sop_desc_c, NULL, 
+                    NULL, :word_count, :att_file1, :att_file2, '/MyReport/', 'viewed.aspx'
+                )
+            """)
+            
+            legacy_db.execute(insert_master_sql, {
+                "daily_no": daily_no,
+                "cocode": cocode,
+                "empno": empno,
+                "deptno": deptno,
+                "doc_date": doc_date,
+                "leader": leader,
+                "g_deptno": g_deptno,
+                "empnamec": empnamec,
+                "deptnamec": deptnamec,
+                "sop_desc_c": main_sop_desc_c,
+                "word_count": total_word_count,
+                "att_file1": all_att_file1,
+                "att_file2": all_att_file2,
+                "current_date": current_date,
+                "current_time": current_time
+            })
+        
+        # 插入 tdr_detail1 (只插入一次)
+        insert_detail1_sql = text("""
+            INSERT INTO jps.tdr_detail1 (
+                DAILY_NO, DAILY_SUB_NOS, XUSER, XDATE, XTIME, CUNO1, COMP_SERNO1
+            ) VALUES (
+                :daily_no, 1, :empno, :current_date, :current_time, NULL, NULL
+            )
+        """)
+        
+        legacy_db.execute(insert_detail1_sql, {
+            "daily_no": daily_no,
+            "empno": empno,
+            "current_date": current_date,
+            "current_time": current_time
+        })
+        
+        # 按照用戶指令插入 tdr_detail2 (每個暫存記錄一條)
+        for i, draft in enumerate(draft_results, 1):
+            # 按照用戶提供的指令插入 tdr_detail2
+            insert_detail2_sql = text("""
+                INSERT INTO jps.tdr_detail2 (
+                    DAILY_NO, DAILY_SUB_NOS, DAILY_JOB_NOS, 
+                    COCODE, EMPNO, SOP_CODE, STATUS, XUSER, XDATE, XTIME, ITEMDESC1, PROD_CATE, 
+                    EXETIME, ESTIMATE, ATTITUDE, PROD_NO, SOLUT_SUBJ, SOLUT_STATUS, 
+                    EMPNAME1, EMPNAME2, EMPNAME3, EMPNAME4, EMPNAME5, 
+                    PPS_SERVECOCODE, PPS_EMPNO, PPS_COCODE, PPS_DEPTNO, MEMO_COLLECT, MEMO, PPS_EMPNAMEC, PLANNO, SOPNO
+                ) VALUES (
+                    :daily_no, :daily_sub_nos, 1, 
+                    :cocode, :empno, :sop_code, 'N', :xuser, :xdate, :xtime, :itemdesc1, 'PROD_CATE', 
+                    :exetime, NULL, NULL, NULL, NULL, NULL, 
+                    '0', NULL, NULL, NULL, NULL, 
+                    :pps_servecocode, :pps_empno, :pps_cocode, :pps_deptno, '1', :memo, :pps_empnamec, :planno, :sopno
+                )
+            """)
+            
+            # 從暫存記錄提取資料
+            draft_planno = draft[5] or ""    # PLANNO
+            draft_sopno = draft[7] or ""     # SOPNO  
+            draft_work_seq = draft[9] or ""  # WORK_ITEM_SEQ
+            draft_content = draft[14] or ""  # CONTENT
+            draft_exetime = draft[15] or 0   # EXECUTION_TIME_MINUTES
+            draft_service_cocode = draft[10] # SERVICE_COCODE
+            draft_service_empno = draft[11]  # SERVICE_EMPNO
+            draft_service_empnamec = draft[12] # SERVICE_EMPNAMEC
+            draft_service_deptno = draft[13] # SERVICE_DEPTNO
+            
+            legacy_db.execute(insert_detail2_sql, {
+                "daily_no": daily_no,
+                "daily_sub_nos": i,  # 每個暫存記錄一個子編號
+                "cocode": cocode,
+                "empno": empno,
+                "sop_code": draft_work_seq,  # 工作項目序列
+                "xuser": empnamec,
+                "xdate": current_date,
+                "xtime": current_time,
+                "itemdesc1": draft_work_seq,  # 規格細項
+                "exetime": draft_exetime,     # 工時
+                "memo": draft_content,        # 日報內文
+                "pps_servecocode": draft_service_cocode,  # 服務公司別
+                "pps_empno": draft_service_empno,         # 服務對象工號
+                "pps_cocode": draft_service_cocode,       # 服務對象公司別
+                "pps_deptno": draft_service_deptno,       # 服務對象部門
+                "pps_empnamec": draft_service_empnamec,   # 服務對象姓名
+                "planno": draft_planno,       # 工作計畫編號
+                "sopno": draft_sopno          # 執行工作編號
+            })
+        
+        # 更新暫存狀態為已提交
+        update_draft_status_sql = text("""
+            UPDATE jps.tdr_draft SET STATUS = 'S' 
+            WHERE EMPNO = :empno AND COCODE = :cocode AND DOC_DATE = :doc_date AND STATUS = 'A'
+        """)
+        legacy_db.execute(update_draft_status_sql, {
+            "empno": empno,
+            "cocode": cocode,
+            "doc_date": doc_date
+        })
+        
+        legacy_db.commit()
+        
+        logger.info(f"Successfully submitted final report {daily_no} with {len(draft_results)} work items")
+        
+        return {
+            "message": "日報提交成功",
+            "daily_no": daily_no,
+            "status": "submitted",
+            "items_count": len(draft_results)
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error submitting report: {str(e)}")
-        raise HTTPException(status_code=500, detail="提交日報失敗")
+        legacy_db.rollback()
+        logger.error(f"Error submitting final report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"提交日報失敗: {str(e)}")
 
 @router.get("/reports-by-date")
 async def get_reports_by_date_for_supervisor(

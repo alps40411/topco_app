@@ -9,7 +9,7 @@ import time
 from fastapi.staticfiles import StaticFiles
 
 # --- 引入所有需要的 API 路由 ---
-from app.api import supervisor, auth, legacy_reports, reviews
+from app.api import supervisor, auth, legacy_reports, reviews, users, reports, drafts, ai
 
 app = FastAPI(
     title="TSC 業務日誌 API",
@@ -62,11 +62,19 @@ if missing:
 # --- 修正：加入 "/api" 前綴以匹配前端代理設定 ---
 # 前端透過 Vite 代理將 /api/* 請求轉發到後端
 # 所以後端需要註冊 /api/* 路由
+
+# === 新的組織化 API 路由 ===
 app.include_router(auth.router, prefix="/api/auth")
+app.include_router(users.router, prefix="/api/users")
+app.include_router(reports.router, prefix="/api/reports")
+app.include_router(drafts.router, prefix="/api/drafts")
+app.include_router(ai.router, prefix="/api/ai")
+
+# === 現有的 API 路由（保持向後兼容）===
 app.include_router(supervisor.router, prefix="/api/supervisor")
 app.include_router(legacy_reports.router, prefix="/api")
 app.include_router(legacy_reports.records_router, prefix="/api")
-app.include_router(legacy_reports.reports_router, prefix="/api")
+# app.include_router(legacy_reports.reports_router, prefix="/api")  # 已被新的 reports API 取代
 app.include_router(legacy_reports.projects_router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 

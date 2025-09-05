@@ -32,7 +32,7 @@ class LegacyReportServiceV2:
     
     @staticmethod
     def save_draft(db: Session, empno: str, cocode: str, doc_date: str, 
-                   draft_type: str, draft_content: Dict[str, Any]) -> str:
+                   draft_type: str, draft_content: Dict[str, Any], daily_no: Optional[str] = None) -> str:
         """保存日報暫存 - 使用新的資料表結構，支援 daily_no 生成和合併邏輯"""
         try:
             # 確保交易狀態正常
@@ -89,76 +89,82 @@ class LegacyReportServiceV2:
             att_file1 = files[0].get('name') if len(files) > 0 and isinstance(files[0], dict) else (files[0] if len(files) > 0 else None)
             att_file2 = files[1].get('name') if len(files) > 1 and isinstance(files[1], dict) else (files[1] if len(files) > 1 else None)
             
-            # 取得或創建 daily_no
-            existing_daily_sql = text("""
-                SELECT DAILY_NO
-                FROM jps.tdr_draft
-                WHERE EMPNO = :empno 
-                AND COCODE = :cocode
-                AND DOC_DATE = :doc_date
-                AND STATUS = 'A'
-                LIMIT 1
-            """)
-            
-            existing_daily_result = db.execute(existing_daily_sql, {
-                "empno": empno,
-                "cocode": cocode,
-                "doc_date": doc_date
-            }).fetchone()
-            
-            if existing_daily_result:
-                # 使用現有的 daily_no
-                daily_no = existing_daily_result[0]
-                logger.info(f"使用現有 daily_no: {daily_no}")
+            # 使用提供的 daily_no 或取得新的 daily_no
+            if daily_no:
+                # 使用前端提供的 daily_no
+                logger.info(f"使用前端提供的 daily_no: {daily_no}")
             else:
-                # 第一次填寫，取得新的 daily_no
-                try:
-                    daily_no_sql = text("SELECT nextval('seq_tdr_master')")
-                    daily_no_result = db.execute(daily_no_sql).fetchone()
-                    daily_no = str(daily_no_result[0])
-                except:
-                    # 如果序列不存在，使用時間戳記
-                    daily_no = f"DR{current_date}{current_time.replace(':', '')}"
-                logger.info(f"創建新 daily_no: {daily_no}")
+                # 查找現有的 daily_no 或創建新的
+                existing_daily_sql = text("""
+                    SELECT DAILY_NO
+                    FROM jps.tdr_draft
+                    WHERE EMPNO = :empno 
+                    AND COCODE = :cocode
+                    AND DOC_DATE = :doc_date
+                    AND STATUS = 'A'
+                    LIMIT 1
+                """)
+                
+                existing_daily_result = db.execute(existing_daily_sql, {
+                    "empno": empno,
+                    "cocode": cocode,
+                    "doc_date": doc_date
+                }).fetchone()
+                
+                if existing_daily_result:
+                    # 使用現有的 daily_no
+                    daily_no = existing_daily_result[0]
+                    logger.info(f"使用現有 daily_no: {daily_no}")
+                else:
+                    # 第一次填寫，取得新的 daily_no
+                    try:
+                        daily_no_sql = text("SELECT nextval('seq_tdr_master')")
+                        daily_no_result = db.execute(daily_no_sql).fetchone()
+                        daily_no = str(daily_no_result[0])
+                    except:
+                        # 如果序列不存在，使用時間戳記
+                        daily_no = f"DR{current_date}{current_time.replace(':', '')}"
+                    logger.info(f"創建新 daily_no: {daily_no}")
             
-            # 檢查是否已存在相同 planno + sopno 組合的記錄
-            existing_combo_sql = text("""
+            # 檢查是否已存在相同 planno + sopno + work_item_seq 組合的記錄
+            existing_exact_match_sql = text("""
                 SELECT RECORD_ID, DAILY_NO, CONTENT, EXECUTION_TIME_MINUTES, WORK_ITEM_SEQ, 
                        WORD_COUNT, ATT_FILE1, ATT_FILE2, FILES
                 FROM jps.tdr_draft
                 WHERE DAILY_NO = :daily_no 
                 AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
                 AND COALESCE(SOPNO, '') = COALESCE(:sopno, '')
+                AND COALESCE(WORK_ITEM_SEQ, '') = COALESCE(:work_item_seq, '')
                 AND STATUS = 'A'
             """)
             
-            existing_combo = db.execute(existing_combo_sql, {
+            existing_exact_match = db.execute(existing_exact_match_sql, {
                 "daily_no": daily_no,
                 "planno": planno,
-                "sopno": sopno
+                "sopno": sopno,
+                "work_item_seq": work_item_seq_str
             }).fetchone()
             
-            if existing_combo:
-                # 相同工作計畫+執行工作：累加內容、時間等欄位
-                logger.info(f"找到相同 planno({planno})+sopno({sopno}) 組合，進行累加更新")
+            if existing_exact_match:
+                # 完全相同的工作計畫+執行工作+工作項目：合併內容
+                logger.info(f"找到完全相同的 planno({planno})+sopno({sopno})+work_item_seq({work_item_seq_str}) 組合，合併內容")
                 
                 # 合併內容
-                existing_content = existing_combo[2] or ""
+                existing_content = existing_exact_match[2] or ""
                 merged_content = f"{existing_content}\n{content}".strip() if existing_content else content
                 
                 # 累加執行時間
-                existing_time = existing_combo[3] or 0
+                existing_time = existing_exact_match[3] or 0
                 total_time = existing_time + draft_content.get('execution_time_minutes', 0)
                 
-                # 合併工作項目序列
-                existing_work_items = existing_combo[4] or ""
-                merged_work_items = f"{existing_work_items}/{work_item_seq_str}".strip('/') if existing_work_items and work_item_seq_str else (existing_work_items or work_item_seq_str)
+                # 工作項目序列保持不變（因為完全相同）
+                merged_work_items = work_item_seq_str
                 
                 # 計算新的字數
                 merged_word_count = len(merged_content) if merged_content else 0
                 
                 # 合併檔案
-                existing_files = existing_combo[8] or "[]"
+                existing_files = existing_exact_match[8] or "[]"
                 if files_json and files_json != "[]":
                     import json
                     try:
@@ -208,16 +214,120 @@ class LegacyReportServiceV2:
                     "files": merged_files,
                     "updated_date": current_date,
                     "updated_time": current_time,
-                    "record_id": existing_combo[0]
+                    "record_id": existing_exact_match[0]
                 })
                 
                 db.commit()
-                logger.info(f"累加更新完成，record_id: {existing_combo[0]}，總執行時間: {total_time} 分鐘")
+                logger.info(f"合併更新完成，record_id: {existing_exact_match[0]}，總執行時間: {total_time} 分鐘")
                 return daily_no
                 
             else:
-                # 不同工作計畫+執行工作：新增一筆記錄（相同 daily_no）
-                logger.info(f"不同 planno({planno})+sopno({sopno}) 組合，新增記錄（daily_no: {daily_no}）")
+                # 檢查是否存在相同 planno + sopno 但不同 work_item_seq 的記錄
+                existing_partial_match_sql = text("""
+                    SELECT RECORD_ID, WORK_ITEM_SEQ
+                    FROM jps.tdr_draft
+                    WHERE DAILY_NO = :daily_no 
+                    AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
+                    AND COALESCE(SOPNO, '') = COALESCE(:sopno, '')
+                    AND COALESCE(WORK_ITEM_SEQ, '') != COALESCE(:work_item_seq, '')
+                    AND STATUS = 'A'
+                """)
+                
+                existing_partial_matches = db.execute(existing_partial_match_sql, {
+                    "daily_no": daily_no,
+                    "planno": planno,
+                    "sopno": sopno,
+                    "work_item_seq": work_item_seq_str
+                }).fetchall()
+                
+                if existing_partial_matches:
+                    # 相同工作計畫+執行工作，但不同工作項目：合併工作項目序列
+                    logger.info(f"找到相同 planno({planno})+sopno({sopno})，但不同工作項目，合併工作項目序列")
+                    
+                    # 收集所有現有的工作項目序列
+                    existing_work_item_seqs = []
+                    for match in existing_partial_matches:
+                        existing_seq = match[1] or ""
+                        if existing_seq:
+                            existing_work_item_seqs.extend(existing_seq.split('/'))
+                    
+                    # 新增當前的工作項目序列
+                    if work_item_seq_str:
+                        existing_work_item_seqs.extend(work_item_seq_str.split('/'))
+                    
+                    logger.info(f"合併前的工作項目序列: {existing_work_item_seqs}")
+                    
+                    # 去重並排序 - 確保去除空白字串
+                    unique_seqs = sorted(list(set(seq.strip() for seq in existing_work_item_seqs if seq and seq.strip())))
+                    final_work_item_seq = '/'.join(unique_seqs)
+                    
+                    logger.info(f"去重後的工作項目序列: {final_work_item_seq}")
+                    
+                    # 更新第一個匹配的記錄，合併工作項目序列、內容和檔案
+                    first_match_id = existing_partial_matches[0][0]
+                    
+                    # 先取得現有記錄的內容和檔案資訊
+                    get_existing_sql = text("""
+                        SELECT CONTENT, EXECUTION_TIME_MINUTES, FILES
+                        FROM jps.tdr_draft
+                        WHERE RECORD_ID = :record_id
+                    """)
+                    
+                    existing_record = db.execute(get_existing_sql, {"record_id": first_match_id}).fetchone()
+                    existing_content = existing_record[0] or ""
+                    existing_time = existing_record[1] or 0
+                    existing_files = existing_record[2] or "[]"
+                    
+                    # 合併內容
+                    merged_content = f"{existing_content}\n{content}".strip() if existing_content else content
+                    
+                    # 累加執行時間
+                    total_time = existing_time + draft_content.get('execution_time_minutes', 0)
+                    
+                    # 合併檔案
+                    if files_json and files_json != "[]":
+                        try:
+                            existing_files_list = json.loads(existing_files) if existing_files != "[]" else []
+                            new_files_list = json.loads(files_json)
+                            merged_files_list = existing_files_list + new_files_list
+                            merged_files = json.dumps(merged_files_list)
+                        except:
+                            merged_files = files_json
+                    else:
+                        merged_files = existing_files
+                    
+                    # 計算新的字數
+                    merged_word_count = len(merged_content) if merged_content else 0
+                    
+                    update_partial_sql = text("""
+                        UPDATE jps.tdr_draft 
+                        SET WORK_ITEM_SEQ = :work_item_seq,
+                            CONTENT = :content,
+                            EXECUTION_TIME_MINUTES = :execution_time_minutes,
+                            WORD_COUNT = :word_count,
+                            FILES = :files,
+                            UPDATED_DATE = :updated_date,
+                            UPDATED_TIME = :updated_time
+                        WHERE RECORD_ID = :record_id
+                    """)
+                    
+                    db.execute(update_partial_sql, {
+                        "work_item_seq": final_work_item_seq,
+                        "content": merged_content,
+                        "execution_time_minutes": total_time,
+                        "word_count": merged_word_count,
+                        "files": merged_files,
+                        "updated_date": current_date,
+                        "updated_time": current_time,
+                        "record_id": first_match_id
+                    })
+                    
+                    db.commit()
+                    logger.info(f"合併工作項目序列完成，最終序列: {final_work_item_seq}")
+                    return daily_no
+                
+                # 完全不同的工作計畫+執行工作：新增一筆記錄
+                logger.info(f"完全不同的 planno({planno})+sopno({sopno}) 組合，新增記錄（daily_no: {daily_no}）")
                 
                 insert_sql = text("""
                     INSERT INTO jps.tdr_draft (

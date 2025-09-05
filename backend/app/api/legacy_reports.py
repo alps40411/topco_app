@@ -14,10 +14,16 @@ from ..schemas.legacy_schemas import (
 )
 import logging
 import json
+from functools import lru_cache
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/legacy", tags=["legacy-reports"])
 records_router = APIRouter(prefix="/records", tags=["records"])
 logger = logging.getLogger(__name__)
+
+# 簡單的內存緩存
+_work_data_cache = {}
+_cache_timeout = timedelta(minutes=10)  # 緩存 10 分鐘
 
 @router.get("/reports", response_model=List[Dict[str, Any]])
 async def get_daily_reports(
@@ -134,25 +140,42 @@ async def get_next_daily_no(db: Session = Depends(get_legacy_db)):
 
 @router.post("/drafts", response_model=DraftResponse)
 async def save_draft(
-    draft_data: DraftSaveRequest,
+    draft_data: Dict[str, Any],
     db: Session = Depends(get_legacy_db)
 ):
     """保存日報暫存"""
     try:
-        draft_id = LegacyReportServiceV2.save_draft(
+        logger.info(f"收到暫存數據: {draft_data}")
+        
+        # 提取數據
+        daily_no = draft_data.get("daily_no")
+        empno = draft_data.get("empno")
+        cocode = draft_data.get("cocode", "001")
+        doc_date = draft_data.get("doc_date")
+        draft_type = draft_data.get("draft_type", "TEMP")
+        draft_content = draft_data.get("draft_content", {})
+        
+        if not all([daily_no, empno, doc_date]):
+            raise HTTPException(status_code=400, detail="缺少必要欄位: daily_no, empno, doc_date")
+        
+        # 保存暫存
+        result_daily_no = LegacyReportServiceV2.save_draft(
             db=db,
-            empno=draft_data.empno,
-            cocode=draft_data.cocode,
-            doc_date=draft_data.doc_date,
-            draft_type=draft_data.draft_type,
-            draft_content=draft_data.draft_content.dict()
+            empno=empno,
+            cocode=cocode,
+            doc_date=doc_date,
+            draft_type=draft_type,
+            draft_content=draft_content,
+            daily_no=daily_no
         )
         
         return DraftResponse(
-            draft_id=draft_id,
-            daily_no=draft_id,  # 使用返回的 daily_no
+            draft_id=result_daily_no,
+            daily_no=result_daily_no,
             message="暫存保存成功"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error saving draft: {str(e)}")
         raise HTTPException(status_code=500, detail=f"暫存保存失敗: {str(e)}")
@@ -518,6 +541,16 @@ async def get_all_work_data(
 ):
     """取得所有工作相關資料：工作計畫、執行工作和工作項目"""
     try:
+        # 檢查緩存
+        cache_key = f"work_data_{empno}"
+        now = datetime.now()
+        
+        if cache_key in _work_data_cache:
+            cached_data, cached_time = _work_data_cache[cache_key]
+            if now - cached_time < _cache_timeout:
+                logger.info(f"使用緩存數據: {empno}")
+                return cached_data
+        
         from sqlalchemy import text
         
         # 1. 取得工作計畫
@@ -571,9 +604,6 @@ async def get_all_work_data(
             seq = row[2] if len(row) > 2 else None
             work_item_name = row[3] if len(row) > 3 else None
             
-            # 添加調試信息
-            logger.info(f"處理行: sopno={sopno}, sop_desc_c={sop_desc_c}, seq={seq}, work_item_name={work_item_name}")
-            
             if current_sop != sopno:
                 basic_execution_works.append({
                     "sopno": str(sopno),  # 確保 sopno 是字符串
@@ -581,7 +611,6 @@ async def get_all_work_data(
                     "work_items": []
                 })
                 current_sop = sopno
-                logger.info(f"新增執行工作: {sopno} - {sop_desc_c}")
             
             if seq is not None and work_item_name:
                 basic_execution_works[-1]["work_items"].append({
@@ -589,47 +618,58 @@ async def get_all_work_data(
                     "name": work_item_name,
                     "unique_id": f"{sopno}_{seq}"  # 創建唯一 ID
                 })
-                logger.info(f"新增工作項目: {seq} - {work_item_name} 到執行工作 {sopno}")
         
-        # 3. 取得所有工作計畫的執行工作
+        # 3. 取得所有工作計畫的執行工作（優化：使用單一查詢）
         project_execution_works = {}
-        for plan in work_plans:
-            planno = plan["planno"]
-            project_sql = text("""
-                SELECT t.sopno, s.sop_desc_c, d.seq, d.name
+        if work_plans:
+            # 構建 planno 列表
+            planno_list = [str(plan["planno"]) for plan in work_plans]
+            planno_params = ", ".join([f":planno_{i}" for i in range(len(planno_list))])
+            
+            project_sql = text(f"""
+                SELECT t.planno, t.sopno, s.sop_desc_c, d.seq, d.name
                 FROM jps.tjp_master t
                 LEFT JOIN jps.tpm_sop s ON t.sopno = s.sopno
                 LEFT JOIN jps.tpm_sop_detail d ON s.sopno = d.sopno
-                WHERE t.planno = :planno
-                ORDER BY t.sopno, d.seq
+                WHERE t.planno IN ({planno_params})
+                ORDER BY t.planno, t.sopno, d.seq
             """)
             
-            project_result = db.execute(project_sql, {"planno": planno})
-            execution_works = []
-            current_sop = None
+            # 準備參數
+            params = {f"planno_{i}": planno for i, planno in enumerate(planno_list)}
+            project_result = db.execute(project_sql, params)
             
+            # 組織結果
             for row in project_result.fetchall():
-                sopno = row[0]
-                sop_desc_c = row[1]
-                seq = row[2] if len(row) > 2 else None
-                work_item_name = row[3] if len(row) > 3 else None
+                planno = str(row[0])
+                sopno = row[1]
+                sop_desc_c = row[2]
+                seq = row[3] if len(row) > 3 else None
+                work_item_name = row[4] if len(row) > 4 else None
                 
-                if current_sop != sopno:
-                    execution_works.append({
-                        "sopno": str(sopno),  # 確保 sopno 是字符串
+                # 初始化 planno 的執行工作字典
+                if planno not in project_execution_works:
+                    project_execution_works[planno] = {}
+                
+                # 初始化 sopno 的工作項目列表
+                if sopno not in project_execution_works[planno]:
+                    project_execution_works[planno][sopno] = {
+                        "sopno": str(sopno),
                         "sop_desc_c": sop_desc_c or f"執行工作 {sopno}",
                         "work_items": []
-                    })
-                    current_sop = sopno
+                    }
                 
+                # 添加工作項目
                 if seq is not None and work_item_name:
-                    execution_works[-1]["work_items"].append({
-                        "seq": str(seq),  # 確保 seq 是字符串
+                    project_execution_works[planno][sopno]["work_items"].append({
+                        "seq": str(seq),
                         "name": work_item_name,
-                        "unique_id": f"{sopno}_{seq}"  # 創建唯一 ID
+                        "unique_id": f"{sopno}_{seq}"
                     })
             
-            project_execution_works[planno] = execution_works
+            # 轉換為列表格式
+            for planno in project_execution_works:
+                project_execution_works[planno] = list(project_execution_works[planno].values())
         
         # 4. 取得服務公司列表
         service_companies_sql = text("SELECT cocode, coabbv FROM jps.dcd001$master WHERE eip_active = 'Y'")
@@ -667,13 +707,26 @@ async def get_all_work_data(
                 "empnamec": row[5]
             })
         
-        return {
+        result = {
             "work_plans": work_plans,
             "basic_execution_works": basic_execution_works,
             "project_execution_works": project_execution_works,
             "service_companies": service_companies,
             "service_targets": service_targets
         }
+        
+        # 保存到緩存
+        _work_data_cache[cache_key] = (result, now)
+        
+        # 清理過期緩存
+        expired_keys = [
+            key for key, (_, cached_time) in _work_data_cache.items()
+            if now - cached_time > _cache_timeout
+        ]
+        for key in expired_keys:
+            del _work_data_cache[key]
+        
+        return result
         
     except Exception as e:
         logger.error(f"Error getting all work data: {str(e)}")
@@ -695,14 +748,12 @@ async def get_consolidated_today(
         today = datetime.now().strftime('%Y%m%d')
         empno = current_user.employee.empno
         
-        # 查詢今天的所有記錄（包括已提交和暫存），JOIN 工作項目表取得中文名稱
+        # 查詢今天的所有記錄（包括已提交和暫存）
         draft_sql = text("""
             SELECT d.DAILY_NO, d.CONTENT, d.PLANNO, d.PLAN_SUBJ_C, d.SOPNO, d.SOP_DESC_C, 
                    d.WORK_ITEM_SEQ, d.SERVICE_COCODE, d.SERVICE_EMPNO, d.SERVICE_EMPNAMEC, 
-                   d.EXECUTION_TIME_MINUTES, d.FILES, d.AI_CONTENT, d.STATUS,
-                   sop.name as WORK_ITEM_NAME
+                   d.EXECUTION_TIME_MINUTES, d.FILES, d.AI_CONTENT, d.STATUS
             FROM jps.tdr_draft d
-            LEFT JOIN jps.tpm_sop_detail sop ON d.SOPNO = sop.sopno AND d.WORK_ITEM_SEQ = sop.seq
             WHERE d.EMPNO = :empno 
             AND d.DOC_DATE = :doc_date 
             ORDER BY d.CREATED_DATE DESC
@@ -729,7 +780,36 @@ async def get_consolidated_today(
             files_json = row[11] or "[]"
             ai_content = row[12]
             status = row[13]
-            work_item_name = row[14] or work_item_seq  # 使用中文名稱，如果沒有則使用序號
+            
+            # 解析多個工作項目序號並取得對應的中文名稱
+            work_item_names = []
+            if work_item_seq and sopno:
+                logger.info(f"處理工作項目序列: '{work_item_seq}', sopno: '{sopno}'")
+                # 分割工作項目序號（如 "1/2" → ["1", "2"]）
+                seq_parts = work_item_seq.split('/')
+                logger.info(f"分割後的序號: {seq_parts}")
+                for seq in seq_parts:
+                    if seq.strip():
+                        # 查詢每個序號對應的中文名稱
+                        work_item_sql = text("""
+                            SELECT name FROM jps.tpm_sop_detail 
+                            WHERE sopno = :sopno AND seq = :seq
+                        """)
+                        work_item_result = db.execute(work_item_sql, {
+                            "sopno": sopno,
+                            "seq": seq.strip()
+                        }).fetchone()
+                        
+                        if work_item_result and work_item_result[0]:
+                            work_item_names.append(work_item_result[0])
+                            logger.info(f"找到工作項目 {seq}: '{work_item_result[0]}'")
+                        else:
+                            work_item_names.append(f"工作項目 {seq}")
+                            logger.warning(f"未找到工作項目 sopno={sopno}, seq={seq} 的中文名稱")
+            
+            # 合併工作項目名稱
+            work_item_name = " / ".join(work_item_names) if work_item_names else work_item_seq
+            logger.info(f"最終工作項目名稱: '{work_item_name}'")
             
             # 解析檔案
             try:
@@ -944,130 +1024,7 @@ async def create_record(
         logger.error(f"Error creating record: {str(e)}")
         raise HTTPException(status_code=500, detail=f"創建記錄失敗: {str(e)}")
 
-# === Comments API (前端相容性) ===
-
-# 創建一個專門的 router 處理 /api/reports/ 端點
-reports_router = APIRouter(prefix="/reports", tags=["reports"])
-
-@reports_router.get("/{report_id}/comments")
-async def get_report_comments(
-    report_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """取得報告的所有留言"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
-        # 查詢回應記錄 (tdr_reply)
-        comments_sql = text("""
-            SELECT r.daily_no, r.reply_nos, r.empno, r.xuser, r.memo, 
-                   r.xdate, r.xtime, s.score
-            FROM jps.tdr_reply r
-            LEFT JOIN jps.tdr_score s ON r.daily_no = s.daily_no AND r.reply_nos = s.reply_nos
-            WHERE r.daily_no = :daily_no
-            ORDER BY r.reply_nos ASC
-        """)
-        
-        result = db.execute(comments_sql, {"daily_no": report_id})
-        
-        comments = []
-        for row in result.fetchall():
-            comment = {
-                "id": row[1],  # reply_nos
-                "content": row[4] or "",  # memo
-                "created_at": f"{row[5]} {row[6]}",  # xdate + xtime
-                "user_id": 0,  # 假的 user_id
-                "author": {
-                    "id": 0,
-                    "name": row[3] or row[2],  # xuser 或 empno
-                    "email": f"{row[2]}@supervisor" if row[7] else f"{row[2]}@employee"  # 根據是否有評分判斷身份
-                },
-                "rating": row[7],  # score
-                "replies": []
-            }
-            comments.append(comment)
-        
-        return comments
-        
-    except Exception as e:
-        logger.error(f"Error getting report comments: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得報告留言失敗: {str(e)}")
-
-@reports_router.post("/{report_id}/comments")
-async def create_report_comment(
-    report_id: str,
-    comment_data: Dict[str, Any],
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """創建報告留言"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
-        content = comment_data.get("content", "").strip()
-        if not content:
-            raise HTTPException(status_code=400, detail="留言內容不能為空")
-        
-        # 取得下一個回應編號
-        max_reply_sql = text("""
-            SELECT COALESCE(MAX(reply_nos), 0) + 1 
-            FROM jps.tdr_reply 
-            WHERE daily_no = :daily_no
-        """)
-        reply_nos = db.execute(max_reply_sql, {"daily_no": report_id}).scalar()
-        
-        # 插入回應記錄
-        from datetime import datetime
-        now = datetime.now()
-        current_date = now.strftime('%Y%m%d')
-        current_time = now.strftime('%H:%M:%S')
-        
-        insert_reply_sql = text("""
-            INSERT INTO jps.tdr_reply (
-                daily_no, reply_nos, empno, memo, xuser, xdate, xtime, memo1, from_where
-            ) VALUES (
-                :daily_no, :reply_nos, :empno, :memo, :xuser, :xdate, :xtime, '', 0
-            )
-        """)
-        
-        db.execute(insert_reply_sql, {
-            "daily_no": report_id,
-            "reply_nos": reply_nos,
-            "empno": current_user.employee.empno,
-            "memo": content,
-            "xuser": current_user.employee.empnamec,
-            "xdate": current_date,
-            "xtime": current_time
-        })
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "留言已創建",
-            "comment": {
-                "id": reply_nos,
-                "content": content,
-                "created_at": f"{current_date} {current_time}",
-                "user_id": 0,
-                "author": {
-                    "id": 0,
-                    "name": current_user.employee.empnamec,
-                    "email": f"{current_user.employee.empno}@employee"
-                },
-                "replies": []
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error creating report comment: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"創建報告留言失敗: {str(e)}")
+# === Comments API removed - now handled by /api/reports/ ===
 
 @router.get("/execution-works")
 async def get_execution_works(

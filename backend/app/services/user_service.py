@@ -73,3 +73,4 @@ async def get_user_by_empno(db: AsyncSession, empno: str) -> Optional[User]:
     )
     return result.scalar_one_or_none()
 
+
