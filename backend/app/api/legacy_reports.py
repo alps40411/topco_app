@@ -494,7 +494,8 @@ async def get_all_work_data(
         work_plans_sql = text("""
             SELECT DISTINCT A.planno, A.plan_subj_c
             FROM jps.tjp_master A
-            WHERE (A.empno = :empno or A.pm_empno = :empno)
+            LEFT JOIN jps.tjp_partner E ON A.planno = E.planno
+            WHERE (A.empno = :empno or A.pm_empno = :empno or E.part_empno = :empno)
             and (A.plan_date2 is null or A.plan_date2 >= TO_CHAR(CURRENT_DATE,'YYYYMMDD'))
             ORDER BY A.planno DESC
         """)

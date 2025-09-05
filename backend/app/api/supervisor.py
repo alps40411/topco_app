@@ -1054,42 +1054,7 @@ async def get_reports_by_date_for_supervisor(
                           AND empno NOT IN ('?0002', '?0003')
                           OR :empno IN ('00002','01174','01376','02970','Z0005')
 
-                        UNION ALL
-
-                        SELECT s1.cocode, s1.empno
-                        FROM jps."dcd003$master" s1
-                        JOIN jps."dcd002$master" s2
-                            ON s1.cocode = s2.cocode
-                           AND s2.deptno = s1.deptno
-                        WHERE s1.cocode = :cocode
-                          AND (
-                            s1.empno = :empno
-                            OR (
-                                (s1.PRACTICE_COCODE IS NULL OR s1.PRACTICE_DEPTNO IS NULL)
-                                AND s1.cocode = :cocode
-                                AND (
-                                    s1.deptno IN (
-                                        SELECT DISTINCT deptno
-                                        FROM jps.GROUPDEPTCHN
-                                        WHERE cocode = 'A'
-                                          AND (leader = :empno OR pleader = :empno)
-                                    )
-                                )
-                            )
-                            OR (
-                                s1.PRACTICE_COCODE IS NOT NULL
-                                AND s1.PRACTICE_DEPTNO IS NOT NULL
-                                AND s1.PRACTICE_COCODE = :cocode
-                                AND (
-                                    s1.PRACTICE_DEPTNO IN (
-                                        SELECT DISTINCT deptno
-                                        FROM jps.GROUPDEPTCHN
-                                        WHERE cocode = 'A'
-                                          AND (leader = :empno OR pleader = :empno)
-                                    )
-                                )
-                            )
-                          )
+                        
 
                         UNION ALL
 
