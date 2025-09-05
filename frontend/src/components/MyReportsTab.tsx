@@ -216,7 +216,7 @@ const MyReportsTab: React.FC = () => {
                 </div>
 
                 {/* 列表維持顯示後端 top-level rating（若有）*/}
-                {report.rating && (
+                {/* {report.rating && (
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-600">我的分數:</span>
                     <div className="flex items-center text-yellow-500">
@@ -232,7 +232,7 @@ const MyReportsTab: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
               </div>
 
               {/* 預覽專案內容 */}
