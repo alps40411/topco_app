@@ -31,7 +31,8 @@
       "Read(/D:\\topco\\Desktop\\topco_app/**)",
       "Read(/D:\\topco\\Desktop\\topco_app\\backend\\app\\api/**)",
       "Read(/D:\\topco\\Desktop\\topco_app\\backend/**)",
-      "Read(/D:\\topco\\Desktop\\topco_app\\backend/**)"
+      "Read(/D:\\topco\\Desktop\\topco_app\\backend/**)",
+      "Bash(cd:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

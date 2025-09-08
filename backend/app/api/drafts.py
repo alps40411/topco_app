@@ -544,7 +544,7 @@ async def update_draft_by_daily_sopno(
         find_sql = text("""
             SELECT DAILY_NO, PLANNO, SOPNO, SOP_DESC_C 
             FROM jps.tdr_draft 
-            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno AND STATUS = 'A'
+            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno
         """)
         
         record_result = db.execute(find_sql, {

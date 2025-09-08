@@ -1043,7 +1043,6 @@ async def upload_daily_report(
                    ATT_FILE1, ATT_FILE2, FILES, STATUS
             FROM jps.tdr_draft 
             WHERE EMPNO = :empno AND COCODE = :cocode AND DOC_DATE = :doc_date
-            AND STATUS = 'A'
             ORDER BY CREATED_DATE, CREATED_TIME
         """)
         
