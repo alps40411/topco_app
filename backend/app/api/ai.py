@@ -148,7 +148,7 @@ async def enhance_record(
                    WORK_ITEM_SEQ, SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC,
                    EXECUTION_TIME_MINUTES, AI_CONTENT
             FROM jps.tdr_draft
-            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno AND STATUS = 'A'
+            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno
         """)
         
         record_result = db.execute(record_sql, {
@@ -242,7 +242,7 @@ async def enhance_all_records(
                    WORK_ITEM_SEQ, SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC,
                    EXECUTION_TIME_MINUTES, AI_CONTENT
             FROM jps.tdr_draft
-            WHERE EMPNO = :empno AND DOC_DATE = :doc_date AND STATUS = 'A'
+            WHERE EMPNO = :empno AND DOC_DATE = :doc_date
             ORDER BY CREATED_DATE ASC
         """)
         
