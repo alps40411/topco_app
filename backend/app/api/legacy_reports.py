@@ -143,7 +143,7 @@ async def save_draft(
     draft_data: Dict[str, Any],
     db: Session = Depends(get_legacy_db)
 ):
-    """保存日報暫存"""
+    """保存日報暫存，使用8:30-8:30邏輯重新計算doc_date"""
     try:
         logger.info(f"收到暫存數據: {draft_data}")
         
@@ -151,19 +151,32 @@ async def save_draft(
         daily_no = draft_data.get("daily_no")
         empno = draft_data.get("empno")
         cocode = draft_data.get("cocode", "001")
-        doc_date = draft_data.get("doc_date")
         draft_type = draft_data.get("draft_type", "TEMP")
         draft_content = draft_data.get("draft_content", {})
         
-        if not all([daily_no, empno, doc_date]):
-            raise HTTPException(status_code=400, detail="缺少必要欄位: daily_no, empno, doc_date")
+        # 重新計算正確的doc_date（8:30-8:30邏輯）
+        from datetime import datetime, time, timedelta
+        now = datetime.now()
+        current_time = now.time()
+        cutoff_time = time(8, 30)  # 8:30 AM
+        
+        # 如果現在時間早於8:30，則使用昨天的日期
+        if current_time < cutoff_time:
+            doc_date = (now - timedelta(days=1)).strftime('%Y%m%d')
+        else:
+            doc_date = now.strftime('%Y%m%d')
+        
+        logger.info(f"根據8:30邏輯重新計算doc_date: {doc_date}, 當前時間: {now}")
+        
+        if not all([daily_no, empno]):
+            raise HTTPException(status_code=400, detail="缺少必要欄位: daily_no, empno")
         
         # 保存暫存
         result_daily_no = LegacyReportServiceV2.save_draft(
             db=db,
             empno=empno,
             cocode=cocode,
-            doc_date=doc_date,
+            doc_date=doc_date,  # 使用重新計算的doc_date
             draft_type=draft_type,
             draft_content=draft_content,
             daily_no=daily_no
@@ -213,13 +226,27 @@ async def get_drafts(
     draft_type: Optional[str] = Query(None, description="暫存類型: TEMP 或 AI"),
     db: Session = Depends(get_legacy_db)
 ):
-    """取得員工的暫存資料"""
+    """取得員工的暫存資料，根據8:30-8:30邏輯計算今天的DOC_DATE"""
     try:
         from sqlalchemy import text
+        from datetime import datetime, time, timedelta
         
-        # 構建查詢條件
-        where_clause = "WHERE EMPNO = :empno AND STATUS = 'A'"
-        params = {"empno": empno}
+        # 計算當前日報的日期（8:30-8:30邏輯）
+        now = datetime.now()
+        current_time = now.time()
+        cutoff_time = time(8, 30)  # 8:30 AM
+        
+        # 如果現在時間早於8:30，則使用昨天的日期
+        if current_time < cutoff_time:
+            doc_date = (now - timedelta(days=1)).strftime('%Y%m%d')
+        else:
+            doc_date = now.strftime('%Y%m%d')
+        
+        logger.info(f"根據8:30邏輯，當前日報日期為: {doc_date}, 當前時間: {now}")
+        
+        # 構建查詢條件，不使用STATUS
+        where_clause = "WHERE EMPNO = :empno AND DOC_DATE = :doc_date"
+        params = {"empno": empno, "doc_date": doc_date}
         
         if draft_type:
             where_clause += " AND DRAFT_TYPE = :draft_type"
@@ -231,7 +258,7 @@ async def get_drafts(
                    SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
                    CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
                    ATT_FILE1, ATT_FILE2, FILES,
-                   CREATED_DATE, CREATED_TIME, UPDATED_DATE, UPDATED_TIME, STATUS
+                   CREATED_DATE, CREATED_TIME, UPDATED_DATE, UPDATED_TIME
             FROM jps.tdr_draft
             {where_clause}
             ORDER BY UPDATED_DATE DESC, UPDATED_TIME DESC
@@ -273,11 +300,11 @@ async def get_drafts(
                 "created_date": row[20],
                 "created_time": row[21],
                 "updated_date": row[22],
-                "updated_time": row[23],
-                "status": row[24]
+                "updated_time": row[23]
             }
             drafts.append(draft)
         
+        logger.info(f"找到 {len(drafts)} 筆今日暫存記錄")
         return drafts
     except Exception as e:
         logger.error(f"Error getting drafts: {str(e)}")

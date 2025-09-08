@@ -54,7 +54,9 @@ const DailyReportTab: React.FC = () => {
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAllAi, setIsGeneratingAllAi] = useState(false);
-  const [generatingAiFor, setGeneratingAiFor] = useState<Set<number>>(new Set());
+  const [generatingAiFor, setGeneratingAiFor] = useState<Set<number>>(
+    new Set()
+  );
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
@@ -152,7 +154,7 @@ const DailyReportTab: React.FC = () => {
 
   const handleEnhanceOne = async (projectId: number) => {
     if (!authFetch || !user?.employee?.empno) return;
-    setGeneratingAiFor(prev => new Set([...prev, projectId]));
+    setGeneratingAiFor((prev) => new Set([...prev, projectId]));
     try {
       // 找到對應的報告
       const report = reports.find((r) => r.project.id === projectId);
@@ -165,10 +167,12 @@ const DailyReportTab: React.FC = () => {
       console.log("daily_no:", report.daily_no);
       console.log("projectId:", projectId);
       console.log("report.project.id:", report.project.id);
-      
+
       // 我們需要從報告中獲取 planno 和 daily_no
       if (!report.daily_no) {
-        throw new Error(`找不到該專案的記錄ID。報告數據: ${JSON.stringify(report)}`);
+        throw new Error(
+          `找不到該專案的記錄ID。報告數據: ${JSON.stringify(report)}`
+        );
       }
 
       // 使用sopno來精確識別要增強的記錄
@@ -176,7 +180,9 @@ const DailyReportTab: React.FC = () => {
         throw new Error("找不到執行工作編號，無法進行AI增強");
       }
 
-      console.log(`準備調用API: /api/ai/enhance_one/${report.daily_no}/${report.sopno}`);
+      console.log(
+        `準備調用API: /api/ai/enhance_one/${report.daily_no}/${report.sopno}`
+      );
 
       const response = await authFetch(
         `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
@@ -209,7 +215,7 @@ const DailyReportTab: React.FC = () => {
       console.error(error);
       toast.error(error.message || "AI 潤飾此專案時發生錯誤");
     } finally {
-      setGeneratingAiFor(prev => {
+      setGeneratingAiFor((prev) => {
         const newSet = new Set(prev);
         newSet.delete(projectId);
         return newSet;
@@ -220,23 +226,25 @@ const DailyReportTab: React.FC = () => {
   const handleEnhanceAll = async () => {
     if (!authFetch) return;
     setIsGeneratingAllAi(true);
-    
+
     // 立即顯示AI視圖並設置所有專案為生成中狀態
     setIsAiViewActive(true);
-    const projectIds = reports.map(report => report.project.id);
-    
+    const projectIds = reports.map((report) => report.project.id);
+
     try {
       // 為每個專案依序調用單獨的AI增強API，以保持UI一致性
       const enhancePromises = reports.map(async (report) => {
         if (!report.sopno || !report.daily_no) {
-          console.warn(`跳過專案 ${report.project.plan_subj_c}: 缺少sopno或daily_no`);
+          console.warn(
+            `跳過專案 ${report.project.plan_subj_c}: 缺少sopno或daily_no`
+          );
           return;
         }
-        
+
         try {
           // 設置該專案為生成中狀態
-          setGeneratingAiFor(prev => new Set([...prev, report.project.id]));
-          
+          setGeneratingAiFor((prev) => new Set([...prev, report.project.id]));
+
           const response = await authFetch(
             `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
             {
@@ -249,7 +257,7 @@ const DailyReportTab: React.FC = () => {
 
           if (response.ok) {
             const enhancedReport = await response.json();
-            
+
             // 更新該專案的AI內容
             setReports((prev) =>
               prev.map((r) =>
@@ -262,20 +270,23 @@ const DailyReportTab: React.FC = () => {
             console.error(`專案 ${report.project.plan_subj_c} AI增強失敗`);
           }
         } catch (error) {
-          console.error(`專案 ${report.project.plan_subj_c} AI增強出錯:`, error);
+          console.error(
+            `專案 ${report.project.plan_subj_c} AI增強出錯:`,
+            error
+          );
         } finally {
           // 清除該專案的生成中狀態
-          setGeneratingAiFor(prev => {
+          setGeneratingAiFor((prev) => {
             const newSet = new Set(prev);
             newSet.delete(report.project.id);
             return newSet;
           });
         }
       });
-      
+
       // 等待所有專案完成
       await Promise.all(enhancePromises);
-      
+
       toast.success("所有報告皆已完成 AI 潤飾！");
     } catch (error: any) {
       console.error(error);
@@ -528,22 +539,18 @@ const DailyReportTab: React.FC = () => {
         return;
       }
 
-      // 檢查今天是否已經有暫存記錄，如果有就使用現有的 daily_no
+      // 檢查今天是否已經有暫存記錄（後端會自動處理8:30-8:30邏輯）
       let daily_no;
       try {
-        const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
         const existingDraftsResponse = await authFetch(
           `/api/legacy/drafts/${user.employee.empno}?draft_type=TEMP`
         );
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
-          // 查找今天的暫存記錄
-          const todayDraft = existingDrafts.find(
-            (draft: any) => draft.doc_date === today
-          );
-          if (todayDraft) {
-            daily_no = todayDraft.daily_no;
-            console.log("使用現有的 daily_no:", daily_no);
+          if (existingDrafts.length > 0) {
+            // 使用現有記錄的daily_no
+            daily_no = existingDrafts[0].daily_no;
+            console.log("✅ 使用現有的 daily_no:", daily_no);
           }
         }
       } catch (error) {
@@ -555,7 +562,7 @@ const DailyReportTab: React.FC = () => {
         const dailyNoResponse = await authFetch("/api/legacy/next-daily-no");
         const { daily_no: newDailyNo } = await dailyNoResponse.json();
         daily_no = newDailyNo;
-        console.log("取得新的 daily_no:", daily_no);
+        console.log("✅ 取得新的 daily_no:", daily_no);
       }
 
       // 準備暫存數據
@@ -635,17 +642,25 @@ const DailyReportTab: React.FC = () => {
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
             <div className="flex items-center justify-center mb-4">
               <div className="flex-shrink-0">
-                <svg className="h-12 w-12 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                <svg
+                  className="h-12 w-12 text-yellow-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
                 </svg>
               </div>
             </div>
             <h3 className="text-lg font-semibold text-yellow-800 mb-2">
               日報編輯已鎖定
             </h3>
-            <p className="text-yellow-700 mb-4">
-              {writingStatus.message}
-            </p>
+            <p className="text-yellow-700 mb-4">{writingStatus.message}</p>
             <p className="text-sm text-yellow-600">
               當前時間: {writingStatus.current_time}
             </p>

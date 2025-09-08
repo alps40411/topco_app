@@ -101,7 +101,6 @@ class LegacyReportServiceV2:
                     WHERE EMPNO = :empno 
                     AND COCODE = :cocode
                     AND DOC_DATE = :doc_date
-                    AND STATUS = 'A'
                     LIMIT 1
                 """)
                 
@@ -137,7 +136,6 @@ class LegacyReportServiceV2:
                 AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
                 AND COALESCE(SOPNO, '') = COALESCE(:sopno, '')
                 AND COALESCE(WORK_ITEM_SEQ, '') = COALESCE(:work_item_seq, '')
-                AND STATUS = 'A'
             """)
             
             existing_exact_match = db.execute(existing_exact_match_sql, {
@@ -232,7 +230,6 @@ class LegacyReportServiceV2:
                     AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
                     AND COALESCE(SOPNO, '') = COALESCE(:sopno, '')
                     AND COALESCE(WORK_ITEM_SEQ, '') != COALESCE(:work_item_seq, '')
-                    AND STATUS = 'A'
                 """)
                 
                 existing_partial_matches = db.execute(existing_partial_match_sql, {

@@ -112,22 +112,18 @@ const DataInputTab: React.FC = () => {
         return;
       }
 
-      // 檢查今天是否已經有暫存記錄，如果有就使用現有的 daily_no
+      // 檢查今天是否已經有暫存記錄（後端會自動處理8:30-8:30邏輯）
       let daily_no;
       try {
-        const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
         const existingDraftsResponse = await authFetch(
           `/api/legacy/drafts/${user.employee.empno}?draft_type=TEMP`
         );
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
-          // 查找今天的暫存記錄
-          const todayDraft = existingDrafts.find(
-            (draft: any) => draft.doc_date === today
-          );
-          if (todayDraft) {
-            daily_no = todayDraft.daily_no;
-            console.log("使用現有的 daily_no:", daily_no);
+          if (existingDrafts.length > 0) {
+            // 使用現有記錄的daily_no
+            daily_no = existingDrafts[0].daily_no;
+            console.log("✅ 使用現有的 daily_no:", daily_no);
           }
         }
       } catch (error) {
@@ -139,7 +135,7 @@ const DataInputTab: React.FC = () => {
         const dailyNoResponse = await authFetch("/api/legacy/next-daily-no");
         const { daily_no: newDailyNo } = await dailyNoResponse.json();
         daily_no = newDailyNo;
-        console.log("取得新的 daily_no:", daily_no);
+        console.log("✅ 取得新的 daily_no:", daily_no);
       }
 
       // 準備暫存數據
