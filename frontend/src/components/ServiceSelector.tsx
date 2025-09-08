@@ -1,11 +1,8 @@
 // frontend/src/components/ServiceSelector.tsx
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import SearchableDropdown from "./SearchableDropdown";
 import SimpleDropdown from "./SimpleDropdown";
-import type { ServiceCompany, ServiceTarget } from "../App";
-import { LegacyApi } from "../services/legacyApi";
-import { toast } from "react-hot-toast";
 
 interface ServiceSelectorProps {
   selectedCompanyId?: string;
@@ -35,17 +32,13 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   required = false,
   className = "",
 }) => {
-  const handleCompanyChange = (companyId?: string) => {
-    onCompanyChange(companyId);
-  };
-
-  const companyOptions = serviceCompanies.map((company) => ({
-    id: company.id,
+  const companyOptions = serviceCompanies.map((company, index) => ({
+    id: company.cocode || company.id || `company-${index}`,
     name: company.coabbv || company.cocode,
   }));
 
-  const targetOptions = serviceTargets.map((target) => ({
-    id: target.empno,
+  const targetOptions = serviceTargets.map((target, index) => ({
+    id: target.empno || `target-${index}`,
     name: target.empnamec || target.empno,
   }));
 
@@ -57,7 +50,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         placeholder="請選擇服務公司"
         options={companyOptions}
         selectedValue={selectedCompanyId}
-        onSelectionChange={handleCompanyChange}
+        onSelectionChange={onCompanyChange}
         isLoading={false}
         required={required}
       />

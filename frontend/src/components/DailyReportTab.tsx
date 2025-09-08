@@ -18,11 +18,7 @@ import type {
   Project,
   WorkRecordCreate,
 } from "../App";
-import {
-  getProjectColors,
-  blueButtonStyle,
-  greenButtonStyle,
-} from "../utils/colorUtils";
+import { getProjectColors, blueButtonStyle } from "../utils/colorUtils";
 import { useAuth } from "../contexts/AuthContext";
 import AttachedFilesManager from "./AttachedFilesManager";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
@@ -31,6 +27,12 @@ import CascadingWorkSelector from "./CascadingWorkSelector";
 import ServiceSelector from "./ServiceSelector";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
+
+interface DailyRecordCreate
+  extends Omit<WorkRecordCreate, "service_company_id" | "service_target_id"> {
+  service_cocode?: string;
+  service_empno?: string;
+}
 
 interface WritingStatus {
   allowed: boolean;
@@ -60,41 +62,57 @@ const DailyReportTab: React.FC = () => {
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
-  const [newRecord, setNewRecord] = useState<Partial<WorkRecordCreate>>({
+  const [newRecord, setNewRecord] = useState<Partial<DailyRecordCreate>>({
     content: "",
     project_id: undefined,
     execution_work_id: undefined,
     work_item_id: undefined,
-    service_company_id: undefined,
-    service_target_id: undefined,
+    service_cocode: undefined,
+    service_empno: undefined,
     files: [],
     execution_time_minutes: 0,
   });
   const [isSavingNewRecord, setIsSavingNewRecord] = useState(false);
   const [isUploadingNewFile, setIsUploadingNewFile] = useState(false);
+  const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
+  const [serviceTargets, setServiceTargets] = useState<any[]>([]);
+
+  // 服務資料載入回調
+  const handleServiceDataLoaded = useCallback(
+    (companies: any[], targets: any[]) => {
+      setServiceCompanies(companies);
+      setServiceTargets(targets);
+    },
+    []
+  );
 
   // 新增記錄的回調函數
-  const handleProjectChange = useCallback((projectId) => {
+  const handleProjectChange = useCallback((projectId?: string) => {
     setNewRecord((prev) => ({
       ...prev,
-      project_id: projectId,
+      project_id: projectId ? parseInt(projectId) : undefined,
       execution_work_id: undefined,
       work_item_id: undefined,
     }));
   }, []);
 
-  const handleExecutionWorkChange = useCallback((executionWorkId) => {
+  const handleExecutionWorkChange = useCallback((executionWorkId?: string) => {
     setNewRecord((prev) => ({
       ...prev,
-      execution_work_id: executionWorkId,
+      execution_work_id: executionWorkId
+        ? parseInt(executionWorkId)
+        : undefined,
       work_item_id: undefined,
     }));
   }, []);
 
-  const handleWorkItemChange = useCallback((workItemId) => {
+  const handleWorkItemChange = useCallback((workItemId?: string[]) => {
     setNewRecord((prev) => ({
       ...prev,
-      work_item_id: workItemId,
+      work_item_id:
+        workItemId && workItemId.length > 0
+          ? parseInt(workItemId[0])
+          : undefined,
     }));
   }, []);
 
@@ -229,7 +247,6 @@ const DailyReportTab: React.FC = () => {
 
     // 立即顯示AI視圖並設置所有專案為生成中狀態
     setIsAiViewActive(true);
-    const projectIds = reports.map((report) => report.project.id);
 
     try {
       // 為每個專案依序調用單獨的AI增強API，以保持UI一致性
@@ -574,14 +591,16 @@ const DailyReportTab: React.FC = () => {
         draft_type: "TEMP",
         draft_content: {
           content: newRecord.content || "",
-          planno: newRecord.project_id,
+          planno: newRecord.project_id?.toString(),
           plan_subj_c: undefined,
-          sopno: newRecord.execution_work_id,
+          sopno: newRecord.execution_work_id?.toString(),
           sop_desc_c: undefined,
-          work_item_seq: newRecord.work_item_id || [],
+          work_item_seq: newRecord.work_item_id
+            ? [newRecord.work_item_id.toString()]
+            : [],
           work_item_name: undefined,
-          service_cocode: newRecord.service_company_id,
-          service_empno: newRecord.service_target_id,
+          service_cocode: newRecord.service_cocode,
+          service_empno: newRecord.service_empno,
           service_empnamec: undefined,
           service_deptno: undefined,
           files: newRecord.files || [],
@@ -608,8 +627,8 @@ const DailyReportTab: React.FC = () => {
         project_id: undefined,
         execution_work_id: undefined,
         work_item_id: undefined,
-        service_company_id: undefined,
-        service_target_id: undefined,
+        service_cocode: undefined,
+        service_empno: undefined,
         files: [],
         execution_time_minutes: 0,
       });
@@ -942,31 +961,38 @@ const DailyReportTab: React.FC = () => {
               <div className="space-y-4 sm:space-y-6">
                 {/* 級聯工作選擇器 */}
                 <CascadingWorkSelector
-                  selectedProjectId={newRecord.project_id}
-                  selectedExecutionWorkId={newRecord.execution_work_id}
-                  selectedWorkItemId={newRecord.work_item_id}
+                  selectedProjectId={newRecord.project_id?.toString()}
+                  selectedExecutionWorkId={newRecord.execution_work_id?.toString()}
+                  selectedWorkItemId={
+                    newRecord.work_item_id
+                      ? [newRecord.work_item_id.toString()]
+                      : undefined
+                  }
                   onProjectChange={handleProjectChange}
                   onExecutionWorkChange={handleExecutionWorkChange}
                   onWorkItemChange={handleWorkItemChange}
+                  onServiceDataLoaded={handleServiceDataLoaded}
                   required={false}
                 />
 
                 {/* 服務選擇器 */}
                 <ServiceSelector
-                  selectedCompanyId={newRecord.service_company_id}
-                  selectedTargetId={newRecord.service_target_id}
-                  onCompanyChange={(companyId) =>
+                  selectedCompanyId={newRecord.service_cocode}
+                  selectedTargetId={newRecord.service_empno}
+                  onCompanyChange={(cocode) =>
                     setNewRecord({
                       ...newRecord,
-                      service_company_id: companyId,
+                      service_cocode: cocode,
                     })
                   }
-                  onTargetChange={(targetId) =>
+                  onTargetChange={(empno) =>
                     setNewRecord({
                       ...newRecord,
-                      service_target_id: targetId,
+                      service_empno: empno,
                     })
                   }
+                  serviceCompanies={serviceCompanies}
+                  serviceTargets={serviceTargets}
                   required={false}
                 />
                 <div>

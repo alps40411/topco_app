@@ -1276,7 +1276,7 @@ async def upload_daily_report(
                     PPS_EMPNAMEC, PLANNO, SOPNO
                 ) VALUES (
                     :daily_no, 1, :daily_job_nos, :cocode, :empno, :work_item_name, 'N',
-                    :empnamec, :current_date, :current_time, :content, NULL, :execution_time_minutes, NULL, NULL,
+                    :empnamec, :current_date, :current_time, NULL, NULL, :execution_time_minutes, NULL, NULL,
                     NULL, NULL, NULL, '0', NULL, NULL, NULL, NULL,
                     :service_cocode, :service_empno, :service_cocode, :service_deptno, '1', :content,
                     :service_empnamec, :planno, :sopno
