@@ -1,14 +1,16 @@
 # backend/app/api/ai.py
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Dict, Any
 import logging
+from datetime import datetime
 
 from ..core.legacy_database import get_legacy_db
 from ..core.deps import get_current_user
 from ..schemas.user import User
+from ..services.azure_ai_service import get_ai_enhanced_report
 
 router = APIRouter(tags=["AI Services"])
 logger = logging.getLogger(__name__)
@@ -126,9 +128,10 @@ async def _generate_supervisor_reply_suggestions(report_content: str, employee_n
     
     return suggestions
 
-@router.post("/enhance/{record_id}")
+@router.post("/enhance_one/{daily_no}/{sopno}")
 async def enhance_record(
-    record_id: str,
+    daily_no: str,
+    sopno: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
@@ -137,18 +140,21 @@ async def enhance_record(
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
         
-        # 查詢記錄內容
+        empno = current_user.employee.empno
+        
+        # 查詢記錄內容 - 使用 daily_no + sopno 來精確識別單一記錄
         record_sql = text("""
             SELECT DAILY_NO, CONTENT, PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C,
                    WORK_ITEM_SEQ, SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC,
                    EXECUTION_TIME_MINUTES, AI_CONTENT
             FROM jps.tdr_draft
-            WHERE DAILY_NO = :record_id AND EMPNO = :empno AND STATUS = 'A'
+            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno AND STATUS = 'A'
         """)
         
         record_result = db.execute(record_sql, {
-            "record_id": record_id,
-            "empno": current_user.employee.empno
+            "daily_no": daily_no,
+            "sopno": sopno,
+            "empno": empno
         }).fetchone()
         
         if not record_result:
@@ -156,10 +162,13 @@ async def enhance_record(
         
         # 生成 AI 增強內容
         original_content = record_result[1] or ""
+        
+        if not original_content.strip():
+             raise HTTPException(status_code=400, detail="記錄內容為空，無法增強")
+
         enhanced_content = await _generate_enhanced_content(
             original_content=original_content,
-            work_description=record_result[5] or "",  # sop_desc_c
-            execution_time=record_result[10] or 0
+            work_description=record_result[5] or "未指定專案",  # sop_desc_c
         )
         
         # 更新記錄的 AI 內容
@@ -168,36 +177,45 @@ async def enhance_record(
             SET AI_CONTENT = :ai_content,
                 UPDATED_DATE = TO_CHAR(sysdate, 'YYYYMMDD'),
                 UPDATED_TIME = TO_CHAR(sysdate, 'HH24:MI:SS')
-            WHERE DAILY_NO = :record_id
+            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno
         """)
         
         db.execute(update_sql, {
-            "record_id": record_id,
+            "daily_no": daily_no,
+            "sopno": sopno,
+            "empno": empno,
             "ai_content": enhanced_content
         })
         
         db.commit()
         
+        planno = record_result[2]
+        sop_desc_c = record_result[5]
+        
         return {
             "success": True,
-            "message": "記錄 AI 增強完成",
+            "message": f"執行工作 {sop_desc_c} AI 增強完成",
+            "ai_content": enhanced_content,
             "data": {
-                "record_id": record_id,
+                "sopno": sopno,
+                "planno": planno,
+                "daily_no": daily_no,
                 "original_content": original_content,
-                "enhanced_content": enhanced_content
+                "ai_content": enhanced_content
             }
         }
         
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error enhancing record {record_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="AI 增強記錄失敗")
+        raise HTTPException(status_code=500, detail=f"AI 增強記錄失敗: {e}")
 
-@router.post("/enhance-batch")
+@router.post("/enhance_all")
 async def enhance_all_records(
-    enhance_data: Dict[str, Any],
+    body: Dict[str, Any] | List[Any] | None = Body(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
@@ -207,13 +225,15 @@ async def enhance_all_records(
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
         
         empno = current_user.employee.empno
-        today = enhance_data.get("date", "")
         
+        today = ""
+        if isinstance(body, dict) and "date" in body:
+            today = body.get("date", "")
+
         if not today:
             from datetime import datetime
             today = datetime.now().strftime('%Y%m%d')
         else:
-            # 轉換日期格式 YYYY-MM-DD -> YYYYMMDD
             today = today.replace("-", "")
         
         # 查詢今天的所有草稿記錄
@@ -229,22 +249,27 @@ async def enhance_all_records(
         records_result = db.execute(records_sql, {
             "empno": empno,
             "doc_date": today
-        })
+        }).fetchall()
         
+        if not records_result:
+            return {
+                "success": True,
+                "message": "沒有需要增強的記錄",
+                "data": {"enhanced_count": 0, "date": today}
+            }
+
         enhanced_count = 0
         
-        for record_row in records_result.fetchall():
+        for record_row in records_result:
             record_id = record_row[0]
             original_content = record_row[1] or ""
             
-            if original_content.strip():  # 只對有內容的記錄進行增強
+            if original_content.strip():
                 enhanced_content = await _generate_enhanced_content(
                     original_content=original_content,
-                    work_description=record_row[5] or "",
-                    execution_time=record_row[10] or 0
+                    work_description=record_row[5] or "未指定專案",
                 )
                 
-                # 更新記錄
                 update_sql = text("""
                     UPDATE jps.tdr_draft 
                     SET AI_CONTENT = :ai_content,
@@ -274,36 +299,21 @@ async def enhance_all_records(
     except Exception as e:
         db.rollback()
         logger.error(f"Error batch enhancing records: {str(e)}")
-        raise HTTPException(status_code=500, detail="批量 AI 增強失敗")
+        raise HTTPException(status_code=500, detail=f"批量 AI 增強失敗: {e}")
 
-async def _generate_enhanced_content(original_content: str, work_description: str, execution_time: int):
-    """生成 AI 增強內容"""
-    # 這裡應該整合實際的 AI 服務
-    # 目前返回模擬的增強內容
-    
-    enhanced_parts = []
-    
-    # 添加工作背景
-    if work_description:
-        enhanced_parts.append(f"工作內容：{work_description}")
-    
-    # 處理原始內容
-    enhanced_parts.append(f"執行詳情：{original_content}")
-    
-    # 添加執行時間資訊
-    if execution_time > 0:
-        hours = execution_time // 60
-        minutes = execution_time % 60
-        if hours > 0:
-            time_str = f"{hours}小時{minutes}分鐘" if minutes > 0 else f"{hours}小時"
-        else:
-            time_str = f"{minutes}分鐘"
-        enhanced_parts.append(f"執行時間：{time_str}")
-    
-    # 添加 AI 建議的改進點
-    enhanced_parts.append("工作成果：順利完成預定目標，過程中注重細節處理，確保工作品質。")
-    
-    return "；".join(enhanced_parts)
+async def _generate_enhanced_content(original_content: str, work_description: str):
+    """使用 Azure AI Service 生成增強內容"""
+    try:
+        # 調用真正的 AI 服務
+        enhanced_content = await get_ai_enhanced_report(
+            original_content=original_content,
+            project_name=work_description
+        )
+        return enhanced_content
+    except Exception as e:
+        logger.error(f"Azure AI service call failed: {e}")
+        # 在 AI 服務失敗時返回一個有意義的錯誤或備用內容
+        return f"AI 服務無法處理您的請求。錯誤：{e}"
 
 @router.get("/status")
 async def get_ai_service_status():

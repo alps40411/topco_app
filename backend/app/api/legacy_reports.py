@@ -686,7 +686,7 @@ async def get_consolidated_today(
         today = datetime.now().strftime('%Y%m%d')
         empno = current_user.employee.empno
         
-        # 查詢今天的所有記錄（包括已提交和暫存）
+        # 查詢今天的所有活躍記錄
         draft_sql = text("""
             SELECT d.DAILY_NO, d.CONTENT, d.PLANNO, d.PLAN_SUBJ_C, d.SOPNO, d.SOP_DESC_C, 
                    d.WORK_ITEM_SEQ, d.SERVICE_COCODE, d.SERVICE_EMPNO, d.SERVICE_EMPNAMEC, 
@@ -702,12 +702,17 @@ async def get_consolidated_today(
             "doc_date": today
         })
         
+        rows = draft_result.fetchall()
+        logger.info(f"查詢到 {len(rows)} 條記錄 for empno={empno}, date={today}")
+        
         consolidated_records = []
-        for row in draft_result.fetchall():
+        for row in rows:
             daily_no = row[0]
             content = row[1] or ""
             planno = row[2] or ""
             plan_subj_c = row[3] or "基本工作項目"
+            
+            logger.info(f"處理記錄: daily_no={daily_no}, planno={planno}, plan_subj_c={plan_subj_c}")
             sopno = row[4] or ""
             sop_desc_c = row[5] or ""
             work_item_seq = row[6] or ""
@@ -761,6 +766,8 @@ async def get_consolidated_today(
                 service_target_name = f"{service_empnamec}({service_empno})"
             
             consolidated_records.append({
+                "daily_no": daily_no,  # 添加 daily_no 字段
+                "sopno": sopno,        # 添加 sopno 字段用於精確識別記錄
                 "project": {
                     "id": planno,
                     "plan_subj_c": plan_subj_c
@@ -823,19 +830,95 @@ async def get_writing_status(
             "doc_date": today
         }).scalar()
         
-        if submitted_count > 0:
+        # 檢查是否有主管已經評分或回覆（任一主管有評分就鎖定）
+        review_status_sql = text("""
+            SELECT 
+                (SELECT COUNT(*) FROM jps.tdr_score s 
+                 JOIN jps.tdr_master m ON s.daily_no = m.daily_no 
+                 WHERE m.empno = :empno AND m.doc_date = :doc_date) as score_count,
+                (SELECT COUNT(*) FROM jps.tdr_reply r 
+                 JOIN jps.tdr_master m ON r.daily_no = m.daily_no 
+                 WHERE m.empno = :empno AND m.doc_date = :doc_date) as reply_count
+        """)
+        
+        review_result = db.execute(review_status_sql, {
+            "empno": empno,
+            "doc_date": today
+        }).fetchone()
+        
+        score_count = review_result[0] if review_result else 0
+        reply_count = review_result[1] if review_result else 0
+        has_supervisor_review = score_count > 0 or reply_count > 0
+        
+        # 檢查時間範圍（8:30 - 隔天8:30）
+        from datetime import datetime, time
+        now = datetime.now()
+        current_time = now.time()
+        cutoff_time = time(8, 30)  # 8:30 AM
+        
+        # 如果現在時間早於8:30，則是前一天的填寫時間
+        if current_time < cutoff_time:
+            # 當前日期減一天作為doc_date
+            from datetime import timedelta
+            actual_date = (now - timedelta(days=1)).strftime('%Y%m%d')
+            is_within_writing_period = True
+        else:
+            # 當前日期作為doc_date
+            actual_date = now.strftime('%Y%m%d')
+            is_within_writing_period = True
+            
+        # 確保查詢的是正確的日期
+        if today != actual_date:
+            # 重新查詢正確日期的數據
+            draft_count = db.execute(draft_sql, {
+                "empno": empno,
+                "doc_date": actual_date
+            }).scalar()
+            
+            submitted_count = db.execute(submitted_sql, {
+                "empno": empno,
+                "doc_date": actual_date
+            }).scalar()
+            
+            review_result = db.execute(review_status_sql, {
+                "empno": empno,
+                "doc_date": actual_date
+            }).fetchone()
+            
+            score_count = review_result[0] if review_result else 0
+            reply_count = review_result[1] if review_result else 0
+            has_supervisor_review = score_count > 0 or reply_count > 0
+        
+        # 決定狀態和是否允許編輯
+        allowed = True
+        message = "可以填寫日報"
+        
+        if has_supervisor_review:
+            allowed = False
+            message = "主管已審閱，今日無法編輯，請等待隔天8:30後填寫新的日報"
+            status = "reviewed"
+        elif submitted_count > 0:
             status = "submitted"
+            message = "日報已提交，等待主管審閱"
         elif draft_count > 0:
             status = "draft"
+            message = "有草稿，可以繼續編輯"
         else:
             status = "empty"
-            
+            message = "尚未開始填寫日報"
+        
         return {
+            "allowed": allowed,
+            "message": message,
+            "current_time": now.strftime('%Y-%m-%d %H:%M:%S'),
             "empno": empno,
-            "doc_date": today,
+            "doc_date": actual_date,
             "status": status,
             "draft_count": draft_count,
-            "submitted_count": submitted_count
+            "submitted_count": submitted_count,
+            "has_supervisor_review": has_supervisor_review,
+            "score_count": score_count,
+            "reply_count": reply_count
         }
         
     except Exception as e:
@@ -877,43 +960,7 @@ async def upload_record(
         logger.error(f"Error uploading record: {str(e)}")
         raise HTTPException(status_code=500, detail=f"記錄上傳失敗: {str(e)}")
 
-@records_router.post("/ai/enhance_one/{project_id}")
-async def enhance_one_record(
-    project_id: str,
-    db: Session = Depends(get_legacy_db)
-):
-    """AI 增強單個記錄"""
-    try:
-        # 這裡應該實現 AI 增強邏輯
-        # 目前返回一個基本響應
-        return {
-            "success": True,
-            "message": f"記錄 {project_id} AI 增強完成",
-            "enhanced_content": "AI 增強後的內容"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error enhancing record {project_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"AI 增強失敗: {str(e)}")
 
-@records_router.post("/ai/enhance_all")
-async def enhance_all_records(
-    enhance_data: Dict[str, Any],
-    db: Session = Depends(get_legacy_db)
-):
-    """AI 增強所有記錄"""
-    try:
-        # 這裡應該實現批量 AI 增強邏輯
-        # 目前返回一個基本響應
-        return {
-            "success": True,
-            "message": "所有記錄 AI 增強完成",
-            "enhanced_count": len(enhance_data.get("records", []))
-        }
-        
-    except Exception as e:
-        logger.error(f"Error enhancing all records: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"批量 AI 增強失敗: {str(e)}")
 
 @records_router.get("/consolidated/{project_id}")
 async def get_consolidated_by_project(

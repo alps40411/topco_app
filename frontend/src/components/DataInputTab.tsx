@@ -42,6 +42,7 @@ const DataInputTab: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
   const [serviceTargets, setServiceTargets] = useState<any[]>([]);
+  const [hasWorkItems, setHasWorkItems] = useState<boolean>(true);
 
   const fetchConsolidatedToday = useCallback(async () => {
     setIsLoading(true);
@@ -72,9 +73,10 @@ const DataInputTab: React.FC = () => {
       toast.error("請選擇執行工作");
       return;
     }
+    // 只有當該執行工作有工作項目時，才要求必須選擇工作項目
     if (
-      !currentRecord.work_item_seq ||
-      currentRecord.work_item_seq.length === 0
+      hasWorkItems &&
+      (!currentRecord.work_item_seq || currentRecord.work_item_seq.length === 0)
     ) {
       toast.error("請選擇工作項目");
       return;
@@ -284,6 +286,9 @@ const DataInputTab: React.FC = () => {
                   ...prev,
                   work_item_seq: workItemSeq,
                 }));
+              }, [])}
+              onWorkItemsAvailabilityChange={useCallback((hasItems) => {
+                setHasWorkItems(hasItems);
               }, [])}
               onServiceDataLoaded={useCallback((companies, targets) => {
                 setServiceCompanies(companies);

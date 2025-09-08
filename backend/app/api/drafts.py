@@ -524,3 +524,84 @@ async def get_writing_status(
     except Exception as e:
         logger.error(f"Error getting writing status: {str(e)}")
         raise HTTPException(status_code=500, detail="取得寫作狀態失敗")
+
+@router.put("/by-daily-sopno/{daily_no}/{sopno}")
+async def update_draft_by_daily_sopno(
+    daily_no: str,
+    sopno: str,
+    update_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """使用daily_no + sopno精確更新單一草稿記錄"""
+    try:
+        if not current_user.employee:
+            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+        
+        empno = current_user.employee.empno
+        
+        # 使用daily_no + sopno精確查找要更新的記錄
+        find_sql = text("""
+            SELECT DAILY_NO, PLANNO, SOPNO, SOP_DESC_C 
+            FROM jps.tdr_draft 
+            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno AND STATUS = 'A'
+        """)
+        
+        record_result = db.execute(find_sql, {
+            "daily_no": daily_no,
+            "sopno": sopno,
+            "empno": empno
+        }).fetchone()
+        
+        if not record_result:
+            raise HTTPException(status_code=404, detail=f"找不到daily_no {daily_no} + sopno {sopno} 的記錄")
+        
+        planno = record_result[1]
+        sop_desc_c = record_result[3]
+        
+        # 準備更新數據
+        content = update_data.get('content', '')
+        files = update_data.get('files', [])
+        files_json = json.dumps(files) if files else "[]"
+        
+        # 更新指定的記錄 - 使用daily_no + sopno確保精確性
+        update_sql = text("""
+            UPDATE jps.tdr_draft 
+            SET CONTENT = :content,
+                FILES = :files,
+                UPDATED_DATE = TO_CHAR(sysdate, 'YYYYMMDD'),
+                UPDATED_TIME = TO_CHAR(sysdate, 'HH24:MI:SS')
+            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno
+        """)
+        
+        db.execute(update_sql, {
+            "content": content,
+            "files": files_json,
+            "daily_no": daily_no,
+            "sopno": sopno,
+            "empno": empno
+        })
+        
+        db.commit()
+        
+        logger.info(f"成功更新記錄: daily_no={daily_no}, sopno={sopno}, empno={empno}")
+        
+        return {
+            "success": True,
+            "message": f"執行工作 {sop_desc_c} 記錄更新成功",
+            "data": {
+                "daily_no": daily_no,
+                "sopno": sopno,
+                "planno": planno,
+                "content": content,
+                "files": files
+            }
+        }
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating draft by sopno {sopno}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新記錄失敗: {str(e)}")

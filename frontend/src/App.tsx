@@ -13,11 +13,12 @@ import { useAuth } from "./contexts/AuthContext";
 import { useHasSubordinates } from "./hooks/useHasSubordinates";
 import { Toaster } from "react-hot-toast";
 
-interface EmployeeEditingStatus {
-  can_edit_records: boolean;
-  can_edit_reports: boolean;
-  can_submit_report: boolean;
+interface WritingStatus {
+  allowed: boolean;
   message: string;
+  current_date: string;
+  current_time: string;
+  next_available_time: string;
 }
 // --- Interface Definitions ---
 export interface Project {
@@ -58,6 +59,8 @@ export interface WorkRecordCreate {
   execution_time_minutes: number;
 }
 export interface ConsolidatedReport {
+  daily_no: string;  // 添加 daily_no 字段
+  sopno?: string;    // 添加 sopno 字段用於精確識別記錄
   project: Project;
   execution_work_name?: string;
   work_item_name?: string;
@@ -156,8 +159,7 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeInList | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
-  const [editingStatus, setEditingStatus] =
-    useState<EmployeeEditingStatus | null>(null);
+  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(null);
 
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
     setSelectedEmployee(employee);
@@ -175,51 +177,39 @@ function App() {
     // 主管評分完成後，跳轉回審閱列表
     setSelectedEmployee(null);
     setSelectedReportId(null);
-    // 刷新編輯狀態，因為主管審閱會影響員工的編輯權限
-    fetchEditingStatus();
+    // 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
+    fetchWritingStatus();
   };
 
-  const fetchEditingStatus = async () => {
+  const fetchWritingStatus = async () => {
     if (!authFetch || !user?.employee) return;
 
     try {
-      const response = await authFetch(
-        "/api/supervisor/employee-editing-status"
-      );
+      const response = await authFetch("/api/records/writing-status");
       if (response.ok) {
-        const status: EmployeeEditingStatus = await response.json();
-        setEditingStatus(status);
+        const status: WritingStatus = await response.json();
+        setWritingStatus(status);
       }
     } catch (error) {
-      console.error("獲取編輯狀態失敗:", error);
+      console.error("獲取寫入狀態失敗:", error);
     }
   };
 
   useEffect(() => {
     if (authFetch && user?.employee) {
-      fetchEditingStatus();
+      fetchWritingStatus();
     }
   }, [authFetch, user?.employee]);
 
-  // 當編輯狀態變化時，確保當前活動標籤是可用的
+  // 當寫入狀態變化時，確保當前活動標籤是可用的
   useEffect(() => {
-    if (editingStatus) {
-      // 如果當前在不可編輯的標籤，切換到可用標籤
-      if (activeTab === "input" && !editingStatus.can_edit_records) {
-        if (editingStatus.can_edit_reports) {
-          setActiveTab("daily");
-        } else {
-          setActiveTab("myreports");
-        }
-      } else if (activeTab === "daily" && !editingStatus.can_edit_reports) {
-        if (editingStatus.can_edit_records) {
-          setActiveTab("input");
-        } else {
-          setActiveTab("myreports");
-        }
+    if (writingStatus && !writingStatus.allowed) {
+      // 如果不允許寫入，且當前在編輯標籤，切換到我的日報
+      if (activeTab === "input" || activeTab === "daily") {
+        setActiveTab("myreports");
       }
     }
-  }, [editingStatus, activeTab]);
+  }, [writingStatus, activeTab]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -255,8 +245,8 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex space-x-1">
-                {/* 隨筆紀錄 */}
-                {editingStatus?.can_edit_records && (
+                {/* 隨筆紀錄 - 只有在允許寫入時才顯示 */}
+                {writingStatus?.allowed && (
                   <button
                     onClick={() => {
                       setActiveTab("input");
@@ -273,8 +263,8 @@ function App() {
                   </button>
                 )}
 
-                {/* 日報編輯 */}
-                {editingStatus?.can_edit_reports && (
+                {/* 日報編輯 - 只有在允許寫入時才顯示 */}
+                {writingStatus?.allowed && (
                   <button
                     onClick={() => {
                       setActiveTab("daily");
@@ -349,41 +339,33 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
-        {/* 顯示編輯狀態消息 */}
-        {editingStatus &&
-          !editingStatus.can_edit_records &&
-          !editingStatus.can_edit_reports && (
-            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-yellow-400"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
-                    {editingStatus.message}
-                  </p>
-                </div>
+        {/* 顯示寫入狀態消息 */}
+        {writingStatus && !writingStatus.allowed && (
+          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-yellow-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">{writingStatus.message}</p>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
         {/* 內容區域 */}
-        {activeTab === "input" && editingStatus?.can_edit_records && (
-          <DataInputTab />
-        )}
-        {activeTab === "daily" && editingStatus?.can_edit_reports && (
-          <DailyReportTab />
-        )}
+        {activeTab === "input" && writingStatus?.allowed && <DataInputTab />}
+        {activeTab === "daily" && writingStatus?.allowed && <DailyReportTab />}
         {activeTab === "myreports" && <MyReportsTab />}
 
         {/* 主管審閱區域 */}

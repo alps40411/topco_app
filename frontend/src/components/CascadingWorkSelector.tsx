@@ -14,6 +14,7 @@ interface CascadingWorkSelectorProps {
   onProjectChange: (projectId?: string) => void;
   onExecutionWorkChange: (executionWorkId?: string) => void;
   onWorkItemChange: (workItemId?: string[]) => void;
+  onWorkItemsAvailabilityChange?: (hasItems: boolean) => void;
   onServiceDataLoaded?: (
     serviceCompanies: Array<{ id: string; cocode: string; coabbv: string }>,
     serviceTargets: Array<{
@@ -36,6 +37,7 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
   onProjectChange,
   onExecutionWorkChange,
   onWorkItemChange,
+  onWorkItemsAvailabilityChange,
   onServiceDataLoaded,
   required = false,
   className = "",
@@ -128,10 +130,7 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
     }
   }, [
     user?.employee?.empno,
-    onServiceDataLoaded,
     isInitialized,
-    selectedProjectId,
-    onExecutionWorkChange,
   ]);
 
   // ===== 修改 #2: 依賴 selectedProjectId 的 useEffect =====
@@ -153,20 +152,21 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
     setCurrentExecutionWorks(executionWorks);
 
     // 當工作計畫改變時，自動選擇第一個執行工作，並清空工作項目
-    if (executionWorks.length > 0) {
+    if (executionWorks.length > 0 && !selectedExecutionWorkId) {
       const firstExecutionWork = executionWorks[0];
       onExecutionWorkChange(firstExecutionWork.sopno);
-    } else {
+    } else if (executionWorks.length === 0) {
       onExecutionWorkChange(undefined);
     }
     // 清空工作項目，讓下一個 effect 來處理
-    onWorkItemChange([]);
+    if (!selectedExecutionWorkId) {
+      onWorkItemChange([]);
+    }
   }, [
     selectedProjectId,
+    selectedExecutionWorkId,
     basicExecutionWorks,
     projectExecutionWorks,
-    onExecutionWorkChange,
-    onWorkItemChange, // 新增依賴
     isInitialized,
   ]);
 
@@ -181,12 +181,23 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
         (work) => String(work.sopno) === String(selectedExecutionWorkId)
       );
       if (selectedWork) {
-        setCurrentWorkItems(selectedWork.work_items || []);
+        const workItems = selectedWork.work_items || [];
+        setCurrentWorkItems(workItems);
+        // 通知父組件該執行工作是否有工作項目
+        if (onWorkItemsAvailabilityChange) {
+          onWorkItemsAvailabilityChange(workItems.length > 0);
+        }
       } else {
         setCurrentWorkItems([]);
+        if (onWorkItemsAvailabilityChange) {
+          onWorkItemsAvailabilityChange(false);
+        }
       }
     } else {
       setCurrentWorkItems([]);
+      if (onWorkItemsAvailabilityChange) {
+        onWorkItemsAvailabilityChange(false);
+      }
     }
   }, [selectedExecutionWorkId, currentExecutionWorks, isInitialized]);
 
@@ -319,8 +330,8 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
               .filter((seq): seq is string => !!seq); // 確保類型正確
             handleWorkItemChange(originalSeqs);
           }}
-          placeholder="暫無工作項目"
-          required={required}
+          placeholder={currentWorkItems.length === 0 ? "此執行工作無工作項目" : "暫無工作項目"}
+          required={required && currentWorkItems.length > 0}
         />
       )}
     </div>

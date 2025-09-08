@@ -1,6 +1,6 @@
 // frontend/src/components/DailyReportTab.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Upload,
   Edit,
@@ -54,7 +54,7 @@ const DailyReportTab: React.FC = () => {
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAllAi, setIsGeneratingAllAi] = useState(false);
-  const [generatingAiFor, setGeneratingAiFor] = useState<number | null>(null);
+  const [generatingAiFor, setGeneratingAiFor] = useState<Set<number>>(new Set());
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
@@ -70,6 +70,31 @@ const DailyReportTab: React.FC = () => {
   });
   const [isSavingNewRecord, setIsSavingNewRecord] = useState(false);
   const [isUploadingNewFile, setIsUploadingNewFile] = useState(false);
+
+  // 新增記錄的回調函數
+  const handleProjectChange = useCallback((projectId) => {
+    setNewRecord((prev) => ({
+      ...prev,
+      project_id: projectId,
+      execution_work_id: undefined,
+      work_item_id: undefined,
+    }));
+  }, []);
+
+  const handleExecutionWorkChange = useCallback((executionWorkId) => {
+    setNewRecord((prev) => ({
+      ...prev,
+      execution_work_id: executionWorkId,
+      work_item_id: undefined,
+    }));
+  }, []);
+
+  const handleWorkItemChange = useCallback((workItemId) => {
+    setNewRecord((prev) => ({
+      ...prev,
+      work_item_id: workItemId,
+    }));
+  }, []);
 
   const fetchReports = async () => {
     if (!authFetch) return;
@@ -127,7 +152,7 @@ const DailyReportTab: React.FC = () => {
 
   const handleEnhanceOne = async (projectId: number) => {
     if (!authFetch || !user?.employee?.empno) return;
-    setGeneratingAiFor(projectId);
+    setGeneratingAiFor(prev => new Set([...prev, projectId]));
     try {
       // 找到對應的報告
       const report = reports.find((r) => r.project.id === projectId);
@@ -135,10 +160,26 @@ const DailyReportTab: React.FC = () => {
         throw new Error("找不到對應的報告");
       }
 
-      // 生成唯一的 daily_no
-      // 使用新的 AI 潤飾 API - 直接更新 tdr_draft 表
+      // 調試：查看報告的實際結構
+      console.log("報告數據:", report);
+      console.log("daily_no:", report.daily_no);
+      console.log("projectId:", projectId);
+      console.log("report.project.id:", report.project.id);
+      
+      // 我們需要從報告中獲取 planno 和 daily_no
+      if (!report.daily_no) {
+        throw new Error(`找不到該專案的記錄ID。報告數據: ${JSON.stringify(report)}`);
+      }
+
+      // 使用sopno來精確識別要增強的記錄
+      if (!report.sopno) {
+        throw new Error("找不到執行工作編號，無法進行AI增強");
+      }
+
+      console.log(`準備調用API: /api/ai/enhance_one/${report.daily_no}/${report.sopno}`);
+
       const response = await authFetch(
-        `/api/records/ai/enhance_one/${projectId}`,
+        `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
         {
           method: "POST",
           headers: {
@@ -168,30 +209,80 @@ const DailyReportTab: React.FC = () => {
       console.error(error);
       toast.error(error.message || "AI 潤飾此專案時發生錯誤");
     } finally {
-      setGeneratingAiFor(null);
+      setGeneratingAiFor(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(projectId);
+        return newSet;
+      });
     }
   };
 
   const handleEnhanceAll = async () => {
     if (!authFetch) return;
     setIsGeneratingAllAi(true);
+    
+    // 立即顯示AI視圖並設置所有專案為生成中狀態
+    setIsAiViewActive(true);
+    const projectIds = reports.map(report => report.project.id);
+    
     try {
-      const response = await authFetch("/api/records/ai/enhance_all", {
-        method: "POST",
+      // 為每個專案依序調用單獨的AI增強API，以保持UI一致性
+      const enhancePromises = reports.map(async (report) => {
+        if (!report.sopno || !report.daily_no) {
+          console.warn(`跳過專案 ${report.project.plan_subj_c}: 缺少sopno或daily_no`);
+          return;
+        }
+        
+        try {
+          // 設置該專案為生成中狀態
+          setGeneratingAiFor(prev => new Set([...prev, report.project.id]));
+          
+          const response = await authFetch(
+            `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (response.ok) {
+            const enhancedReport = await response.json();
+            
+            // 更新該專案的AI內容
+            setReports((prev) =>
+              prev.map((r) =>
+                r.project.id === report.project.id
+                  ? { ...r, ai_content: enhancedReport.ai_content }
+                  : r
+              )
+            );
+          } else {
+            console.error(`專案 ${report.project.plan_subj_c} AI增強失敗`);
+          }
+        } catch (error) {
+          console.error(`專案 ${report.project.plan_subj_c} AI增強出錯:`, error);
+        } finally {
+          // 清除該專案的生成中狀態
+          setGeneratingAiFor(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(report.project.id);
+            return newSet;
+          });
+        }
       });
-      if (response.ok) {
-        const enhancedReports = await response.json();
-        setReports(enhancedReports);
-        setIsAiViewActive(true);
-        toast.success("所有報告皆已完成 AI 潤飾！");
-      } else {
-        throw new Error("AI 服務失敗");
-      }
+      
+      // 等待所有專案完成
+      await Promise.all(enhancePromises);
+      
+      toast.success("所有報告皆已完成 AI 潤飾！");
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message);
+      toast.error(error.message || "批量AI潤飾時發生錯誤");
     } finally {
       setIsGeneratingAllAi(false);
+      setGeneratingAiFor(new Set()); // 確保清除任何剩餘的生成狀態
     }
   };
 
@@ -222,12 +313,19 @@ const DailyReportTab: React.FC = () => {
       );
       if (!reportToUpdate) throw new Error("找不到原始報告");
 
+      // 使用sopno來精確識別要更新的記錄
+      if (!reportToUpdate.sopno) {
+        throw new Error("找不到執行工作編號，無法更新記錄");
+      }
+
       const response = await authFetch(
-        `/api/records/consolidated/${editingProjectId}`,
+        `/api/drafts/by-daily-sopno/${reportToUpdate.daily_no}/${reportToUpdate.sopno}`,
         {
           method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
-            ...reportToUpdate,
             content: editContent,
             files: editFiles,
           }),
@@ -385,26 +483,29 @@ const DailyReportTab: React.FC = () => {
 
   const handleSaveNewRecord = async () => {
     if (!authFetch) return;
-    if (!newRecord.project_id) {
-      toast.error("請選擇工作計劃");
-      return;
-    }
+    // 工作計畫現在為非必選項
+    // if (!newRecord.project_id) {
+    //   toast.error("請選擇工作計劃");
+    //   return;
+    // }
     if (!newRecord.execution_work_id) {
       toast.error("請選擇執行工作");
       return;
     }
-    if (!newRecord.work_item_id) {
-      toast.error("請選擇工作項目");
-      return;
-    }
-    if (!newRecord.service_company_id) {
-      toast.error("請選擇服務公司");
-      return;
-    }
-    if (!newRecord.service_target_id) {
-      toast.error("請選擇服務對象");
-      return;
-    }
+    // 工作項目現在根據執行工作是否有項目來決定是否必選
+    // if (!newRecord.work_item_id) {
+    //   toast.error("請選擇工作項目");
+    //   return;
+    // }
+    // 服務公司和服務對象現在為非必填項目
+    // if (!newRecord.service_company_id) {
+    //   toast.error("請選擇服務公司");
+    //   return;
+    // }
+    // if (!newRecord.service_target_id) {
+    //   toast.error("請選擇服務對象");
+    //   return;
+    // }
     if (
       !newRecord.content?.trim() &&
       (!newRecord.files || newRecord.files.length === 0)
@@ -421,21 +522,80 @@ const DailyReportTab: React.FC = () => {
     }
     setIsSavingNewRecord(true);
     try {
-      const response = await authFetch("/api/records/", {
-        method: "POST",
-        body: JSON.stringify({
-          project_id: newRecord.project_id,
-          execution_work_id: newRecord.execution_work_id,
-          work_item_id: newRecord.work_item_id,
-          service_company_id: newRecord.service_company_id,
-          service_target_id: newRecord.service_target_id,
-          content: newRecord.content,
+      // 保存到 tdr_draft 資料表
+      if (!user?.employee?.empno) {
+        toast.error("無法獲取用戶信息");
+        return;
+      }
+
+      // 檢查今天是否已經有暫存記錄，如果有就使用現有的 daily_no
+      let daily_no;
+      try {
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+        const existingDraftsResponse = await authFetch(
+          `/api/legacy/drafts/${user.employee.empno}?draft_type=TEMP`
+        );
+        if (existingDraftsResponse.ok) {
+          const existingDrafts = await existingDraftsResponse.json();
+          // 查找今天的暫存記錄
+          const todayDraft = existingDrafts.find(
+            (draft: any) => draft.doc_date === today
+          );
+          if (todayDraft) {
+            daily_no = todayDraft.daily_no;
+            console.log("使用現有的 daily_no:", daily_no);
+          }
+        }
+      } catch (error) {
+        console.warn("檢查現有暫存失敗:", error);
+      }
+
+      // 如果沒有找到現有的 daily_no，才取得新的
+      if (!daily_no) {
+        const dailyNoResponse = await authFetch("/api/legacy/next-daily-no");
+        const { daily_no: newDailyNo } = await dailyNoResponse.json();
+        daily_no = newDailyNo;
+        console.log("取得新的 daily_no:", daily_no);
+      }
+
+      // 準備暫存數據
+      const draftData = {
+        daily_no,
+        empno: user.employee.empno,
+        cocode: user.employee.cocode || "001", // 預設公司代碼
+        doc_date: new Date().toISOString().slice(0, 10).replace(/-/g, ""), // YYYYMMDD
+        draft_type: "TEMP",
+        draft_content: {
+          content: newRecord.content || "",
+          planno: newRecord.project_id,
+          plan_subj_c: undefined,
+          sopno: newRecord.execution_work_id,
+          sop_desc_c: undefined,
+          work_item_seq: newRecord.work_item_id || [],
+          work_item_name: undefined,
+          service_cocode: newRecord.service_company_id,
+          service_empno: newRecord.service_target_id,
+          service_empnamec: undefined,
+          service_deptno: undefined,
           files: newRecord.files || [],
-          execution_time_minutes: newRecord.execution_time_minutes,
-        }),
+          execution_time_minutes: newRecord.execution_time_minutes || 0,
+        },
+      };
+
+      // 保存暫存
+      const saveResponse = await authFetch("/api/legacy/drafts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(draftData),
       });
-      if (!response.ok) throw new Error("儲存新筆記失敗");
-      toast.success("新筆記儲存成功！");
+
+      if (!saveResponse.ok) {
+        throw new Error("保存暫存失敗");
+      }
+
+      await fetchReports(); // Re-fetch consolidated records
       setNewRecord({
         content: "",
         project_id: undefined,
@@ -447,10 +607,10 @@ const DailyReportTab: React.FC = () => {
         execution_time_minutes: 0,
       });
       setIsAddNoteModalOpen(false);
-      await fetchReports();
-    } catch (error: any) {
-      console.error("儲存新筆記時發生錯誤:", error);
-      toast.error(error.message);
+      toast.success("記錄儲存成功！");
+    } catch (error) {
+      console.error("儲存筆記時發生錯誤:", error);
+      toast.error("儲存失敗，請稍後再試。");
     } finally {
       setIsSavingNewRecord(false);
     }
@@ -465,6 +625,34 @@ const DailyReportTab: React.FC = () => {
 
   if (isLoading) {
     return <div className="p-6 text-center">載入中...</div>;
+  }
+
+  // 如果主管已審閱，顯示提示信息並禁止編輯
+  if (writingStatus && !writingStatus.allowed) {
+    return (
+      <div className="p-6">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="flex-shrink-0">
+                <svg className="h-12 w-12 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+              日報編輯已鎖定
+            </h3>
+            <p className="text-yellow-700 mb-4">
+              {writingStatus.message}
+            </p>
+            <p className="text-sm text-yellow-600">
+              當前時間: {writingStatus.current_time}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -487,7 +675,7 @@ const DailyReportTab: React.FC = () => {
           <div className="flex flex-row items-center gap-3">
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
-              disabled={editingProjectId !== null || generatingAiFor !== null}
+              disabled={editingProjectId !== null || generatingAiFor.size > 0}
               className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -500,7 +688,7 @@ const DailyReportTab: React.FC = () => {
                 isGeneratingAllAi ||
                 reports.length === 0 ||
                 editingProjectId !== null ||
-                generatingAiFor !== null
+                generatingAiFor.size > 0
               }
               className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300 flex-shrink-0"
             >
@@ -571,13 +759,13 @@ const DailyReportTab: React.FC = () => {
                         <button
                           onClick={() => handleEnhanceOne(report.project.id)}
                           disabled={
-                            generatingAiFor !== null ||
+                            generatingAiFor.size > 0 ||
                             isGeneratingAllAi ||
                             editingProjectId !== null
                           }
                           className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
                         >
-                          {generatingAiFor === report.project.id ? (
+                          {generatingAiFor.has(report.project.id) ? (
                             <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
                           ) : (
                             <Wand2 className="w-4 h-4 mr-2" />
@@ -587,7 +775,7 @@ const DailyReportTab: React.FC = () => {
                         <button
                           onClick={() => startEdit(report)}
                           disabled={
-                            generatingAiFor !== null || isGeneratingAllAi
+                            generatingAiFor.size > 0 || isGeneratingAllAi
                           }
                           className={`inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg ${
                             getProjectColors(report.project.plan_subj_c).button
@@ -672,7 +860,7 @@ const DailyReportTab: React.FC = () => {
                       <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
                     </div>
                   </div>
-                  {generatingAiFor === report.project.id ? (
+                  {generatingAiFor.has(report.project.id) ? (
                     <p className="text-sm text-gray-500 italic">
                       AI 正在為此專案生成潤飾內容...
                     </p>
@@ -742,28 +930,10 @@ const DailyReportTab: React.FC = () => {
                   selectedProjectId={newRecord.project_id}
                   selectedExecutionWorkId={newRecord.execution_work_id}
                   selectedWorkItemId={newRecord.work_item_id}
-                  onProjectChange={(projectId) =>
-                    setNewRecord({
-                      ...newRecord,
-                      project_id: projectId,
-                      execution_work_id: undefined,
-                      work_item_id: undefined,
-                    })
-                  }
-                  onExecutionWorkChange={(executionWorkId) =>
-                    setNewRecord({
-                      ...newRecord,
-                      execution_work_id: executionWorkId,
-                      work_item_id: undefined,
-                    })
-                  }
-                  onWorkItemChange={(workItemId) =>
-                    setNewRecord({
-                      ...newRecord,
-                      work_item_id: workItemId,
-                    })
-                  }
-                  required
+                  onProjectChange={handleProjectChange}
+                  onExecutionWorkChange={handleExecutionWorkChange}
+                  onWorkItemChange={handleWorkItemChange}
+                  required={false}
                 />
 
                 {/* 服務選擇器 */}
@@ -782,7 +952,7 @@ const DailyReportTab: React.FC = () => {
                       service_target_id: targetId,
                     })
                   }
-                  required
+                  required={false}
                 />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
