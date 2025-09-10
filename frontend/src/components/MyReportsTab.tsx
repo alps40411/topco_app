@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   MessageCircle,
   Star,
@@ -12,11 +10,10 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { getProjectColors } from "../utils/colorUtils";
 import type { DailyReport } from "../App";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import toast from "react-hot-toast";
 import EmployeeDetailTab from "./EmployeeDetailTab";
 import { formatMinutesToHours } from "../utils/timeUtils";
+import EnhancedDateSelector from "./EnhancedDateSelector";
 
 const MyReportsTab: React.FC = () => {
   const [reports, setReports] = useState<DailyReport[]>([]);
@@ -86,20 +83,9 @@ const MyReportsTab: React.FC = () => {
     fetchMyReports();
   }, [selectedDate]);
 
-  const changeDate = (offset: number) => {
-    setSelectedDate((prevDate) => {
-      if (!prevDate) return new Date();
-      const newDate = new Date(prevDate);
-      newDate.setDate(newDate.getDate() + offset);
-      return newDate;
-    });
-  };
-
-  const handleDateChange = (date: Date | null) => {
-    if (date) {
-      setSelectedDate(date);
-      setSelectedReport(null);
-    }
+  const handleDateChange = (date: Date) => {
+    setSelectedDate(date);
+    setSelectedReport(null);
   };
 
   const formatDate = (dateString: string) =>
@@ -132,44 +118,15 @@ const MyReportsTab: React.FC = () => {
   return (
     <div className="p-6">
       {/* 標題和日期選擇器 */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-900 h-8 flex items-center">
           我的日報
         </h2>
-        <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-1">
-          <button
-            onClick={() => changeDate(-1)}
-            className="p-2 rounded hover:bg-gray-100"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <DatePicker
-            selected={selectedDate}
-            onChange={handleDateChange}
-            dateFormat="yyyy / MM / dd"
-            className="text-center font-semibold text-gray-700 w-32 bg-transparent focus:outline-none"
-            customInput={
-              <button className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded">
-                <Calendar className="w-5 h-5 text-gray-500" />
-                <span>
-                  {selectedDate
-                    ? selectedDate.toLocaleDateString("zh-TW", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                      })
-                    : "選擇日期"}
-                </span>
-              </button>
-            }
-          />
-          <button
-            onClick={() => changeDate(1)}
-            className="p-2 rounded hover:bg-gray-100"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
+        <EnhancedDateSelector
+          selectedDate={selectedDate}
+          onChange={handleDateChange}
+          className="flex-shrink-0"
+        />
       </div>
 
       {/* 日報列表 */}

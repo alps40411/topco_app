@@ -4,16 +4,12 @@ import React, { useState, useEffect } from "react";
 import {
   Clock,
   CheckCircle,
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
   MessageCircle,
 } from "lucide-react";
 import type { DailyReport, EmployeeInList } from "../App";
 import { useAuth } from "../contexts/AuthContext";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
+import SupervisorDateBar from "./SupervisorDateBar";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];
@@ -101,19 +97,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     fetchReportsByDate();
   }, [selectedDate, authFetch]);
 
-  const changeDate = (offset: number) => {
-    setSelectedDate((prevDate) => {
-      if (!prevDate) return new Date();
-      const newDate = new Date(prevDate);
-      newDate.setDate(newDate.getDate() + offset);
-      return newDate;
-    });
-  };
-
-  const handleDateChange = (date: Date | null) => {
-    if (date) {
-      setSelectedDate(date);
-    }
+  const handleDateChange = (date: Date) => {
+    setSelectedDate(date);
   };
 
   if (isLoading) {
@@ -122,47 +107,16 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">日報審閱</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            預設顯示前一天的日報，因為員工填寫時間到隔天8:30截止
-          </p>
-        </div>
-        <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-1">
-          <button
-            onClick={() => changeDate(-1)}
-            className="p-2 rounded hover:bg-gray-100"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <DatePicker
-            selected={selectedDate}
-            onChange={handleDateChange} // Corrected handler
-            dateFormat="yyyy / MM / dd"
-            className="text-center font-semibold text-gray-700 w-32 bg-transparent focus:outline-none"
-            customInput={
-              <button className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded">
-                <Calendar className="w-5 h-5 text-gray-500" />
-                <span>
-                  {selectedDate
-                    ? selectedDate.toLocaleDateString("zh-TW", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                      })
-                    : "選擇日期"}
-                </span>
-              </button>
-            }
-          />
-          <button
-            onClick={() => changeDate(1)}
-            className="p-2 rounded hover:bg-gray-100"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">日報審閱</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          預設顯示前一天的日報，因為員工填寫時間到隔天8:30截止
+        </p>
+        <SupervisorDateBar
+          selectedDate={selectedDate}
+          onChange={handleDateChange}
+          className="w-full"
+        />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
