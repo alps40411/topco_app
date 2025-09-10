@@ -3,16 +3,38 @@
 import React, { useState, useEffect } from "react";
 import {
   Clock,
-  CheckCircle,
-  MessageCircle,
+  UserCheck,
+  User,
 } from "lucide-react";
 import type { DailyReport, EmployeeInList } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
 import SupervisorDateBar from "./SupervisorDateBar";
 
-interface ReportWithApprovals extends DailyReport {
-  approvals?: SupervisorApprovalInfo[];
+// 新的日報首頁數據結構
+interface HomepageReport {
+  id: number;
+  employee: {
+    id: number;
+    name: string;
+    department_no: string;
+    department_name: string;
+    company_code: string;
+  };
+  date: string;
+  status: "pending" | "reviewed";
+  emergency: string;
+  classify: string;
+  sop_desc_c: string;
+  reply_count: number;
+  my_ask: boolean;
+  other_ask: boolean;
+  is_forwarded: boolean;
+  attachments: string[];
+  customers: Array<{name: string; company: string} | null>;
+  last_update: string | null;
+  can_view_detail: boolean;  // 是否可以查看詳情
+  supervision_status: "pending" | "approved" | "no_permission";  // 主管審核狀態
 }
 
 interface EmployeeListTabProps {
@@ -22,10 +44,10 @@ interface EmployeeListTabProps {
 const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   onSelectEmployee,
 }) => {
-  const [reports, setReports] = useState<ReportWithApprovals[]>([]);
+  const [reports, setReports] = useState<HomepageReport[]>([]);
   const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // 主管審閱頁面預設顯示前一天的日報，因為當天的日報通常隔天才審閱
+  // 日報首頁預設顯示前一天的日報，因為當天的日報通常隔天才審閱
   const getDefaultDate = () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -46,59 +68,66 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   useEffect(() => {
     if (!selectedDate) return; // Don't fetch if date is null
 
-    const fetchReportsByDate = async () => {
+    const fetchHomepageReports = async () => {
       setIsLoading(true);
       // 確保使用本地日期，避免時區問題
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
       const day = String(selectedDate.getDate()).padStart(2, "0");
       const dateString = `${year}-${month}-${day}`;
-      console.log("Fetching reports for date:", dateString); // 除錯用
+      console.log("Fetching homepage reports for date:", dateString); // 除錯用
       try {
+        // 使用新的日報首頁API
         const response = await authFetch(
-          `/api/supervisor/reports-by-date?date=${dateString}`
+          `/api/supervisor/daily-homepage?date=${dateString}`
         );
         if (response.ok) {
-          const reportsData = await response.json();
-
-          // 為每個報告獲取審閱狀態
-          const reportsWithApprovals = await Promise.all(
-            reportsData.map(async (report: DailyReport) => {
-              try {
-                const approvalResponse = await authFetch(
-                  `/api/supervisor/reports/${report.id}/approvals`
-                );
-                if (approvalResponse.ok) {
-                  const approvals = await approvalResponse.json();
-                  // 確保 approvals 是數組
-                  return {
-                    ...report,
-                    approvals: Array.isArray(approvals) ? approvals : [],
-                  };
-                }
-              } catch (error) {
-                console.error(`無法獲取報告 ${report.id} 的審閱狀態:`, error);
-              }
-              return { ...report, approvals: [] };
-            })
-          );
-
-          setReports(reportsWithApprovals);
+          const homepageReports = await response.json();
+          setReports(homepageReports);
         } else {
           setReports([]);
         }
-      } catch {
-        console.error("無法獲取日報列表");
+      } catch (error) {
+        console.error("無法獲取日報首頁列表:", error);
         setReports([]);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchReportsByDate();
+    fetchHomepageReports();
   }, [selectedDate, authFetch]);
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
+  };
+
+  // 渲染主管審核狀態
+  const renderSupervisionStatus = (status: string) => {
+    switch (status) {
+      case "pending":
+        return (
+          <div className="flex items-center space-x-1 text-orange-600">
+            <Clock className="w-4 h-4" />
+            <span className="text-sm font-medium">待審核</span>
+          </div>
+        );
+      case "approved":
+        return (
+          <div className="flex items-center space-x-1 text-green-600">
+            <UserCheck className="w-4 h-4" />
+            <span className="text-sm font-medium">已審核</span>
+          </div>
+        );
+      case "no_permission":
+        return (
+          <div className="flex items-center space-x-1 text-gray-500">
+            <User className="w-4 h-4" />
+            <span className="text-sm font-medium">無須審核</span>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   if (isLoading) {
@@ -108,9 +137,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">日報審閱</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">日報首頁</h2>
         <p className="text-sm text-gray-600 mb-4">
-          預設顯示前一天的日報，因為員工填寫時間到隔天8:30截止
+          顯示您有權限查看的所有日報，預設顯示前一天的日報
         </p>
         <SupervisorDateBar
           selectedDate={selectedDate}
@@ -124,13 +153,13 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                員工姓名
+                員工資訊
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                狀態
+                審核狀態
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                留言
+                執行項目
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 操作
@@ -141,75 +170,45 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
             {reports.map((report) => (
               <tr key={report.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="text-sm font-medium text-gray-900">
-                      {report.employee.name || report.employee.empnamec}
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {report.employee.department_name ||
-                      report.employee.department_no}
+                  <div className="text-sm font-medium text-gray-900">
+                    {report.employee.name}
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  {(() => {
-                    const myApproval = report.approvals?.find(
-                      (approval) =>
-                        approval.supervisor_empno === currentUserEmpno
-                    );
-                    if (!myApproval || myApproval.status === "pending") {
-                      return (
-                        <div className="flex items-center space-x-1 text-orange-600">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm font-medium">待審閱</span>
-                        </div>
-                      );
-                    } else if (myApproval.status === "approved") {
-                      return (
-                        <div className="flex items-center space-x-1 text-green-600">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm font-medium">已審閱</span>
-                        </div>
-                      );
-                    } else {
-                      // Fallback for unexpected statuses, should ideally not happen with current backend logic
-                      return (
-                        <div className="flex items-center space-x-1 text-orange-600">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm font-medium">
-                            待審閱 (未知狀態)
-                          </span>
-                        </div>
-                      );
-                    }
-                  })()}
+                  {renderSupervisionStatus(report.supervision_status)}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex items-center space-x-1">
-                    <MessageCircle className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">
-                      {report.reply_count || 0} 則
-                    </span>
+                <td className="px-4 py-3">
+                  <div className="text-sm text-gray-900 max-w-xs">
+                    {report.sop_desc_c || "執行項目"}
+                    {report.emergency && (
+                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        緊急
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <button
-                    onClick={() =>
-                      onSelectEmployee(
-                        {
-                          id: report.employee.id,
-                          name: report.employee.name,
-                          department_name: report.employee.department_name,
-                          department_no: report.employee.department_no,
-                          pending_reports_count: 0,
-                        },
-                        report.id
-                      )
-                    }
-                    className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-                  >
-                    查看日報
-                  </button>
+                  {report.can_view_detail ? (
+                    <button
+                      onClick={() =>
+                        onSelectEmployee(
+                          {
+                            id: report.employee.id,
+                            name: report.employee.name,
+                            department_name: report.employee.department_name,
+                            department_no: report.employee.department_no,
+                            pending_reports_count: 0,
+                          },
+                          report.id
+                        )
+                      }
+                      className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                    >
+                      查看詳情
+                    </button>
+                  ) : (
+                    <span className="text-gray-400 text-sm">無權限</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -218,7 +217,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       </div>
       {reports.length === 0 && !isLoading && (
         <div className="text-center py-16 text-gray-500 bg-white border border-gray-200 rounded-lg">
-          <p>這天沒有任何人提交日報。</p>
+          <p>這天沒有任何相關的日報。</p>
         </div>
       )}
     </div>

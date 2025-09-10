@@ -45,6 +45,7 @@ class EmployeeForUser(BaseModel):
     dutyscript: Optional[str] = None  # 職稱
     deptabbv: Optional[str] = None    # 部門簡稱
     cocode: Optional[str] = None      # 公司代碼
+    deptno: Optional[str] = None      # 部門代碼
 
     class Config:
         from_attributes = True

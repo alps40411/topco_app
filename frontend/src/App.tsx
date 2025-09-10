@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Edit3, FileText, LogOut } from "lucide-react";
 import DataInputTab from "./components/DataInputTab";
 import DailyReportTab from "./components/DailyReportTab";
-import MyReportsTab from "./components/MyReportsTab";
+// import MyReportsTab from "./components/MyReportsTab"; // 已移除我的日報功能
 // import AIDailyReportTab from './components/AIDailyReportTab';
 // import ComprehensiveEditTab from './components/ComprehensiveEditTab';
 import EmployeeListTab from "./components/EmployeeListTab";
@@ -153,8 +153,8 @@ function App() {
   const { hasSubordinates, loading: subordinatesLoading } =
     useHasSubordinates();
   const [activeTab, setActiveTab] = useState<
-    "input" | "daily" | "myreports" | "supervisor" | "ai" | "comprehensive"
-  >("input"); // 預設為隨筆紀錄
+    "input" | "daily" | "supervisor" | "ai" | "comprehensive"
+  >("supervisor"); // 預設為日報首頁
 
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeInList | null>(null);
@@ -204,9 +204,9 @@ function App() {
   // 當寫入狀態變化時，確保當前活動標籤是可用的
   useEffect(() => {
     if (writingStatus && !writingStatus.allowed) {
-      // 如果不允許寫入，且當前在編輯標籤，切換到我的日報
+      // 如果不允許寫入，且當前在編輯標籤，切換到日報首頁
       if (activeTab === "input" || activeTab === "daily") {
-        setActiveTab("myreports");
+        setActiveTab("supervisor");
       }
     }
   }, [writingStatus, activeTab]);
@@ -281,39 +281,21 @@ function App() {
                   </button>
                 )}
 
-                {/* 我的日報 */}
+                {/* 日報首頁 (所有用戶都可見) */}
                 <button
                   onClick={() => {
-                    setActiveTab("myreports");
+                    setActiveTab("supervisor");
                     setSelectedEmployee(null);
                     setSelectedReportId(null);
                   }}
                   className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === "myreports"
+                    activeTab === "supervisor"
                       ? "bg-green-100 text-green-700"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
-                  我的日報
+                  日報首頁
                 </button>
-
-                {/* 日報審閱 (僅主管) */}
-                {!subordinatesLoading && hasSubordinates && (
-                  <button
-                    onClick={() => {
-                      setActiveTab("supervisor");
-                      setSelectedEmployee(null);
-                      setSelectedReportId(null);
-                    }}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      activeTab === "supervisor"
-                        ? "bg-green-100 text-green-700"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    日報審閱
-                  </button>
-                )}
               </div>
               <div className="flex items-center space-x-3">
                 <div className="text-right">
@@ -366,9 +348,8 @@ function App() {
         {/* 內容區域 */}
         {activeTab === "input" && writingStatus?.allowed && <DataInputTab />}
         {activeTab === "daily" && writingStatus?.allowed && <DailyReportTab />}
-        {activeTab === "myreports" && <MyReportsTab />}
 
-        {/* 主管審閱區域 */}
+        {/* 日報首頁區域 */}
         {activeTab === "supervisor" && !selectedEmployee && (
           <EmployeeListTab onSelectEmployee={handleSelectEmployee} />
         )}

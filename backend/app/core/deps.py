@@ -66,7 +66,8 @@ async def get_current_user(
             empnamec=user_row[1] or "",
             dutyscript=user_row[4] or "",    # dutyscript
             deptabbv=user_row[7] or "",      # deptabbv from join
-            cocode=user_row[2] or ""         # cocode
+            cocode=user_row[2] or "",      # cocode
+            deptno=user_row[3] or "",       # deptno
         )
     )
     
