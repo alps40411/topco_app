@@ -77,6 +77,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [showAISuggestions, setShowAISuggestions] = useState(false);
 
+  // 狀態：控制主管常用回覆是否展開
+  const [isSupervisorRepliesExpanded, setIsSupervisorRepliesExpanded] =
+    useState(false);
+
   const { authFetch, user } = useAuth();
 
   // This effect now correctly determines if the current user has reviewed
@@ -256,8 +260,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleSelectAISuggestion = (suggestion: AISuggestion) => {
     setReviewComment(suggestion.content);
-    // 不關閉 AI 建議，讓用戶可以繼續選擇其他建議
-    // setShowAISuggestions(false);
     toast.success(`已套用「${suggestion.title}」建議`);
   };
 
@@ -351,7 +353,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const flattenComments = (comments: Comment[]): Comment[] => {
-    // 確保 comments 是陣列
     if (!Array.isArray(comments)) {
       console.warn("comments is not an array:", comments);
       return [];
@@ -421,15 +422,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     "謝謝建議，我會改進",
   ];
 
-  // const supervisorSuggestedReplies = [
-  //   "工作內容詳實，執行效果良好，請繼續保持。",
-  //   "報告內容完整，建議在執行細節上可以更加具體。",
-  //   "工作進度符合預期，期待看到更多創新想法。",
-  //   "整體表現良好，建議加強時程管控。",
-  //   "請在下次日報中提供更多執行細節。",
-  //   "表現優秀，值得肯定。",
-  //   "請注意品質管控的細節。",
-  // ];
   const supervisorSuggestedReplies = [
     "Good Job !",
     "Go Ahead !",
@@ -513,7 +505,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </div>
                   </div>
 
-                  {/* 建議回復按鈕 - 主管版 */}
+                  {/* 建議回復區塊 */}
                   <div className="mb-3">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs text-blue-700">快速回復建議：</p>
@@ -536,10 +528,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5">
-                      {/* AI 建議按鈕 */}
-                      {showAISuggestions &&
-                        aiSuggestions.map((suggestion, index) => (
+                    {/* AI 建議 (垂直排列, Tag 樣式) */}
+                    {showAISuggestions && aiSuggestions.length > 0 && (
+                      <div className="flex flex-col items-start gap-2 mb-3">
+                        {aiSuggestions.map((suggestion, index) => (
                           <button
                             key={`ai-${index}`}
                             onClick={() => handleSelectAISuggestion(suggestion)}
@@ -553,29 +545,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             </span>
                           </button>
                         ))}
+                      </div>
+                    )}
 
-                      {/* 預設快速回覆按鈕 */}
-                      {supervisorSuggestedReplies.map((reply, index) => (
+                    {/* 主管常用回覆 (摺疊, 展開後水平排列) */}
+                    {!isSupervisorRepliesExpanded ? (
+                      <div className="flex flex-wrap gap-1.5">
                         <button
-                          key={`default-${index}`}
-                          onClick={() => setReviewComment(reply)}
-                          className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200 text-left max-w-full break-words whitespace-normal leading-snug"
+                          onClick={() => setIsSupervisorRepliesExpanded(true)}
+                          className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200"
                         >
-                          {reply}
+                          顯示常用回覆...
                         </button>
-                      ))}
-                    </div>
-
-                    {/* 收起AI建議的小按鈕 */}
-                    {showAISuggestions && aiSuggestions.length > 0 && (
-                      <button
-                        onClick={() => setShowAISuggestions(false)}
-                        className="mt-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                      >
-                        收起 AI 建議
-                      </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {supervisorSuggestedReplies.map((reply, index) => (
+                            <button
+                              key={`default-${index}`}
+                              onClick={() => setReviewComment(reply)}
+                              className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200"
+                            >
+                              {reply}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => setIsSupervisorRepliesExpanded(false)}
+                          className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          收起
+                        </button>
+                      </div>
                     )}
                   </div>
+
                   <textarea
                     value={reviewComment}
                     onChange={(e) => setReviewComment(e.target.value)}
