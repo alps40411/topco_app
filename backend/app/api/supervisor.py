@@ -786,7 +786,7 @@ async def get_daily_homepage_reports(
                 "status": "pending" if row[15] != 'Y' else "reviewed",  # reply_status
                 "emergency": row[4] or "",  # emergency
                 "classify": row[5] or "",  # classify
-                "sop_desc_c": row[14] or "",  # sop_desc_c
+                "sop_desc_c": row[15] or "",  # sop_desc_c
                 "reply_count": row[24] or 0,  # reply_count
                 "my_ask": row[26] == 'true',  # my_ask
                 "other_ask": row[27] == 'true',  # other_ask
