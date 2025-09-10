@@ -178,7 +178,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             );
             return totalExecutionTime > 0 ? (
               <span className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full font-medium border border-green-200">
-                總執行時間: {formatMinutesToHours(totalExecutionTime)}
+                總執行時間: {totalExecutionTime} 小時
               </span>
             ) : (
               <span className="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full font-medium border border-gray-200">
@@ -215,10 +215,8 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                   {projectReport.total_execution_time_minutes !== undefined &&
                   projectReport.total_execution_time_minutes > 0 ? (
                     <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
-                      執行時間:{" "}
-                      {formatMinutesToHours(
-                        projectReport.total_execution_time_minutes
-                      )}
+                      執行時間: {projectReport.total_execution_time_minutes}{" "}
+                      小時
                     </span>
                   ) : (
                     <span className="text-sm text-gray-400 bg-gray-50 px-2 py-1 rounded font-medium">

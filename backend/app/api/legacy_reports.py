@@ -1203,7 +1203,7 @@ async def upload_daily_report(
                     CUST_COMP_ABBV1, WORD_COUNT, ATT_FILE1, ATT_FILE2, openpath, openwebpage
                 ) VALUES (
                     :daily_no, :cocode, :empno, :deptno, :doc_date, NULL, 
-                    NULL, 0, :empno, :current_date, :current_time, 'N', :leader, :g_deptno, :empnamec, 
+                    NULL, 0, :empnamec, :current_date, :current_time, 'N', :leader, :g_deptno, :empnamec, 
                     :deptnamec, 'D', :empnamec, 'N', :sop_desc_c, NULL, 
                     NULL, :word_count, :att_file1, :att_file2, '/MyReport/', 'viewed.aspx'
                 )
@@ -1232,13 +1232,13 @@ async def upload_daily_report(
             INSERT INTO jps.tdr_detail1 (
                 DAILY_NO, DAILY_SUB_NOS, XUSER, XDATE, XTIME, CUNO1, COMP_SERNO1
             ) VALUES (
-                :daily_no, 1, :empno, :current_date, :current_time, NULL, NULL
+                :daily_no, 1, :empnamec, :current_date, :current_time, NULL, NULL
             )
         """)
         
         db.execute(insert_detail1_sql, {
             "daily_no": daily_no,
-            "empno": empno,
+            "empnamec": empnamec,
             "current_date": current_date,
             "current_time": current_time
         })
@@ -1291,7 +1291,7 @@ async def upload_daily_report(
                 "work_item_name": work_item_name,
                 "empnamec": empnamec,
                 "content": draft[14],  # CONTENT
-                "execution_time_minutes": draft[15],  # EXECUTION_TIME_MINUTES
+                "execution_time_minutes": draft[15]/60,  # EXECUTION_TIME_MINUTES
                 "service_cocode": draft[10],  # SERVICE_COCODE
                 "service_empno": draft[11],   # SERVICE_EMPNO
                 "service_deptno": draft[13],  # SERVICE_DEPTNO

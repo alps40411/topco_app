@@ -530,7 +530,7 @@ async def get_report_detail(
                 "content": detail_row[36] or "",  # memo - 工作內容
                 "execution_work_name": execution_work_name_c or detail_row[62] or f"執行工作 {detail_row[2] or ''}",  # 中文執行工作名稱
                 "work_item_name": work_item_display,  # 處理後的工作項目名稱
-                "total_execution_time_minutes": int(detail_row[6] or 0),  # exetime - 執行時間
+                "total_execution_time_minutes": float(detail_row[6] or 0),  # exetime - 執行時間
                 "daily_sub_nos": detail_row[1],  # daily_sub_nos
                 "prod_cate": detail_row[4] or "",  # prod_cate
                 "estimate": detail_row[7] or "",  # estimate

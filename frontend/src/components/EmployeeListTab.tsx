@@ -1,11 +1,7 @@
 // frontend/src/components/EmployeeListTab.tsx
 
 import React, { useState, useEffect } from "react";
-import {
-  Clock,
-  UserCheck,
-  User,
-} from "lucide-react";
+import { Clock, UserCheck, User } from "lucide-react";
 import type { DailyReport, EmployeeInList } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
@@ -31,10 +27,10 @@ interface HomepageReport {
   other_ask: boolean;
   is_forwarded: boolean;
   attachments: string[];
-  customers: Array<{name: string; company: string} | null>;
+  customers: Array<{ name: string; company: string } | null>;
   last_update: string | null;
-  can_view_detail: boolean;  // 是否可以查看詳情
-  supervision_status: "pending" | "approved" | "no_permission";  // 主管審核狀態
+  can_view_detail: boolean; // 是否可以查看詳情
+  supervision_status: "pending" | "approved" | "no_permission"; // 主管審核狀態
 }
 
 interface EmployeeListTabProps {
@@ -48,14 +44,15 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // 日報首頁預設顯示前一天的日報，因為當天的日報通常隔天才審閱
-  const getDefaultDate = () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday;
-  };
+  // const getDefaultDate = () => {
+  //   const yesterday = new Date();
+  //   yesterday.setDate(yesterday.getDate() - 1);
+  //   return yesterday;
+  // };
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(
-    getDefaultDate()
+    // getDefaultDate()
+    new Date()
   );
   const { authFetch, user } = useAuth();
 
