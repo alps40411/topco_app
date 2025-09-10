@@ -1,7 +1,15 @@
 // frontend/src/components/ChatInterface.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { User, Crown, MessageCircle, Sparkles, Loader2 } from "lucide-react";
+import {
+  User,
+  Crown,
+  MessageCircle,
+  Sparkles,
+  Loader2,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import ForwardSelector from "./ForwardSelector";
@@ -548,37 +556,55 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       </div>
                     )}
 
-                    {/* 主管常用回覆 (摺疊, 展開後水平排列) */}
-                    {!isSupervisorRepliesExpanded ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => setIsSupervisorRepliesExpanded(true)}
-                          className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200"
-                        >
-                          顯示常用回覆...
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex flex-wrap gap-1.5">
+                    {/* 主管常用回覆 (水平展開/收合) - NEW ANIMATION */}
+                    <div
+                      className="relative flex items-center"
+                      style={{ minHeight: "32px" }}
+                    >
+                      {/* The expanded content, positioned to appear when active */}
+                      <div
+                        className={`flex items-center transition-all duration-300 ease-in-out ${
+                          isSupervisorRepliesExpanded
+                            ? "opacity-100 transform scale-100"
+                            : "opacity-0 transform scale-95 pointer-events-none"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {supervisorSuggestedReplies.map((reply, index) => (
                             <button
                               key={`default-${index}`}
                               onClick={() => setReviewComment(reply)}
-                              className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200"
+                              className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200 whitespace-nowrap"
                             >
                               {reply}
                             </button>
                           ))}
                         </div>
+
+                        {/* Collapse button */}
                         <button
                           onClick={() => setIsSupervisorRepliesExpanded(false)}
-                          className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                          className="ml-2 flex flex-shrink-0 items-center px-2.5 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-full hover:bg-gray-200 transition-colors border border-gray-200 whitespace-nowrap"
                         >
-                          收起
+                          <ChevronLeft className="w-4 h-4" />
+                          <span className="hidden sm:inline ml-1">收起</span>
                         </button>
                       </div>
-                    )}
+
+                      {/* The "Expand" button, which disappears when content is shown */}
+                      <button
+                        onClick={() => setIsSupervisorRepliesExpanded(true)}
+                        className={`absolute top-0 left-0 flex items-center px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-all duration-300 ease-in-out border border-blue-200 ${
+                          isSupervisorRepliesExpanded
+                            ? "opacity-0 scale-95 pointer-events-none"
+                            : "opacity-100 scale-100"
+                        }`}
+                        aria-expanded={isSupervisorRepliesExpanded}
+                      >
+                        <span>常用回覆</span>
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </button>
+                    </div>
                   </div>
 
                   <textarea

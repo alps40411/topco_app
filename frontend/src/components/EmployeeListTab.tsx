@@ -98,6 +98,45 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     setSelectedDate(date);
   };
 
+  // 渲染回應狀態圖片 - 基於 reply_count 和 replier_count 判斷
+  const renderResponseStatus = (report: HomepageReport) => {
+    const replyCount = report.reply_count || 0;
+    const replierCount = report.replier_count || 0;
+    
+    if (replyCount === 0) {
+      // 沒有任何回應
+      return null;
+    } else if (replyCount === replierCount) {
+      // 只有自己回應 (reply_count = replier_count)
+      return <img src="/purple_heart.gif" alt="自己回應" className="w-6 h-6" />;
+    } else if (replierCount === 0) {
+      // 自己沒回應，只有別人回應 (replier_count = 0)
+      return <img src="/red_heart.gif" alt="有人回應" className="w-6 h-6" />;
+    } else if (replyCount > replierCount) {
+      // 都有回應 (reply_count > replier_count)
+      return <img src="/hearts.gif" alt="雙方回應" className="w-6 h-6" />;
+    }
+    
+    return null;
+  };
+
+  // 渲染內容欄位 - my_ask 和 other_ask 圖片
+  const renderContentStatus = (report: HomepageReport) => {
+    const hasMyAsk = report.my_ask;
+    const hasOtherAsk = report.other_ask;
+    
+    return (
+      <div className="flex items-center space-x-1">
+        {hasMyAsk && (
+          <img src="/my_ask.png" alt="我的提問" className="w-5 h-5" />
+        )}
+        {hasOtherAsk && (
+          <img src="/other_ask.png" alt="他人提問" className="w-5 h-5" />
+        )}
+      </div>
+    );
+  };
+
   // 渲染主管審核狀態
   const renderSupervisionStatus = (status: string) => {
     switch (status) {
@@ -149,44 +188,34 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                狀態
+              </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 員工資訊
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                審核狀態
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 執行項目
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                操作
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                內容
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {reports.map((report) => (
               <tr key={report.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-center">
+                  {renderResponseStatus(report)}
+                </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
                     {report.employee.name}
                   </div>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  {renderSupervisionStatus(report.supervision_status)}
-                </td>
                 <td className="px-4 py-3">
-                  <div className="text-sm text-gray-900 max-w-xs">
-                    {report.sop_desc_c || "執行項目"}
-                    {report.emergency && (
-                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        緊急
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
                   {report.can_view_detail ? (
-                    <button
+                    <div
                       onClick={() =>
                         onSelectEmployee(
                           {
@@ -199,13 +228,28 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                           report.id
                         )
                       }
-                      className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                      className="text-sm text-blue-600 hover:text-blue-900 max-w-xs cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
                     >
-                      查看詳情
-                    </button>
+                      {report.sop_desc_c || "執行項目"}
+                      {report.emergency && (
+                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          緊急
+                        </span>
+                      )}
+                    </div>
                   ) : (
-                    <span className="text-gray-400 text-sm">無權限</span>
+                    <div className="text-sm text-gray-400 max-w-xs p-2">
+                      {report.sop_desc_c || "執行項目"}
+                      {report.emergency && (
+                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          緊急
+                        </span>
+                      )}
+                    </div>
                   )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {renderContentStatus(report)}
                 </td>
               </tr>
             ))}

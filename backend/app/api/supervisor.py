@@ -187,6 +187,15 @@ async def create_daily_report_reply(
         if not current_user.employee:
             raise HTTPException(status_code=404, detail="該用戶不是員工")
         
+        # 定義罐頭回覆列表
+        GENERAL_COMMENTS = [
+            "Good Job !",
+            "Go Ahead !",
+            "Well Done & Thanks !",
+            "內容過於簡單 !",
+            "瞭解 !",
+        ]
+        
         # 取得 legacy 資料庫連接
         legacy_db_gen = get_legacy_db()
         legacy_db = next(legacy_db_gen)
@@ -218,7 +227,32 @@ async def create_daily_report_reply(
             "empnamec": current_user.employee.empnamec or current_user.name
         })
         
-        # 3. 更新已回應狀態
+        # 3. 檢查是否為特殊留言（非罐頭回覆）
+        reply_content = reply_data.get("content", "")
+        if reply_content and reply_content not in GENERAL_COMMENTS:
+            # 查詢日報的 doc_date
+            doc_date_sql = text("""
+                SELECT doc_date FROM jps.tdr_master WHERE daily_no = :daily_no
+            """)
+            doc_date_result = legacy_db.execute(doc_date_sql, {"daily_no": daily_no})
+            doc_date_row = doc_date_result.fetchone()
+            
+            if doc_date_row:
+                doc_date = doc_date_row[0]
+                
+                # 插入特殊留言記錄
+                insert_special_comment_sql = text("""
+                    INSERT INTO jps.TDR_REPLY_SPECIAL_COMMENT 
+                    (DAILY_NO, DOC_DATE, EMPNO, UPDATETIME)
+                    VALUES (:daily_no, :doc_date, :empno, CURRENT_TIMESTAMP)
+                """)
+                legacy_db.execute(insert_special_comment_sql, {
+                    "daily_no": daily_no,
+                    "doc_date": doc_date,
+                    "empno": current_user.employee.empno
+                })
+
+        # 4. 更新已回應狀態
         update_reply_status_sql = text("""
             UPDATE jps.tdr_master SET reply_status = 'Y' 
             WHERE daily_no = :daily_no
@@ -787,18 +821,19 @@ async def get_daily_homepage_reports(
                 "emergency": row[4] or "",  # emergency
                 "classify": row[5] or "",  # classify
                 "sop_desc_c": row[15] or "",  # sop_desc_c
-                "reply_count": row[24] or 0,  # reply_count
-                "my_ask": row[26] == 'true',  # my_ask
-                "other_ask": row[27] == 'true',  # other_ask
-                "is_forwarded": row[28] == 'true',  # isForwarded
+                "reply_count": row[25] or 0,  # reply_count
+                "replier_count": row[26] or 0,  # replier_count"
+                "my_ask": row[27] == 'true',  # my_ask
+                "other_ask": row[28] == 'true',  # other_ask
+                "is_forwarded": row[29] == 'true',  # isForwarded
                 "attachments": [f for f in [row[6], row[7], row[8]] if f],  # att_file1-3
                 "customers": [
                     {"name": row[9], "company": row[12]} if row[9] else None,  # cust_ename1, cust_comp_abbv1
                     {"name": row[10], "company": row[13]} if row[10] else None,  # cust_ename2, cust_comp_abbv2
                     {"name": row[11], "company": row[14]} if row[11] else None,  # cust_ename3, cust_comp_abbv3
                 ],
-                "last_update": row[29] if row[29] else None,  # LASTDATETIME
-                
+                "last_update": row[30] if row[30] else None,  # LASTDATETIME
+
                 # 新增字段 - 權限相關
                 "can_view_detail": False,  # 稍後會通過權限檢查更新
                 "supervision_status": "no_permission"  # pending, approved, no_permission

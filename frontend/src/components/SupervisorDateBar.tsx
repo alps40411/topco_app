@@ -140,12 +140,16 @@ const SupervisorDateBar: React.FC<SupervisorDateBarProps> = ({
                       onClick={() => handleDateClick(dateInfo.dateString)}
                       className={`
                         min-w-[32px] h-8 text-sm rounded border transition-colors font-medium
-                        ${dateInfo.isSaturday ? "text-[#C3D600]" : ""}
-                        ${dateInfo.isSunday ? "text-[#FF0000]" : ""}
                         ${
                           isSelected(dateInfo.dateString)
                             ? "bg-gray-500 text-white border-gray-500"
-                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                            : `bg-white border-gray-300 hover:bg-gray-100 ${
+                                dateInfo.isSaturday
+                                  ? "text-[#C3D600]"
+                                  : dateInfo.isSunday
+                                  ? "text-[#FF0000]"
+                                  : "text-gray-700"
+                              }`
                         }
                       `}
                     >
@@ -172,12 +176,16 @@ const SupervisorDateBar: React.FC<SupervisorDateBarProps> = ({
                       onClick={() => handleDateClick(dateInfo.dateString)}
                       className={`
                         min-w-[32px] h-8 text-sm rounded border transition-colors font-medium
-                        ${dateInfo.isSaturday ? "text-[#C3D600]" : ""}
-                        ${dateInfo.isSunday ? "text-[#FF0000]" : ""}
                         ${
                           isSelected(dateInfo.dateString)
                             ? "bg-gray-400 text-white border-gray-400"
-                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+                            : `bg-white border-gray-300 hover:bg-gray-100 ${
+                                dateInfo.isSaturday
+                                  ? "text-[#C3D600]"
+                                  : dateInfo.isSunday
+                                  ? "text-[#FF0000]"
+                                  : "text-gray-700"
+                              }`
                         }
                       `}
                     >
