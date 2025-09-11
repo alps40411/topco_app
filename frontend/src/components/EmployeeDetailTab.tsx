@@ -9,6 +9,7 @@ import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ChatInterface from "./ChatInterface";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
 import { formatMinutesToHours } from "../utils/timeUtils";
+import ForwardSelector from "./ForwardSelector";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];
@@ -29,6 +30,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
     null
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>([]);
   const { authFetch } = useAuth();
 
   const fetchReportDetails = useCallback(async () => {
@@ -235,7 +237,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       </div>
 
       {/* 下方 - 對話區域 */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
         <ChatInterface
           reportId={reportDetail.id}
           reportOwnerId={reportDetail.employee.id}
@@ -244,6 +246,16 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           approvals={reportDetail.approvals || []}
           onReviewSubmitted={fetchReportDetails}
           onReviewCompleted={onReviewCompleted}
+          selectedForwardUsers={selectedForwardUsers}
+          onForwardUsersChange={setSelectedForwardUsers}
+        />
+      </div>
+
+      {/* 轉寄功能區塊 - 在頁面底部 */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <ForwardSelector
+          selectedForwardUsers={selectedForwardUsers}
+          onForwardUsersChange={setSelectedForwardUsers}
         />
       </div>
     </div>

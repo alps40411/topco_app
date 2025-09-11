@@ -5,24 +5,18 @@ import { ChevronDown, ChevronUp, Forward, Users } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 
-interface Visor {
+interface ForwardCandidate {
   empno: string;
   empname: string;
-}
-
-interface Employee {
-  empno: string;
-  empname: string;
-  cocode: string;
-  deptno: string;
-  duty: string;
-  dclass: string;
-  adm_rank: string;
+  type: "title" | "department";
+  cocode?: string;
+  deptabbv?: string;
+  dutyscript?: string;
 }
 
 interface ForwardData {
-  visors: Visor[];
-  employees: Record<string, Record<string, Employee[]>>;
+  user_adm_rank: number;
+  candidates: ForwardCandidate[];
 }
 
 interface ForwardSelectorProps {
@@ -37,45 +31,31 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
   className = "",
 }) => {
   const [forwardData, setForwardData] = useState<ForwardData | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"visors" | "employees">("visors");
-  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const { authFetch } = useAuth();
+
+  useEffect(() => {
+    loadForwardData();
+  }, []);
 
   const loadForwardData = async () => {
     if (forwardData) return; // 已載入過就不重複載入
     
     setIsLoading(true);
     try {
-      const [visorsResponse, employeesResponse] = await Promise.all([
-        authFetch("/api/forward/visors"),
-        authFetch("/api/forward/employees")
-      ]);
+      const response = await authFetch("/api/supervisor/forward/candidates");
 
-      if (!visorsResponse.ok || !employeesResponse.ok) {
+      if (!response.ok) {
         throw new Error("無法載入轉寄名單");
       }
 
-      const visorsData = await visorsResponse.json();
-      const employeesData = await employeesResponse.json();
-
-      setForwardData({
-        visors: visorsData.data || [],
-        employees: employeesData.data || {}
-      });
+      const data = await response.json();
+      setForwardData(data);
     } catch (error) {
       console.error("載入轉寄名單失敗:", error);
       toast.error("載入轉寄名單失敗");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleToggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-    if (!isExpanded && !forwardData) {
-      loadForwardData();
     }
   };
 
@@ -87,186 +67,122 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
     onForwardUsersChange(newSelectedUsers);
   };
 
-  const handleToggleCompany = (coabbv: string) => {
-    const newExpanded = new Set(expandedCompanies);
-    if (newExpanded.has(coabbv)) {
-      newExpanded.delete(coabbv);
-    } else {
-      newExpanded.add(coabbv);
-    }
-    setExpandedCompanies(newExpanded);
-  };
-
   const clearAllSelections = () => {
     onForwardUsersChange([]);
   };
 
   const selectedCount = selectedForwardUsers.length;
+  const selectedNames = forwardData?.candidates
+    .filter(c => selectedForwardUsers.includes(c.empno))
+    .map(c => c.empname) || [];
+  
+  const titleCandidates = forwardData?.candidates.filter(c => c.type === "title") || [];
+  const deptCandidates = forwardData?.candidates.filter(c => c.type === "department") || [];
 
   return (
     <div className={`border border-blue-300 rounded-lg bg-blue-25 ${className}`}>
-      <div 
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-blue-100 transition-colors"
-        onClick={handleToggleExpanded}
-      >
-        <div className="flex items-center space-x-2">
-          <Forward className="w-4 h-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-800">
-            轉寄給其他主管
-          </span>
-          {selectedCount > 0 && (
-            <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
-              已選 {selectedCount} 人
+      {/* 標題區塊 */}
+      <div className="p-4 border-b border-blue-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Forward className="w-5 h-5 text-blue-600" />
+            <span className="text-lg font-medium text-blue-800">
+              轉寄給其他主管
             </span>
-          )}
+          </div>
+          <div className="flex items-center space-x-2">
+            {selectedCount > 0 && (
+              <>
+                <span className="text-sm text-blue-800">
+                  已選擇: {selectedNames.join(', ')}
+                </span>
+                <button
+                  onClick={clearAllSelections}
+                  className="text-sm text-red-600 hover:text-red-800 underline"
+                >
+                  清除全選
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-blue-600" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-blue-600" />
-        )}
       </div>
 
-      {isExpanded && (
-        <div className="border-t border-blue-200 bg-blue-50">
-          {isLoading ? (
-            <div className="p-4 text-center text-blue-600">載入轉寄名單中...</div>
-          ) : forwardData ? (
-            <>
-              {/* 標籤切換 */}
-              <div className="flex border-b border-blue-200">
-                <button
-                  onClick={() => setActiveTab("visors")}
-                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === "visors"
-                      ? "bg-blue-500 text-white"
-                      : "text-blue-700 hover:bg-blue-100"
-                  }`}
-                >
-                  職稱列表
-                </button>
-                <button
-                  onClick={() => setActiveTab("employees")}
-                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === "employees"
-                      ? "bg-blue-500 text-white"
-                      : "text-blue-700 hover:bg-blue-100"
-                  }`}
-                >
-                  部門員工
-                </button>
+      {/* 內容區塊 - 始終顯示 */}
+      <div className="p-4">
+        {isLoading ? (
+          <div className="text-center text-blue-600 py-8">載入轉寄名單中...</div>
+        ) : forwardData ? (
+          <>
+            {/* 職稱轉寄區塊 */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-blue-800 mb-3 flex items-center">
+                <Forward className="w-4 h-4 mr-2" />
+                職稱轉寄
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                {titleCandidates.map((candidate) => (
+                  <label
+                    key={candidate.empno}
+                    className="flex items-center space-x-2 p-2 hover:bg-blue-100 rounded cursor-pointer text-sm border border-blue-200"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedForwardUsers.includes(candidate.empno)}
+                      onChange={() => handleToggleUser(candidate.empno)}
+                      className="text-blue-600 focus:ring-blue-500 h-4 w-4"
+                    />
+                    <span className="text-blue-800 truncate">
+                      {candidate.empname}
+                    </span>
+                  </label>
+                ))}
               </div>
+              {titleCandidates.length === 0 && (
+                <div className="text-sm text-gray-500 text-center py-4">
+                  暫無職稱資料
+                </div>
+              )}
+            </div>
 
-              <div className="p-3">
-                {selectedCount > 0 && (
-                  <div className="mb-3 flex justify-between items-center">
-                    <span className="text-xs text-blue-700">已選擇 {selectedCount} 人</span>
-                    <button
-                      onClick={clearAllSelections}
-                      className="text-xs text-red-600 hover:text-red-800 underline"
+            {/* 部門轉寄區塊 - 只有高管才顯示 */}
+            {forwardData.user_adm_rank <= 5 && deptCandidates.length > 0 && (
+              <div>
+                <h4 className="text-md font-medium text-blue-800 mb-3 flex items-center">
+                  <Users className="w-4 h-4 mr-2" />
+                  部門轉寄 
+                  <span className="text-sm text-blue-600 ml-2">(管理階層專用)</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                  {deptCandidates.map((candidate) => (
+                    <label
+                      key={candidate.empno}
+                      className="flex items-start space-x-2 p-3 hover:bg-blue-100 rounded cursor-pointer text-sm border border-blue-200"
                     >
-                      清除全選
-                    </button>
-                  </div>
-                )}
-
-                <div className="max-h-64 overflow-y-auto">
-                  {activeTab === "visors" ? (
-                    <div className="space-y-1">
-                      {forwardData.visors.map((visor) => (
-                        <label
-                          key={visor.empno}
-                          className="flex items-center space-x-2 p-2 hover:bg-blue-100 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedForwardUsers.includes(visor.empno)}
-                            onChange={() => handleToggleUser(visor.empno)}
-                            className="text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-blue-800">
-                            {visor.empname} ({visor.empno})
-                          </span>
-                        </label>
-                      ))}
-                      {forwardData.visors.length === 0 && (
-                        <div className="text-sm text-gray-500 text-center py-4">
-                          暫無職稱資料
+                      <input
+                        type="checkbox"
+                        checked={selectedForwardUsers.includes(candidate.empno)}
+                        onChange={() => handleToggleUser(candidate.empno)}
+                        className="text-blue-600 focus:ring-blue-500 h-4 w-4 mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-blue-800 truncate">
+                          {candidate.empname}
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {Object.entries(forwardData.employees).map(([coabbv, departments]) => (
-                        <div key={coabbv} className="border border-blue-200 rounded">
-                          <div
-                            className="flex items-center justify-between p-2 bg-blue-100 cursor-pointer"
-                            onClick={() => handleToggleCompany(coabbv)}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <Users className="w-4 h-4 text-blue-600" />
-                              <span className="text-sm font-medium text-blue-800">
-                                {coabbv}
-                              </span>
-                            </div>
-                            {expandedCompanies.has(coabbv) ? (
-                              <ChevronUp className="w-4 h-4 text-blue-600" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-blue-600" />
-                            )}
-                          </div>
-
-                          {expandedCompanies.has(coabbv) && (
-                            <div className="p-2 space-y-2">
-                              {Object.entries(departments).map(([deptabbv, employees]) => (
-                                <div key={deptabbv} className="border-l-2 border-blue-300 pl-2">
-                                  <div className="text-xs font-medium text-blue-700 mb-1">
-                                    {deptabbv}
-                                  </div>
-                                  <div className="space-y-1">
-                                    {employees.map((employee) => (
-                                      <label
-                                        key={employee.empno}
-                                        className="flex items-center space-x-2 p-1 hover:bg-blue-50 rounded cursor-pointer"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedForwardUsers.includes(employee.empno)}
-                                          onChange={() => handleToggleUser(employee.empno)}
-                                          className="text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span className="text-xs text-blue-800">
-                                          {employee.empname} ({employee.empno})
-                                          {employee.duty && (
-                                            <span className="text-gray-500 ml-1">
-                                              - {employee.duty}
-                                            </span>
-                                          )}
-                                        </span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        <div className="text-blue-600 truncate text-xs">
+                          {candidate.deptabbv} - {candidate.dutyscript}
                         </div>
-                      ))}
-                      {Object.keys(forwardData.employees).length === 0 && (
-                        <div className="text-sm text-gray-500 text-center py-4">
-                          暫無員工資料
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="p-4 text-center text-red-600">載入轉寄名單失敗</div>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        ) : (
+          <div className="text-center text-red-600 py-8">載入轉寄名單失敗</div>
+        )}
+      </div>
     </div>
   );
 };

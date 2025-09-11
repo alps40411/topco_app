@@ -318,96 +318,140 @@ async def create_daily_report_score(
         legacy_db.rollback()
         raise HTTPException(status_code=500, detail="建立日報評分失敗")
 
-@router.get("/forward/titles")
-async def get_forward_title_candidates(
+@router.get("/forward/candidates")
+async def get_forward_candidates(
     current_user: User = Depends(get_current_user)
 ):
-    """取得職稱轉寄名單 - 使用 JPS Legacy 資料庫"""
+    """取得轉寄名單 - 根據用戶 adm_rank 權限決定"""
     try:
         if not current_user.employee:
             raise HTTPException(status_code=404, detail="該用戶不是員工")
 
         db = next(get_legacy_db())
-        sql = text("""
-            SELECT a.empno, a.empname
-            FROM jps.tdr_forward_visor a 
-            LEFT JOIN jps.dcd003$master b ON a.empno = b.empno
-            WHERE (b.quitdate IS NULL)
-              AND (b.right_stop_date IS NULL OR b.right_stop_date > TO_CHAR(sysdate, 'YYYYMMDD'))
-              AND b.cocode IN (SELECT cocode FROM jps.dcd001$master WHERE eip_active = 'Y')
-            ORDER BY a.sorting
+        
+        # 查詢當前用戶的 adm_rank
+        user_rank_sql = text("""
+            SELECT adm_rank FROM jps.dcd003$master 
+            WHERE empno = :empno AND cocode = :cocode
         """)
-        rows = db.execute(sql).fetchall()
-        return [{"empno": r[0], "empname": r[1]} for r in rows]
-    except Exception as e:
-        logger.error(f"Error get_forward_title_candidates: {e}")
-        raise HTTPException(status_code=500, detail="取得職稱轉寄名單失敗")
-
-@router.get("/forward/departments")
-async def get_forward_department_candidates(
-    current_user: User = Depends(get_current_user)
-):
-    """取得部門轉寄名單 - 使用 JPS Legacy 資料庫"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=404, detail="該用戶不是員工")
-
-        db = next(get_legacy_db())
-        sql = text("""
-            SELECT 
-                empno,
-                empname,
-                deptno,
-                deptname,
-                dutyname,
-                adm_rank,
-                g_deptno,
-                dclass,
-                sort_order
-            FROM (
-                SELECT 
-                    a.empno,
-                    b.empnamec AS empname,
-                    b.deptno,
-                    c.deptabbv AS deptname,
-                    e.dutyname,
-                    b.adm_rank,
-                    (CASE 
-                        WHEN c.g_deptno IS NOT NULL THEN c.g_deptno
-                        ELSE b.deptno
-                    END) AS g_deptno,
-                    b.dclass,
-                    g.sort_order
-                FROM jps.tdr_forwardlist a
-                JOIN jps.dcd003$master b ON a.cocode = b.cocode AND a.empno = b.empno
-                JOIN jps.dcd002$master c ON a.cocode = c.cocode AND b.deptno = c.deptno
-                JOIN jps.dcd001$master d ON a.cocode = d.cocode
-                LEFT JOIN jps.dcd004$master e ON a.cocode = e.cocode AND b.dutyno = e.dutyno AND e.ducode = 'O'
-                LEFT JOIN jps.tdr_forward_duty f ON e.dutyname = f.dutyname
-                LEFT JOIN jps.tdr_forward_dept_sort g ON d.cocode = g.cocode AND c.g_deptno = g.deptno
-                WHERE b.quitdate IS NULL
-                  AND (b.right_stop_date IS NULL OR b.right_stop_date > TO_CHAR(sysdate, 'YYYYMMDD'))
-            ) t
-            ORDER BY t.g_deptno, t.sort_order, t.empno
+        rank_result = db.execute(user_rank_sql, {
+            "empno": current_user.employee.empno,
+            "cocode": current_user.employee.cocode
+        })
+        rank_row = rank_result.fetchone()
+        
+        if not rank_row:
+            raise HTTPException(status_code=404, detail="找不到用戶資料")
+        
+        adm_rank = int(rank_row[0]) if rank_row[0] else 99
+        candidates = []
+        
+        # 基礎職稱轉寄名單（所有人都能用）
+        title_sql = text("""
+            SELECT a.empno, a.empname, 'title' AS type
+            FROM tdr_forward_visor a 
+            left join dcd003$master b on a.empno = b.empno and b.estatus<> '3' 
+            and (b.RIGHT_STOP_DATE is not null AND b.RIGHT_STOP_DATE <= TO_CHAR(sysdate, 'yyyyMMdd')) and cocode in (select cocode from dcd001$master where eip_active = 'Y') ORDER BY a.sorting
         """)
-        rows = db.execute(sql).fetchall()
-        return [
-            {
-                "empno": r[0],
-                "empname": r[1],
-                "deptno": r[2],
-                "deptname": r[3],
-                "dutyname": r[4],
-                "adm_rank": r[5],
-                "g_deptno": r[6],
-                "dclass": r[7],
-                "sort_order": r[8]
-            }
-            for r in rows
-        ]
+        title_rows = db.execute(title_sql).fetchall()
+        candidates.extend([{"empno": r[0], "empname": r[1], "type": r[2]} for r in title_rows])
+        
+        # 如果 adm_rank <= 5，增加部門轉寄選項
+        if adm_rank <= 5:
+            dept_sql = text("""
+                SELECT t.*,
+                    (CASE
+                        WHEN t.cocode = 'G' THEN 'ZG'
+                        WHEN t.cocode = 'G01' THEN 'ZG01'
+                        WHEN t.cocode = 'J09' THEN 'J009'
+                        ELSE t.cocode
+                    END) AS sort_cocode,
+                    (CASE
+                        WHEN sort_order IS NULL THEN '99999'
+                        ELSE sort_order
+                    END) AS sort_customize,
+                    (CASE
+                        WHEN t.cocode = 'H' AND g_deptno = '00A00' THEN '0'
+                        WHEN t.cocode = 'J07' AND g_deptno = '00010' THEN '0'
+                        WHEN t.cocode = 'J10' AND g_deptno = '00010' THEN '0'
+                        WHEN t.cocode = 'J17' AND g_deptno = '03000' THEN '0'
+                        WHEN t.cocode = 'M' AND g_deptno = '00000' THEN '0'
+                        WHEN t.cocode = 'P' AND g_deptno = '00010' THEN '0'
+                        WHEN t.cocode = 'T' AND g_deptno = 'S0000' THEN '0'
+                        WHEN t.cocode = 'X' AND g_deptno = '05000' THEN '0'
+                        ELSE '1'
+                    END) AS sort_gmDept,
+                    (CASE
+                        WHEN t.sbu = 1 AND t.cocode = 'T' THEN SUBSTR(t.g_deptno, 1, 3) || '00'
+                        WHEN t.sbu = 1 AND t.cocode = 'A' AND SUBSTR(t.g_deptno, 1, 2) = '00' THEN '99' || SUBSTR(t.g_deptno, 3, 3)
+                        WHEN t.sbu = 1 AND t.cocode = 'A' THEN SUBSTR(t.g_deptno, 1, 2) || '000'
+                        WHEN t.sbu = 2 AND t.cocode = 'A' AND t.g_deptno = '00521' THEN t.g_deptno
+                        WHEN t.sbu = 2 AND t.cocode = 'A' AND (
+                            t.g_deptno NOT LIKE '00G7%' AND t.g_deptno NOT LIKE '00G1%' AND 
+                            t.g_deptno NOT LIKE '00G3%' AND t.g_deptno NOT LIKE '00B4%'
+                        ) THEN SUBSTR(t.g_deptno, 1, 4) || '0'
+                        ELSE t.g_deptno
+                    END) AS g_deptno1
+                FROM (
+                    SELECT
+                        (CASE
+                            WHEN b.cocode = '003' AND (b.deptno = '00000' OR b.deptno = '00281') THEN 'A'
+                            WHEN b.practice_cocode IS NULL THEN b.cocode
+                            WHEN b.practice_cocode <> b.cocode THEN b.cocode
+                            ELSE b.practice_cocode
+                        END) AS cocode,
+                        a.empno, b.empnamec,
+                        (CASE
+                            WHEN b.practice_cocode IS NULL THEN b.deptno
+                            WHEN b.practice_cocode <> b.cocode THEN b.deptno
+                            ELSE b.practice_deptno
+                        END) AS deptno,
+                        (CASE
+                            WHEN f.duty IS NULL THEN '其他'
+                            ELSE f.duty
+                        END) AS dutyscript,
+                        c.sbu, d.coabbv,
+                        (CASE
+                            WHEN c.sbu = 2 AND c.cocode = 'A' AND c.g_deptno LIKE '00A2%' THEN '資訊處'
+                            WHEN c.sbu = 2 AND c.cocode = 'A' AND c.g_deptno LIKE '00B3%' THEN '資材處'
+                            ELSE c.deptabbv
+                        END) AS deptabbv,
+                        (CASE
+                            WHEN b.cocode = '003' AND (b.deptno = '00000' OR b.deptno = '00281') THEN '00G10'
+                            ELSE c.g_deptno
+                        END) AS g_deptno,
+                        b.dclass, b.adm_rank, g.sort_order
+                    FROM jps.TDR_FORWARDLIST a
+                    JOIN jps.DCD003$MASTER b ON a.cocode = b.cocode AND a.empno = b.empno
+                    JOIN jps.DCD002$MASTER c ON a.cocode = c.cocode AND b.deptno = c.deptno
+                    JOIN jps.DCD001$MASTER d ON a.cocode = d.cocode
+                    LEFT JOIN jps.DCD004$MASTER e ON a.cocode = e.cocode AND b.dutyno = e.dutyno AND e.ducode = 'O'
+                    LEFT JOIN jps.tdr_forward_duty f ON e.dutyname = f.dutyname
+                    LEFT JOIN jps.tdr_forward_dept_sort g ON d.cocode = g.cocode AND c.g_deptno = g.deptno
+                    WHERE b.quitdate IS NULL
+                      AND (b.right_stop_date IS NULL OR b.right_stop_date > TO_CHAR(sysdate, 'YYYYMMDD'))
+                ) t
+                ORDER BY sort_cocode, sort_customize, sort_gmDept, sbu, g_deptno1, dclass DESC, adm_rank
+            """)
+            dept_rows = db.execute(dept_sql).fetchall()
+            candidates.extend([{
+                "empno": r[1], 
+                "empname": r[2], 
+                "type": "department",
+                "cocode": r[0],
+                "deptabbv": r[6],
+                "dutyscript": r[4]
+            } for r in dept_rows])
+        
+        return {
+            "user_adm_rank": adm_rank,
+            "candidates": candidates
+        }
+        
     except Exception as e:
-        logger.error(f"Error get_forward_department_candidates: {e}")
-        raise HTTPException(status_code=500, detail="取得部門轉寄名單失敗")
+        logger.error(f"Error get_forward_candidates: {e}")
+        raise HTTPException(status_code=500, detail="取得轉寄名單失敗")
+
 
 # my-reports-by-date API已移除，因為已廢除「我的日報」功能
 

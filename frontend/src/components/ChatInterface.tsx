@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
-import ForwardSelector from "./ForwardSelector";
 
 // Duplicating from EmployeeDetailTab, should be centralized
 interface SupervisorApprovalInfo {
@@ -55,6 +54,8 @@ interface ChatInterfaceProps {
   onReviewSubmitted?: () => void;
   onReviewCompleted?: () => void; // 主管評分完成後的回調
   isReadOnly?: boolean; // 新增只讀模式屬性
+  selectedForwardUsers?: string[]; // 選中的轉寄用戶
+  onForwardUsersChange?: (users: string[]) => void; // 轉寄用戶變更回調
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -66,6 +67,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onReviewSubmitted,
   onReviewCompleted,
   isReadOnly = false, // 預設為 false
+  selectedForwardUsers = [],
+  onForwardUsersChange,
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -76,9 +79,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [selectedRating, setSelectedRating] = useState<number>(3); // 預設評分為「普通」(5分制)
   const [reviewComment, setReviewComment] = useState("");
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
-  const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>(
-    []
-  );
 
   // AI建議相關狀態
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -616,13 +616,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     disabled={isSubmitting}
                   />
 
-                  {/* 轉寄選擇組件 */}
-                  <div className="mb-3">
-                    <ForwardSelector
-                      selectedForwardUsers={selectedForwardUsers}
-                      onForwardUsersChange={setSelectedForwardUsers}
-                    />
-                  </div>
 
                   <div className="flex space-x-2">
                     <button
@@ -636,7 +629,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       onClick={() => {
                         setSelectedRating(3); // Reset to default (普通)
                         setReviewComment("");
-                        setSelectedForwardUsers([]); // 清空轉寄選擇
+                        onForwardUsersChange?.([]); // 清空轉寄選擇
                       }}
                       disabled={isSubmitting}
                       className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
