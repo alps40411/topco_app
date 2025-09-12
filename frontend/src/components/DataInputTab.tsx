@@ -370,7 +370,7 @@ const DataInputTab: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-6 h-6 flex items-center">
             今日彙整預覽 ({consolidatedRecords.length})
           </h2>
-          <div className="space-y-4 h-[400px] sm:h-[600px] overflow-y-auto pr-2">
+          <div className="space-y-4">
             {isLoading ? (
               <div className="text-center py-8 text-gray-500">載入中...</div>
             ) : consolidatedRecords.length === 0 ? (

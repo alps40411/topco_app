@@ -11,7 +11,6 @@ import {
   FileAudio,
   Archive,
   Download,
-  Eye,
 } from "lucide-react";
 import type { FileAttachment } from "../App";
 
@@ -101,13 +100,22 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
   if (!files || files.length === 0) return null;
 
   const getFullUrl = (url: string) => {
+    if (!url) {
+      console.error("❌ AttachedFilesDisplay - 空的URL");
+      return "";
+    }
+
     if (url.startsWith("http")) {
       return url;
     }
 
-    // 在生產環境中，需要包含後端服務器地址
-    const isProduction = window.location.port === "3000";
-    const backendUrl = isProduction
+    // 檢查是否為開發環境
+    const isDevelopment =
+      window.location.port === "5173" ||
+      window.location.port === "3000" ||
+      window.location.hostname === "localhost";
+
+    const backendUrl = isDevelopment
       ? `http://${window.location.hostname}:8000`
       : "";
 
@@ -115,14 +123,6 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
       ? `${backendUrl}${url}`
       : `${backendUrl}/${url}`;
 
-    // console.log('🖼️ AttachedFilesDisplay - 圖片URL調試:', {
-    //     originalUrl: url,
-    //     fullUrl,
-    //     isHttp: url.startsWith('http'),
-    //     isProduction,
-    //     backendUrl,
-    //     currentLocation: window.location.href
-    // });
     return fullUrl;
   };
 
@@ -151,6 +151,14 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
                       alt={file.name}
                       className="w-12 h-12 object-cover rounded-md cursor-pointer hover:opacity-80"
                       onClick={() => setPreviewImageUrl(getFullUrl(file.url))}
+                      onError={(e) => {
+                        console.error("❌ 圖片載入失敗:", {
+                          url: file.url,
+                          fullUrl: getFullUrl(file.url),
+                          error: e,
+                        });
+                        // 可以設置一個預設圖片或顯示錯誤狀態
+                      }}
                     />
                   ) : (
                     getFileIcon(file.type, file.name)
@@ -174,23 +182,24 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
 
               {/* 操作按鈕 */}
               <div className="flex justify-end space-x-2 mt-3">
-                {file.type.startsWith("image/") && (
-                  <button
-                    onClick={() => setPreviewImageUrl(getFullUrl(file.url))}
-                    className="p-1.5 rounded-md bg-white/70 hover:bg-white text-gray-600 hover:text-gray-800 transition-colors"
-                    title="預覽圖片"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                )}
                 <button
                   onClick={() => {
-                    const link = document.createElement("a");
-                    link.href = getFullUrl(file.url);
-                    link.download = file.name;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    try {
+                      const link = document.createElement("a");
+                      link.href = getFullUrl(file.url);
+                      link.download = file.name;
+                      link.style.display = "none";
+                      document.body.appendChild(link);
+                      link.click();
+                      // 使用 setTimeout 確保點擊事件完成後再移除
+                      setTimeout(() => {
+                        if (link.parentNode) {
+                          link.parentNode.removeChild(link);
+                        }
+                      }, 100);
+                    } catch (error) {
+                      console.error("下載檔案時發生錯誤:", error);
+                    }
                   }}
                   className="p-1.5 rounded-md bg-white/70 hover:bg-white text-gray-600 hover:text-gray-800 transition-colors"
                   title="下載檔案"

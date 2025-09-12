@@ -1131,37 +1131,44 @@ async def upload_daily_report(
                 "current_time": current_time
             })
         
-        # 按照 sopno 分組草稿，並為每組收集檔案
-        sopno_groups = {}
+        # 按照 planno + sopno 組合分組草稿，並為每組收集檔案
+        planno_sopno_groups = {}
         for draft in draft_results:
+            planno = draft[2] or ""  # PLANNO
             sopno = draft[7]  # SOPNO
-            if sopno not in sopno_groups:
-                sopno_groups[sopno] = {
+            group_key = f"{planno}_{sopno}"  # 使用 planno + sopno 作為分組鍵
+            
+            if group_key not in planno_sopno_groups:
+                planno_sopno_groups[group_key] = {
+                    'planno': planno,
+                    'sopno': sopno,
                     'drafts': [],
                     'files': []
                 }
-            sopno_groups[sopno]['drafts'].append(draft)
+            planno_sopno_groups[group_key]['drafts'].append(draft)
             
             # 收集此 draft 的檔案
             if draft[19]:  # FILES
                 try:
                     files = json.loads(draft[19])
-                    sopno_groups[sopno]['files'].extend(files)
+                    planno_sopno_groups[group_key]['files'].extend(files)
                 except:
                     pass
         
-        # 為每個不同的 sopno 組合插入 tdr_detail1 並分配不同的 daily_sub_nos
+        # 為每個不同的 planno + sopno 組合插入 tdr_detail1 並分配不同的 daily_sub_nos
         daily_sub_nos = 1
-        sopno_to_daily_sub_nos = {}  # 記錄 sopno 對應的 daily_sub_nos
+        planno_sopno_to_daily_sub_nos = {}  # 記錄 planno + sopno 對應的 daily_sub_nos
         
-        for sopno, group_data in sopno_groups.items():
+        for group_key, group_data in planno_sopno_groups.items():
+            planno = group_data['planno']
+            sopno = group_data['sopno']
             drafts_in_group = group_data['drafts']
             group_files = group_data['files']
             
             # 記錄對應關係
-            sopno_to_daily_sub_nos[sopno] = daily_sub_nos
+            planno_sopno_to_daily_sub_nos[group_key] = daily_sub_nos
             
-            logger.info(f"處理 sopno={sopno}, daily_sub_nos={daily_sub_nos}, 檔案數量={len(group_files)}")
+            logger.info(f"處理 planno={planno}, sopno={sopno}, daily_sub_nos={daily_sub_nos}, 檔案數量={len(group_files)}")
             
             # 插入 tdr_detail1 
             insert_detail1_sql = text("""
@@ -1245,14 +1252,16 @@ async def upload_daily_report(
             
             daily_sub_nos += 1
         
-        # 為每個 sopno 組處理其對應的檔案
+        # 為每個 planno + sopno 組處理其對應的檔案
         total_files_processed = 0
-        for sopno, group_data in sopno_groups.items():
+        for group_key, group_data in planno_sopno_groups.items():
+            planno = group_data['planno']
+            sopno = group_data['sopno']
             group_files = group_data['files']
-            corresponding_daily_sub_nos = sopno_to_daily_sub_nos[sopno]
+            corresponding_daily_sub_nos = planno_sopno_to_daily_sub_nos[group_key]
             
             if group_files:
-                logger.info(f"處理 sopno={sopno} (daily_sub_nos={corresponding_daily_sub_nos}) 的 {len(group_files)} 個檔案")
+                logger.info(f"處理 planno={planno}, sopno={sopno} (daily_sub_nos={corresponding_daily_sub_nos}) 的 {len(group_files)} 個檔案")
                 for i, f in enumerate(group_files):
                     logger.info(f"  檔案{i}: {f}")
                 
@@ -1266,9 +1275,9 @@ async def upload_daily_report(
                     files=group_files
                 )
                 total_files_processed += len(group_files)
-                logger.info(f"sopno={sopno} 檔案處理完成")
+                logger.info(f"planno={planno}, sopno={sopno} 檔案處理完成")
             else:
-                logger.info(f"sopno={sopno} (daily_sub_nos={corresponding_daily_sub_nos}) 沒有檔案")
+                logger.info(f"planno={planno}, sopno={sopno} (daily_sub_nos={corresponding_daily_sub_nos}) 沒有檔案")
         
         logger.info(f"檔案處理完成，總共處理 {total_files_processed} 個檔案")
         

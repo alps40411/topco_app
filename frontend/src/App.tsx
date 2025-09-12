@@ -1,7 +1,7 @@
 // frontend/src/App.tsx
 
-import { useState, useEffect } from "react";
-import { Edit3, FileText, LogOut } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { LogOut } from "lucide-react";
 import DataInputTab from "./components/DataInputTab";
 import DailyReportTab from "./components/DailyReportTab";
 // import MyReportsTab from "./components/MyReportsTab"; // 已移除我的日報功能
@@ -150,8 +150,7 @@ export interface User {
 }
 function App() {
   const { user, logout, authFetch } = useAuth();
-  const { hasSubordinates, loading: subordinatesLoading } =
-    useHasSubordinates();
+  const { hasSubordinates } = useHasSubordinates();
   const [activeTab, setActiveTab] = useState<
     "input" | "daily" | "supervisor" | "ai" | "comprehensive"
   >("supervisor"); // 預設為日報首頁
@@ -163,27 +162,43 @@ function App() {
     null
   );
 
+  // 添加歷史管理的標籤切換函數
+  const changeTab = useCallback((tab: "input" | "daily" | "supervisor" | "ai" | "comprehensive") => {
+    setActiveTab(tab);
+    setSelectedEmployee(null);
+    setSelectedReportId(null);
+    // 為每個標籤創建瀏覽器歷史記錄
+    window.history.pushState({ tab }, "", `/?tab=${tab}`);
+  }, []);
+
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
     setSelectedEmployee(employee);
     setSelectedReportId(reportId);
     setActiveTab("supervisor"); // 切換到審閱模式
+    // 為員工詳情創建歷史記錄
+    window.history.pushState({ tab: "supervisor", employee: employee.id, report: reportId }, "", `/?tab=supervisor&employee=${employee.id}&report=${reportId}`);
   };
 
   const handleBackFromDetail = () => {
     setSelectedEmployee(null);
     setSelectedReportId(null);
-    // 保持在supervisor標籤
+    setActiveTab("supervisor");
+    // 返回到員工列表時創建歷史記錄
+    window.history.pushState({ tab: "supervisor" }, "", "/?tab=supervisor");
   };
 
   const handleReviewCompleted = () => {
     // 主管評分完成後，跳轉回審閱列表
     setSelectedEmployee(null);
     setSelectedReportId(null);
+    setActiveTab("supervisor");
+    // 返回到員工列表時創建歷史記錄
+    window.history.pushState({ tab: "supervisor" }, "", "/?tab=supervisor");
     // 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
     fetchWritingStatus();
   };
 
-  const fetchWritingStatus = async () => {
+  const fetchWritingStatus = useCallback(async () => {
     if (!authFetch || !user?.employee) return;
 
     try {
@@ -195,23 +210,63 @@ function App() {
     } catch (error) {
       console.error("獲取寫入狀態失敗:", error);
     }
-  };
+  }, [authFetch, user?.employee]);
 
   useEffect(() => {
     if (authFetch && user?.employee) {
       fetchWritingStatus();
     }
-  }, [authFetch, user?.employee]);
+  }, [authFetch, user?.employee, fetchWritingStatus]);
+
+  // 監聽瀏覽器歷史變化並恢復狀態
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state;
+      if (state) {
+        setActiveTab(state.tab || "supervisor");
+        if (state.employee && state.report) {
+          // 這裡需要重新獲取員工信息，暫時先重置
+          setSelectedEmployee(null);
+          setSelectedReportId(null);
+        } else {
+          setSelectedEmployee(null);
+          setSelectedReportId(null);
+        }
+      } else {
+        // 沒有狀態信息時，檢查URL參數
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab') as "input" | "daily" | "supervisor" | "ai" | "comprehensive" || "supervisor";
+        setActiveTab(tabParam);
+        setSelectedEmployee(null);
+        setSelectedReportId(null);
+      }
+    };
+
+    // 初始化時檢查URL參數
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab') as "input" | "daily" | "supervisor" | "ai" | "comprehensive";
+    if (tabParam) {
+      setActiveTab(tabParam);
+    } else {
+      // 如果沒有URL參數，創建初始歷史記錄
+      window.history.replaceState({ tab: "supervisor" }, "", "/?tab=supervisor");
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   // 當寫入狀態變化時，確保當前活動標籤是可用的
   useEffect(() => {
     if (writingStatus && !writingStatus.allowed) {
       // 如果不允許寫入，且當前在編輯標籤，切換到日報首頁
       if (activeTab === "input" || activeTab === "daily") {
-        setActiveTab("supervisor");
+        changeTab("supervisor");
       }
     }
-  }, [writingStatus, activeTab]);
+  }, [writingStatus, activeTab, changeTab]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -254,11 +309,7 @@ function App() {
                 {/* 隨筆紀錄 - 只有在允許寫入時才顯示 */}
                 {writingStatus?.allowed && (
                   <button
-                    onClick={() => {
-                      setActiveTab("input");
-                      setSelectedEmployee(null);
-                      setSelectedReportId(null);
-                    }}
+                    onClick={() => changeTab("input")}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                       activeTab === "input"
                         ? "bg-green-100 text-green-700"
@@ -272,11 +323,7 @@ function App() {
                 {/* 日報編輯 - 只有在允許寫入時才顯示 */}
                 {writingStatus?.allowed && (
                   <button
-                    onClick={() => {
-                      setActiveTab("daily");
-                      setSelectedEmployee(null);
-                      setSelectedReportId(null);
-                    }}
+                    onClick={() => changeTab("daily")}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                       activeTab === "daily"
                         ? "bg-green-100 text-green-700"
@@ -289,11 +336,7 @@ function App() {
 
                 {/* 日報首頁 (所有用戶都可見) */}
                 <button
-                  onClick={() => {
-                    setActiveTab("supervisor");
-                    setSelectedEmployee(null);
-                    setSelectedReportId(null);
-                  }}
+                  onClick={() => changeTab("supervisor")}
                   className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                     activeTab === "supervisor"
                       ? "bg-green-100 text-green-700"
@@ -354,15 +397,23 @@ function App() {
         )}
 
         {/* 內容區域 */}
-        {activeTab === "input" && writingStatus?.allowed && <DataInputTab />}
-        {activeTab === "daily" && writingStatus?.allowed && <DailyReportTab />}
+        {activeTab === "input" && writingStatus?.allowed && (
+          <DataInputTab key="data-input" />
+        )}
+        {activeTab === "daily" && writingStatus?.allowed && (
+          <DailyReportTab key="daily-report" />
+        )}
 
         {/* 日報首頁區域 */}
         {activeTab === "supervisor" && !selectedEmployee && (
-          <EmployeeListTab onSelectEmployee={handleSelectEmployee} />
+          <EmployeeListTab
+            key="employee-list"
+            onSelectEmployee={handleSelectEmployee}
+          />
         )}
         {activeTab === "supervisor" && selectedEmployee && selectedReportId && (
           <EmployeeDetailTab
+            key={`employee-detail-${selectedReportId}`}
             reportId={selectedReportId}
             onBack={handleBackFromDetail}
             onReviewCompleted={handleReviewCompleted}

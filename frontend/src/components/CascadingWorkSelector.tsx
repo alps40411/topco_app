@@ -89,7 +89,7 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
       setIsLoading(true);
       try {
         const workData = await LegacyApi.getAllWorkData(user.employee.empno);
-        console.log("=== API 已呼叫並返回資料 (只會執行一次) ===", workData);
+        // console.log("=== API 已呼叫並返回資料 (只會執行一次) ===", workData);
 
         // 1. 設定從 API 獲取的原始資料
         setWorkPlans(workData.work_plans || []);
@@ -128,10 +128,7 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
     if (user?.employee?.empno && !isInitialized) {
       fetchAllWorkData();
     }
-  }, [
-    user?.employee?.empno,
-    isInitialized,
-  ]);
+  }, [user?.employee?.empno, isInitialized]);
 
   // ===== 修改 #2: 依賴 selectedProjectId 的 useEffect =====
   // 這個 Effect 現在只負責根據已有的資料，在「工作計畫」變更時，更新「執行工作」的列表。
@@ -330,7 +327,11 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
               .filter((seq): seq is string => !!seq); // 確保類型正確
             handleWorkItemChange(originalSeqs);
           }}
-          placeholder={currentWorkItems.length === 0 ? "此執行工作無工作項目" : "暫無工作項目"}
+          placeholder={
+            currentWorkItems.length === 0
+              ? "此執行工作無工作項目"
+              : "暫無工作項目"
+          }
           required={required && currentWorkItems.length > 0}
         />
       )}
