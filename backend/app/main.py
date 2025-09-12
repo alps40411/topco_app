@@ -23,7 +23,7 @@ app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 # 最寬鬆的CORS設置，允許所有來源
 origins = ["*"]  # 允許所有來源
 
-print(f"CORS允許的來源: {origins}")
+print(f"CORS allowed origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,12 +38,12 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
-    print(f"{request.method} {request.url.path} - 開始處理")
+    print(f"{request.method} {request.url.path} - Start processing")
     
     response = await call_next(request)
     
     process_time = time.time() - start_time
-    print(f"{request.method} {request.url.path} - 完成 ({response.status_code}) - {process_time:.2f}s")
+    print(f"{request.method} {request.url.path} - Completed ({response.status_code}) - {process_time:.2f}s")
     
     return response
 
@@ -56,7 +56,7 @@ missing = [name for name, value in required_settings.items() if not value]
 if missing:
     missing_str = ", ".join(missing)
     raise RuntimeError(
-        f"缺少必要設定: {missing_str}. 請在 backend 資料夾建立 .env，或設定對應的系統環境變數。"
+        f"Missing required settings: {missing_str}. Please create .env file in backend folder or set corresponding environment variables."
     )
 
 # --- 修正：加入 "/api" 前綴以匹配前端代理設定 ---

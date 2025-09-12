@@ -59,8 +59,8 @@ export interface WorkRecordCreate {
   execution_time_minutes: number;
 }
 export interface ConsolidatedReport {
-  daily_no: string;  // 添加 daily_no 字段
-  sopno?: string;    // 添加 sopno 字段用於精確識別記錄
+  daily_no: string; // 添加 daily_no 字段
+  sopno?: string; // 添加 sopno 字段用於精確識別記錄
   project: Project;
   execution_work_name?: string;
   work_item_name?: string;
@@ -159,7 +159,9 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeInList | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
-  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(null);
+  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(
+    null
+  );
 
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
     setSelectedEmployee(employee);
@@ -233,12 +235,16 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">TSC</span>
+              <div className="w-40 h-10 rounded-lg flex items-center justify-center max-w-40 min-w-40">
+                <img
+                  src="/top_logoA.jpg"
+                  alt="業務日誌"
+                  className="w-40 h-10 rounded-lg max-w-40 min-w-40"
+                />
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">
-                  TSC 業務日誌
+                  業務日報
                 </h1>
                 <p className="text-sm text-gray-500">崇越科技</p>
               </div>
@@ -339,7 +345,9 @@ function App() {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-yellow-700">{writingStatus.message}</p>
+                <p className="text-sm text-yellow-700">
+                  {writingStatus.message}
+                </p>
               </div>
             </div>
           </div>

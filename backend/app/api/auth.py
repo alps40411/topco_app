@@ -92,7 +92,7 @@ async def login_for_access_token(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ 認證錯誤: {str(e)}")
+        print(f"認證錯誤: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication service error"

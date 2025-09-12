@@ -33,6 +33,10 @@ class Settings(BaseSettings):
 
     # CORS origins (comma-separated). Example: http://localhost:5173,https://your.domain
     CORS_ORIGINS: str = ""
+    
+    # File upload settings
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
 
     @field_validator("DATABASE_URL", mode="before")
     def _clean_database_url(cls, v: str) -> str:

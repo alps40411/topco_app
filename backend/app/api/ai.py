@@ -3,14 +3,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
+import json
 from datetime import datetime
 
 from ..core.legacy_database import get_legacy_db
 from ..core.deps import get_current_user
+from ..core.config import settings
 from ..schemas.user import User
-from ..services.azure_ai_service import get_ai_enhanced_report
+from ..services.azure_ai_service import get_ai_enhanced_report, process_attachments_for_ai
 
 router = APIRouter(tags=["AI Services"])
 logger = logging.getLogger(__name__)
@@ -24,7 +26,7 @@ async def get_ai_suggestions(
     """取得日報的 AI 建議"""
     try:
         if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+            raise HTTPException(status_code=400, detail="User has no employee information")
         
         # 查詢日報詳細內容
         report_sql = text("""
@@ -40,7 +42,7 @@ async def get_ai_suggestions(
         report_results = db.execute(report_sql, {"daily_no": report_id}).fetchall()
         
         if not report_results:
-            raise HTTPException(status_code=404, detail="找不到指定的日報")
+            raise HTTPException(status_code=404, detail="Daily report not found")
         
         # 組合報告內容
         employee_name = report_results[0][1]  # empnamec
@@ -102,7 +104,7 @@ async def get_ai_suggestions(
         raise
     except Exception as e:
         logger.error(f"Error getting AI suggestions: {str(e)}")
-        raise HTTPException(status_code=500, detail="生成 AI 建議失敗")
+        raise HTTPException(status_code=500, detail="AI suggestion generation failed")
 
 def _get_fallback_suggestions():
     """當無法生成 AI 建議時的備用建議"""
@@ -137,16 +139,20 @@ async def enhance_record(
 ):
     """AI 增強單個記錄"""
     try:
+        print("!!! FUNCTION CALLED !!!")  # 強制輸出
+        logger.error(f"! [FORCE] 函數被調用: daily_no={daily_no}, sopno={sopno}")
+        
         if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+            raise HTTPException(status_code=400, detail="User has no employee information")
         
         empno = current_user.employee.empno
+        logger.info(f"[DEBUG] 請求參數: daily_no={daily_no}, sopno={sopno}, empno={empno}")
         
-        # 查詢記錄內容 - 使用 daily_no + sopno 來精確識別單一記錄
+        # 查詢記錄內容 - 使用 daily_no + sopno 來精確識別單一記錄，同時取得FILES欄位
         record_sql = text("""
             SELECT DAILY_NO, CONTENT, PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C,
                    WORK_ITEM_SEQ, SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC,
-                   EXECUTION_TIME_MINUTES, AI_CONTENT
+                   EXECUTION_TIME_MINUTES, AI_CONTENT, FILES
             FROM jps.tdr_draft
             WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno
         """)
@@ -158,17 +164,84 @@ async def enhance_record(
         }).fetchone()
         
         if not record_result:
-            raise HTTPException(status_code=404, detail="找不到指定的記錄")
+            logger.error(f"[DEBUG] 找不到記錄: daily_no={daily_no}, sopno={sopno}, empno={empno}")
+            raise HTTPException(status_code=404, detail="Record not found")
+        
+        logger.info(f"[DEBUG] 找到記錄: daily_no={daily_no}, sopno={sopno}")
+        logger.info(f"[DEBUG] 記錄內容長度: {len(record_result[1] or '')}")
+        
+        # 處理FILES欄位中的檔案
+        files_json = record_result[12] or "[]"  # FILES欄位是第13個（索引12）
+        logger.info(f"[DEBUG] 原始FILES欄位內容: {repr(files_json)}")
+        
+        files = []
+        try:
+            files = json.loads(files_json) if files_json != "[]" else []
+            logger.info(f"[DEBUG] JSON解析成功")
+        except Exception as e:
+            logger.error(f"[DEBUG] JSON解析失敗: {e}")
+            files = []
+        
+        logger.info(f"[DEBUG] FILES欄位檔案數量: {len(files)}")
+        logger.info(f"[DEBUG] FILES內容: {files}")
+        
+        # 檢查FILES中標記為AI參考的檔案
+        ai_files = []
+        for i, f in enumerate(files):
+            is_ai_selected = f.get('is_selected_for_ai', False)
+            logger.info(f"[DEBUG] 檔案{i}: name={f.get('name')}, is_selected_for_ai={is_ai_selected} (type: {type(is_ai_selected)})")
+            if is_ai_selected:
+                ai_files.append(f)
+                logger.info(f"[DEBUG] 檔案{i}被加入AI參考列表")
+        
+        logger.info(f"[DEBUG] AI參考檔案數量: {len(ai_files)}")
+        logger.info(f"[DEBUG] AI參考檔案列表: {ai_files}")
         
         # 生成 AI 增強內容
         original_content = record_result[1] or ""
         
-        if not original_content.strip():
-             raise HTTPException(status_code=400, detail="記錄內容為空，無法增強")
+        # 檢查是否有AI參考檔案可以處理
+        has_ai_files = len(ai_files) > 0
+        
+        logger.info(f"[DEBUG] 內容檢查 - 原始內容: '{original_content}' (長度: {len(original_content)})")
+        logger.info(f"[DEBUG] 內容檢查 - 原始內容strip(): '{original_content.strip()}' (長度: {len(original_content.strip())})")
+        logger.info(f"[DEBUG] 內容檢查 - AI參考檔案: {has_ai_files}")
+        logger.info(f"[DEBUG] 內容檢查 - AI檔案列表: {ai_files}")
+        
+        # 如果既沒有文字內容也沒有AI參考檔案，才拒絕處理
+        if not original_content.strip() and not has_ai_files:
+            logger.error(f"[DEBUG] 拒絕處理: 無文字內容且無AI參考檔案")
+            raise HTTPException(status_code=400, detail="Record content is empty and no AI reference data available")
+        
+        logger.info(f"[DEBUG] 通過檢查，準備AI增強")
+
+        # 將AI參考檔案轉換為附件格式
+        attachments = []
+        if has_ai_files:
+            for ai_file in ai_files:
+                # 轉換URL為檔案路徑
+                url_path = ai_file.get('url', '')
+                if url_path.startswith('/uploads/'):
+                    # 轉換為實際檔案路徑  
+                    file_path = settings.UPLOAD_DIR + url_path.replace('/uploads/', '/')
+                else:
+                    file_path = url_path
+                
+                # 創建附件記錄
+                attachments.append({
+                    "att_id": f"files_{ai_file.get('name', 'unknown')}",
+                    "file_name": ai_file.get('name', 'unknown'),
+                    "file_path": file_path,
+                    "file_size": ai_file.get('size', 0),
+                    "file_type": ai_file.get('type', ''),
+                    "is_selected_for_ai": True  # 已經篩選過了
+                })
+                logger.info(f"[DEBUG] 轉換檔案: {ai_file.get('name')} -> {file_path}")
 
         enhanced_content = await _generate_enhanced_content(
             original_content=original_content,
             work_description=record_result[5] or "未指定專案",  # sop_desc_c
+            attachments=attachments
         )
         
         # 更新記錄的 AI 內容
@@ -210,8 +283,8 @@ async def enhance_record(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error enhancing record {record_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"AI 增強記錄失敗: {e}")
+        logger.error(f"Error enhancing record {daily_no}: {str(e)}")
+        raise HTTPException(status_code=500, detail="AI enhancement failed")
 
 @router.post("/enhance_all")
 async def enhance_all_records(
@@ -222,7 +295,7 @@ async def enhance_all_records(
     """批量 AI 增強記錄"""
     try:
         if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+            raise HTTPException(status_code=400, detail="User has no employee information")
         
         empno = current_user.employee.empno
         
@@ -264,10 +337,35 @@ async def enhance_all_records(
             record_id = record_row[0]
             original_content = record_row[1] or ""
             
-            if original_content.strip():
+            # 取得該記錄的附件
+            attachments_sql = text("""
+                SELECT att_id, file_name, file_path, file_size, file_type, is_selected_for_ai
+                FROM jps.tdr_draft_attachment
+                WHERE draft_record_id = :daily_no
+            """)
+            
+            attachments_result = db.execute(attachments_sql, {"daily_no": record_id})
+            attachments = []
+            for att_row in attachments_result.fetchall():
+                attachments.append({
+                    "att_id": att_row[0],
+                    "file_name": att_row[1],
+                    "file_path": att_row[2],
+                    "file_size": att_row[3],
+                    "file_type": att_row[4],
+                    "is_selected_for_ai": att_row[5]
+                })
+            
+            # 檢查是否有內容可以處理（文字內容或AI附件）
+            has_ai_attachments = any(att.get('is_selected_for_ai', False) for att in attachments)
+            
+            if original_content.strip() or has_ai_attachments:
+                logger.info(f"處理記錄 {record_id}: 文字={len(original_content)}字符, AI附件={len([att for att in attachments if att.get('is_selected_for_ai')])}")
+                
                 enhanced_content = await _generate_enhanced_content(
                     original_content=original_content,
                     work_description=record_row[5] or "未指定專案",
+                    attachments=attachments
                 )
                 
                 update_sql = text("""
@@ -284,6 +382,8 @@ async def enhance_all_records(
                 })
                 
                 enhanced_count += 1
+            else:
+                logger.info(f"跳過記錄 {record_id}: 無文字內容且無AI附件")
         
         db.commit()
         
@@ -299,21 +399,48 @@ async def enhance_all_records(
     except Exception as e:
         db.rollback()
         logger.error(f"Error batch enhancing records: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"批量 AI 增強失敗: {e}")
+        raise HTTPException(status_code=500, detail="Batch AI enhancement failed")
 
-async def _generate_enhanced_content(original_content: str, work_description: str):
-    """使用 Azure AI Service 生成增強內容"""
+async def _generate_enhanced_content(original_content: str, work_description: str, attachments: Optional[List[Dict]] = None):
+    """使用 Azure AI Service 生成增強內容，支援附件處理"""
     try:
-        # 調用真正的 AI 服務
+        logger.info(f"開始生成增強內容，工作描述: {work_description}")
+        logger.info(f"原始內容長度: {len(original_content)}")
+        
+        # 處理附件內容
+        reference_texts = []
+        if attachments:
+            logger.info(f"處理 {len(attachments)} 個附件，查找AI參考檔案")
+            reference_texts = await process_attachments_for_ai(attachments)
+            logger.info(f"成功提取 {len(reference_texts)} 個檔案的內容作為AI參考")
+        else:
+            logger.info(f"沒有附件需要處理")
+        
+        # 如果沒有原始內容但有附件內容，則使用附件內容作為主要內容
+        content_to_enhance = original_content
+        if not original_content.strip() and reference_texts:
+            logger.info(f"沒有文字內容，使用附件內容進行AI增強")
+            content_to_enhance = "請基於提供的參考資料生成工作報告。"
+        
+        # 調用真正的 AI 服務，包含附件內容
+        logger.info(f"調用 Azure OpenAI 服務進行內容增強...")
+        logger.info(f"增強內容: {content_to_enhance[:100]}...")
+        logger.info(f"參考資料數量: {len(reference_texts)}")
+        
         enhanced_content = await get_ai_enhanced_report(
-            original_content=original_content,
-            project_name=work_description
+            original_content=content_to_enhance,
+            project_name=work_description,
+            reference_texts=reference_texts
         )
+        
+        logger.info(f"AI 內容增強完成，結果長度: {len(enhanced_content)}")
         return enhanced_content
     except Exception as e:
         logger.error(f"Azure AI service call failed: {e}")
+        import traceback
+        logger.error(f"錯誤詳情: {traceback.format_exc()}")
         # 在 AI 服務失敗時返回一個有意義的錯誤或備用內容
-        return f"AI 服務無法處理您的請求。錯誤：{e}"
+        return "AI service temporarily unavailable"
 
 @router.get("/status")
 async def get_ai_service_status():

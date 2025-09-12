@@ -209,7 +209,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         toast.success(message);
 
         setHasSubmittedReview(true);
-        setSelectedForwardUsers([]); // 清空轉寄選擇
+        onForwardUsersChange?.([]); // 清空轉寄選擇
 
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();

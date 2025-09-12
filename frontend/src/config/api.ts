@@ -36,7 +36,7 @@ export const apiConfig = {
       workPlans: "/api/legacy/work-plans",
       companies: "/api/legacy/companies",
       nextDailyNo: "/api/legacy/next-daily-no",
-      drafts: "/api/legacy/drafts",
+      drafts: "/api/drafts",
       attachments: "/api/legacy/attachments",
       submit: "/api/legacy/submit",
       executionWorks: "/api/legacy/execution-works",

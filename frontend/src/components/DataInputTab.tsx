@@ -116,7 +116,7 @@ const DataInputTab: React.FC = () => {
       let daily_no;
       try {
         const existingDraftsResponse = await authFetch(
-          `/api/legacy/drafts/${user.employee.empno}?draft_type=TEMP`
+          `/api/drafts/${user.employee.empno}?draft_type=TEMP`
         );
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
@@ -163,7 +163,7 @@ const DataInputTab: React.FC = () => {
       };
 
       // 保存暫存
-      const saveResponse = await authFetch("/api/legacy/drafts", {
+      const saveResponse = await authFetch("/api/drafts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

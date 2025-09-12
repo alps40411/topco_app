@@ -1,9 +1,12 @@
 # backend/app/api/supervisor.py
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Any
 import logging
+import os
+from pathlib import Path
 from datetime import datetime
 
 from app.core.legacy_database import get_legacy_db
@@ -600,6 +603,66 @@ async def get_report_detail(
                 except:
                     pass  # 保持預設值
             
+            # 查詢該 daily_sub_nos 對應的檔案
+            daily_sub_nos = detail_row[1]  # daily_sub_nos
+            cocode = detail_row[32]  # cocode - 修正索引
+            empno = detail_row[33]  # empno - 修正索引
+            doc_date = master_row[4]  # xdate 來自 master
+            
+            # 調試日誌
+            logger.info(f"檔案查詢參數: daily_sub_nos={daily_sub_nos}, cocode={cocode}, empno={empno}, doc_date={doc_date}")
+            
+            # 計算檔案 ID 範圍，避免整數溢位
+            daily_no_int = int(report_id)
+            daily_sub_nos_int = int(daily_sub_nos) if daily_sub_nos else 1
+            
+            # 使用字符串格式計算，避免 Python 整數溢位
+            id_start = daily_no_int * 1000000 + daily_sub_nos_int * 1000
+            id_end = daily_no_int * 1000000 + (daily_sub_nos_int + 1) * 1000 - 1
+            
+            logger.info(f"檔案 ID 範圍: {id_start} - {id_end}")
+            
+            files_sql = text("""
+                SELECT filepath, filename
+                FROM jps.tdr_upload_file
+                WHERE id >= CAST(:id_start AS BIGINT) AND id <= CAST(:id_end AS BIGINT)
+                  AND (:cocode IS NULL OR cocode = :cocode)
+                  AND (:empno IS NULL OR empno = :empno)
+                  AND docdate = :doc_date
+                  AND status = 'Online'
+                ORDER BY id
+            """)
+            
+            files_result = legacy_db.execute(files_sql, {
+                "id_start": id_start,
+                "id_end": id_end,
+                "cocode": cocode,
+                "empno": empno,
+                "doc_date": doc_date
+            })
+            
+            files = []
+            file_index = 1
+            for file_row in files_result.fetchall():
+                file_id = daily_no_int * 1000000 + daily_sub_nos_int * 1000 + file_index
+                # 根據檔案副檔名判斷類型
+                filename = file_row[1] or ""
+                file_ext = filename.lower().split('.')[-1] if '.' in filename else ""
+                if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
+                    file_type = f"image/{file_ext}"
+                else:
+                    file_type = "application/octet-stream"
+                
+                files.append({
+                    "id": file_id,
+                    "name": filename,
+                    "type": file_type,
+                    "size": 0,  # 檔案大小暫時設為 0，因為資料庫中沒有這個欄位
+                    "url": f"/api/supervisor/files/download/{file_id}",  # 檔案下載 URL
+                    "filepath": file_row[0]  # 保留原始路徑供後端使用
+                })
+                file_index += 1
+
             content_item = {
                 "project": {
                     "plan_subj_c": plan_name,  # 處理後的工作計畫中文名稱
@@ -618,7 +681,8 @@ async def get_report_detail(
                 "cuno_msg": detail_row[11] or "",  # cuno_msg
                 "comp_desc": detail_row[14] or "",  # comp_desc
                 "ques_desc": detail_row[17] or "",  # ques_desc
-                "solut_desc": detail_row[19] or ""  # solut_desc
+                "solut_desc": detail_row[19] or "",  # solut_desc
+                "files": files  # 新增檔案列表
             }
             consolidated_content.append(content_item)
         
@@ -647,6 +711,75 @@ async def get_report_detail(
     except Exception as e:
         logger.error(f"Error getting report detail: {str(e)}")
         raise HTTPException(status_code=500, detail="取得日報詳情失敗")
+
+@router.get("/files/download/{file_id}")
+async def download_file(
+    file_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    """下載檔案"""
+    try:
+        if not current_user.employee:
+            raise HTTPException(status_code=404, detail="該用戶不是員工")
+        
+        legacy_db = next(get_legacy_db())
+        
+        # 查詢檔案資訊
+        file_sql = text("""
+            SELECT filepath, filename, cocode, empno, docdate
+            FROM jps.tdr_upload_file
+            WHERE id = :file_id AND status = 'Online'
+        """)
+        
+        file_result = legacy_db.execute(file_sql, {"file_id": file_id})
+        file_row = file_result.fetchone()
+        
+        if not file_row:
+            raise HTTPException(status_code=404, detail="檔案不存在")
+        
+        filepath = file_row[0]
+        filename = file_row[1]
+        
+        # 檢查檔案是否存在於檔案系統中
+        upload_dir = Path("uploads")
+        
+        # 嘗試多種可能的檔案路徑
+        possible_paths = [
+            # 1. 使用資料庫中的 filepath
+            upload_dir / filepath if not os.path.isabs(filepath) else Path(filepath),
+            # 2. 直接使用檔名
+            upload_dir / filename,
+            # 3. 在 uploads 目錄下搜尋包含原始檔名的檔案
+        ]
+        
+        # 搜尋 uploads 目錄下所有包含原始檔名的檔案
+        if upload_dir.exists():
+            for file_path in upload_dir.glob("*"):
+                if file_path.is_file() and filename in file_path.name:
+                    possible_paths.append(file_path)
+        
+        full_path = None
+        for path in possible_paths:
+            if path and path.exists():
+                full_path = path
+                break
+        
+        if not full_path:
+            logger.warning(f"檔案不存在: filepath={filepath}, filename={filename}")
+            raise HTTPException(status_code=404, detail=f"檔案在檔案系統中不存在: {filename}")
+        
+        # 返回檔案
+        return FileResponse(
+            path=str(full_path),
+            filename=filename,
+            media_type='application/octet-stream'
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading file {file_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="下載檔案失敗")
 
 @router.post("/reports/{report_id}/ai-suggestions")
 async def get_ai_suggestions(
@@ -871,6 +1004,7 @@ async def get_daily_homepage_reports(
                 "other_ask": row[28] == 'true',  # other_ask
                 "is_forwarded": row[29] == 'true',  # isForwarded
                 "attachments": [f for f in [row[6], row[7], row[8]] if f],  # att_file1-3
+                "has_attachments": any(f for f in [row[6], row[7], row[8]] if f),  # 判斷是否有附件
                 "customers": [
                     {"name": row[9], "company": row[12]} if row[9] else None,  # cust_ename1, cust_comp_abbv1
                     {"name": row[10], "company": row[13]} if row[10] else None,  # cust_ename2, cust_comp_abbv2

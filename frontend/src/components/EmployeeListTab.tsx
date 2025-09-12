@@ -102,7 +102,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   const renderResponseStatus = (report: HomepageReport) => {
     const replyCount = report.reply_count || 0;
     const replierCount = report.replier_count || 0;
-    
+
     if (replyCount === 0) {
       // 沒有任何回應
       return null;
@@ -116,15 +116,16 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       // 都有回應 (reply_count > replier_count)
       return <img src="/hearts.gif" alt="雙方回應" className="w-6 h-6" />;
     }
-    
+
     return null;
   };
 
-  // 渲染內容欄位 - my_ask 和 other_ask 圖片
+  // 渲染內容欄位 - my_ask、other_ask 和附件圖片
   const renderContentStatus = (report: HomepageReport) => {
     const hasMyAsk = report.my_ask;
     const hasOtherAsk = report.other_ask;
-    
+    const hasAttachments = report.attachments && report.attachments.length > 0;
+
     return (
       <div className="flex items-center space-x-1">
         {hasMyAsk && (
@@ -132,6 +133,14 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         )}
         {hasOtherAsk && (
           <img src="/other_ask.png" alt="他人提問" className="w-5 h-5" />
+        )}
+        {hasAttachments && (
+          <img
+            src="/attached.gif"
+            alt="有附件"
+            className="w-5 h-5"
+            title="此日報包含附件"
+          />
         )}
       </div>
     );

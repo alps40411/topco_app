@@ -49,14 +49,14 @@ const DailyReportTab: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+  const [editingSopno, setEditingSopno] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
   const { authFetch, user } = useAuth();
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAllAi, setIsGeneratingAllAi] = useState(false);
-  const [generatingAiFor, setGeneratingAiFor] = useState<Set<number>>(
+  const [generatingAiFor, setGeneratingAiFor] = useState<Set<string>>(
     new Set()
   );
 
@@ -170,37 +170,29 @@ const DailyReportTab: React.FC = () => {
     }
   }, [authFetch]);
 
-  const handleEnhanceOne = async (projectId: number) => {
+  const handleEnhanceOne = async (sopno: string) => {
     if (!authFetch || !user?.employee?.empno) return;
-    setGeneratingAiFor((prev) => new Set([...prev, projectId]));
+    
+    // 找到對應的報告 - 使用 sopno 精確識別
+    const report = reports.find((r) => r.sopno === sopno);
+    if (!report) {
+      throw new Error("找不到對應的報告");
+    }
+    
+    // 使用 daily_no + sopno 作為唯一識別符
+    const reportKey = `${report.daily_no}-${report.sopno}`;
+    setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
+    
     try {
-      // 找到對應的報告
-      const report = reports.find((r) => r.project.id === projectId);
-      if (!report) {
-        throw new Error("找不到對應的報告");
-      }
 
-      // 調試：查看報告的實際結構
-      console.log("報告數據:", report);
-      console.log("daily_no:", report.daily_no);
-      console.log("projectId:", projectId);
-      console.log("report.project.id:", report.project.id);
-
-      // 我們需要從報告中獲取 planno 和 daily_no
+      // 驗證必要字段
       if (!report.daily_no) {
-        throw new Error(
-          `找不到該專案的記錄ID。報告數據: ${JSON.stringify(report)}`
-        );
+        throw new Error("找不到該報告的daily_no");
       }
 
-      // 使用sopno來精確識別要增強的記錄
       if (!report.sopno) {
-        throw new Error("找不到執行工作編號，無法進行AI增強");
+        throw new Error("找不到執行工作編號(sopno)，無法進行AI增強");
       }
-
-      console.log(
-        `準備調用API: /api/ai/enhance_one/${report.daily_no}/${report.sopno}`
-      );
 
       const response = await authFetch(
         `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
@@ -218,10 +210,10 @@ const DailyReportTab: React.FC = () => {
 
       const enhancedReport = await response.json();
 
-      // 更新報告內容
+      // 更新報告內容 - 使用 daily_no + sopno 精確識別
       setReports((prev) =>
         prev.map((r) =>
-          r.project.id === projectId
+          r.daily_no === report.daily_no && r.sopno === report.sopno
             ? { ...r, ai_content: enhancedReport.ai_content }
             : r
         )
@@ -235,7 +227,7 @@ const DailyReportTab: React.FC = () => {
     } finally {
       setGeneratingAiFor((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(projectId);
+        newSet.delete(reportKey);
         return newSet;
       });
     }
@@ -258,9 +250,12 @@ const DailyReportTab: React.FC = () => {
           return;
         }
 
+        // 使用 daily_no + sopno 作為唯一識別符
+        const reportKey = `${report.daily_no}-${report.sopno}`;
+        
         try {
           // 設置該專案為生成中狀態
-          setGeneratingAiFor((prev) => new Set([...prev, report.project.id]));
+          setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
 
           const response = await authFetch(
             `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
@@ -275,10 +270,10 @@ const DailyReportTab: React.FC = () => {
           if (response.ok) {
             const enhancedReport = await response.json();
 
-            // 更新該專案的AI內容
+            // 更新該專案的AI內容 - 使用 daily_no + sopno 精確識別
             setReports((prev) =>
               prev.map((r) =>
-                r.project.id === report.project.id
+                r.daily_no === report.daily_no && r.sopno === report.sopno
                   ? { ...r, ai_content: enhancedReport.ai_content }
                   : r
               )
@@ -295,7 +290,7 @@ const DailyReportTab: React.FC = () => {
           // 清除該專案的生成中狀態
           setGeneratingAiFor((prev) => {
             const newSet = new Set(prev);
-            newSet.delete(report.project.id);
+            newSet.delete(reportKey);
             return newSet;
           });
         }
@@ -315,7 +310,11 @@ const DailyReportTab: React.FC = () => {
   };
 
   const startEdit = (report: ConsolidatedReport) => {
-    setEditingProjectId(report.project.id);
+    if (!report.sopno) {
+      toast.error("無法編輯：缺少執行工作編號");
+      return;
+    }
+    setEditingSopno(report.sopno);
     setEditContent(report.content);
     setEditFiles(
       report.files.map((f) => ({
@@ -327,17 +326,17 @@ const DailyReportTab: React.FC = () => {
   };
 
   const cancelEdit = () => {
-    setEditingProjectId(null);
+    setEditingSopno(null);
     setEditContent("");
     setEditFiles([]);
   };
 
   const saveEdit = async () => {
-    if (editingProjectId === null || !authFetch) return;
+    if (editingSopno === null || !authFetch) return;
     setIsSaving(true);
     try {
       const reportToUpdate = reports.find(
-        (r) => r.project.id === editingProjectId
+        (r) => r.sopno === editingSopno
       );
       if (!reportToUpdate) throw new Error("找不到原始報告");
 
@@ -364,7 +363,7 @@ const DailyReportTab: React.FC = () => {
 
       setReports((prevReports) =>
         prevReports.map((r) =>
-          r.project.id === editingProjectId
+          r.sopno === editingSopno
             ? {
                 ...r,
                 content: editContent,
@@ -560,7 +559,7 @@ const DailyReportTab: React.FC = () => {
       let daily_no;
       try {
         const existingDraftsResponse = await authFetch(
-          `/api/legacy/drafts/${user.employee.empno}?draft_type=TEMP`
+          `/api/drafts/${user.employee.empno}?draft_type=TEMP`
         );
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
@@ -609,7 +608,7 @@ const DailyReportTab: React.FC = () => {
       };
 
       // 保存暫存
-      const saveResponse = await authFetch("/api/legacy/drafts", {
+      const saveResponse = await authFetch("/api/drafts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -709,7 +708,7 @@ const DailyReportTab: React.FC = () => {
           <div className="flex flex-row items-center gap-3">
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
-              disabled={editingProjectId !== null || generatingAiFor.size > 0}
+              disabled={editingSopno !== null || generatingAiFor.size > 0}
               className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -721,7 +720,7 @@ const DailyReportTab: React.FC = () => {
               disabled={
                 isGeneratingAllAi ||
                 reports.length === 0 ||
-                editingProjectId !== null ||
+                editingSopno !== null ||
                 generatingAiFor.size > 0
               }
               className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300 flex-shrink-0"
@@ -744,7 +743,7 @@ const DailyReportTab: React.FC = () => {
             </button>
             <button
               onClick={handleSubmitReport}
-              disabled={isSubmitting || editingProjectId !== null}
+              disabled={isSubmitting || editingSopno !== null}
               className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -788,18 +787,18 @@ const DailyReportTab: React.FC = () => {
                           </span>
                         )}
                     </div>
-                    {editingProjectId !== report.project.id && (
+                    {editingSopno !== report.sopno && (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleEnhanceOne(report.project.id)}
+                          onClick={() => handleEnhanceOne(report.sopno!)}
                           disabled={
                             generatingAiFor.size > 0 ||
                             isGeneratingAllAi ||
-                            editingProjectId !== null
+                            editingSopno !== null
                           }
                           className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
                         >
-                          {generatingAiFor.has(report.project.id) ? (
+                          {generatingAiFor.has(`${report.daily_no}-${report.sopno}`) ? (
                             <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
                           ) : (
                             <Wand2 className="w-4 h-4 mr-2" />
@@ -841,7 +840,7 @@ const DailyReportTab: React.FC = () => {
                 </div>
 
                 <div className="flex-grow">
-                  {editingProjectId === report.project.id ? (
+                  {editingSopno === report.sopno ? (
                     <div className="space-y-4">
                       <textarea
                         value={editContent}
@@ -876,9 +875,19 @@ const DailyReportTab: React.FC = () => {
                     <div className="space-y-4">
                       {/* 報告內容 */}
                       <div>
-                        <p className="prose max-w-none text-gray-700 whitespace-pre-wrap">
-                          {report.content}
-                        </p>
+                        <div className="flex items-start space-x-2">
+                          <p className="prose max-w-none text-gray-700 whitespace-pre-wrap flex-1">
+                            {report.content}
+                          </p>
+                          {/* {report.files && report.files.length > 0 && (
+                            <img
+                              src="/attached.gif"
+                              alt="有附件"
+                              className="w-4 h-4 mt-1 flex-shrink-0"
+                              title="此日報包含附件"
+                            />
+                          )} */}
+                        </div>
                         <AttachedFilesDisplay files={report.files} />
                       </div>
                     </div>
@@ -894,7 +903,7 @@ const DailyReportTab: React.FC = () => {
                       <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
                     </div>
                   </div>
-                  {generatingAiFor.has(report.project.id) ? (
+                  {generatingAiFor.has(`${report.daily_no}-${report.sopno}`) ? (
                     <p className="text-sm text-gray-500 italic">
                       AI 正在為此專案生成潤飾內容...
                     </p>
@@ -915,7 +924,7 @@ const DailyReportTab: React.FC = () => {
               )}
 
               {/* --- Apply AI Suggestion Button (FINAL - Corrected Position) --- */}
-              {editingProjectId === report.project.id &&
+              {editingSopno === report.sopno &&
                 isAiViewActive &&
                 report.ai_content && (
                   <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
