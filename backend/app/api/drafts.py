@@ -74,6 +74,108 @@ async def save_draft(
         logger.error(f"Error saving draft: {str(e)}")
         raise HTTPException(status_code=500, detail=f"暫存保存失敗: {str(e)}")
 
+@router.put("/by-daily-planno-sopno/{daily_no}/{planno}/{sopno}")
+async def update_draft_by_daily_planno_sopno(
+    daily_no: str,
+    planno: str,
+    sopno: str,
+    update_data: Dict[str, Any],
+    db: Session = Depends(get_legacy_db)
+):
+    """根據 daily_no、planno 和 sopno 更新特定的暫存記錄"""
+    try:
+        logger.info(f"🔥 UPDATE DRAFT API - 收到更新數據: daily_no={daily_no}, planno={planno}, sopno={sopno}, data={update_data}")
+        
+        # 檢查記錄是否存在 - 使用 planno + sopno 組合
+        check_sql = text("""
+            SELECT RECORD_ID, CONTENT, FILES, ATT_FILE1, ATT_FILE2
+            FROM jps.tdr_draft
+            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
+        """)
+        
+        existing_record = db.execute(check_sql, {
+            "daily_no": daily_no,
+            "planno": planno,
+            "sopno": sopno
+        }).fetchone()
+        
+        if not existing_record:
+            raise HTTPException(status_code=404, detail="找不到指定的暫存記錄")
+        
+        # 準備更新數據
+        content = update_data.get('content', '')
+        files = update_data.get('files', [])
+        
+        # 處理檔案
+        att_file1_list = []
+        att_file2_list = []
+        files_json_list = []
+        
+        for file_info in files:
+            if isinstance(file_info, dict):
+                file_name = file_info.get('name', '')
+                file_url = file_info.get('url', '')
+                if file_name:
+                    att_file1_list.append(file_name)
+                if file_url:
+                    att_file2_list.append(file_url)
+                files_json_list.append(file_info)
+        
+        att_file1 = ','.join(att_file1_list) if att_file1_list else ""
+        att_file2 = ','.join(att_file2_list) if att_file2_list else ""
+        files_json = json.dumps(files_json_list, ensure_ascii=False) if files_json_list else "[]"
+        
+        # 計算字數
+        word_count = len(content) if content else 0
+        
+        # 更新記錄
+        from datetime import datetime
+        now = datetime.now()
+        current_date = now.strftime('%Y%m%d')
+        current_time = now.strftime('%H:%M:%S')
+        
+        update_sql = text("""
+            UPDATE jps.tdr_draft 
+            SET CONTENT = :content,
+                WORD_COUNT = :word_count,
+                ATT_FILE1 = :att_file1,
+                ATT_FILE2 = :att_file2,
+                FILES = :files,
+                UPDATED_DATE = :updated_date,
+                UPDATED_TIME = :updated_time
+            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
+        """)
+        
+        db.execute(update_sql, {
+            "content": content,
+            "word_count": word_count,
+            "att_file1": att_file1,
+            "att_file2": att_file2,
+            "files": files_json,
+            "updated_date": current_date,
+            "updated_time": current_time,
+            "daily_no": daily_no,
+            "planno": planno,
+            "sopno": sopno
+        })
+        
+        db.commit()
+        logger.info(f"🔥 UPDATE DRAFT API - 更新完成: daily_no={daily_no}, planno={planno}, sopno={sopno}")
+        
+        return {
+            "message": "暫存記錄更新成功",
+            "daily_no": daily_no,
+            "planno": planno,
+            "sopno": sopno
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating draft: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新暫存記錄失敗: {str(e)}")
+
 @router.get("/{empno}")
 async def get_drafts(
     empno: str,

@@ -130,9 +130,10 @@ async def _generate_supervisor_reply_suggestions(report_content: str, employee_n
     
     return suggestions
 
-@router.post("/enhance_one/{daily_no}/{sopno}")
+@router.post("/enhance_one/{daily_no}/{planno}/{sopno}")
 async def enhance_record(
     daily_no: str,
+    planno: str,
     sopno: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
@@ -140,25 +141,26 @@ async def enhance_record(
     """AI 增強單個記錄"""
     try:
         print("!!! FUNCTION CALLED !!!")  # 強制輸出
-        logger.error(f"! [FORCE] 函數被調用: daily_no={daily_no}, sopno={sopno}")
+        logger.error(f"! [FORCE] 函數被調用: daily_no={daily_no}, planno={planno}, sopno={sopno}")
         
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="User has no employee information")
         
         empno = current_user.employee.empno
-        logger.info(f"[DEBUG] 請求參數: daily_no={daily_no}, sopno={sopno}, empno={empno}")
+        logger.info(f"[DEBUG] 請求參數: daily_no={daily_no}, planno={planno}, sopno={sopno}, empno={empno}")
         
-        # 查詢記錄內容 - 使用 daily_no + sopno 來精確識別單一記錄，同時取得FILES欄位
+        # 查詢記錄內容 - 使用 daily_no + planno + sopno 來精確識別單一記錄，同時取得FILES欄位
         record_sql = text("""
             SELECT DAILY_NO, CONTENT, PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C,
                    WORK_ITEM_SEQ, SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC,
                    EXECUTION_TIME_MINUTES, AI_CONTENT, FILES
             FROM jps.tdr_draft
-            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno
+            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
         """)
         
         record_result = db.execute(record_sql, {
             "daily_no": daily_no,
+            "planno": planno,
             "sopno": sopno,
             "empno": empno
         }).fetchone()
@@ -250,11 +252,12 @@ async def enhance_record(
             SET AI_CONTENT = :ai_content,
                 UPDATED_DATE = TO_CHAR(sysdate, 'YYYYMMDD'),
                 UPDATED_TIME = TO_CHAR(sysdate, 'HH24:MI:SS')
-            WHERE DAILY_NO = :daily_no AND SOPNO = :sopno AND EMPNO = :empno
+            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
         """)
         
         db.execute(update_sql, {
             "daily_no": daily_no,
+            "planno": planno,
             "sopno": sopno,
             "empno": empno,
             "ai_content": enhanced_content

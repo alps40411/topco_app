@@ -172,19 +172,18 @@ const DailyReportTab: React.FC = () => {
 
   const handleEnhanceOne = async (sopno: string) => {
     if (!authFetch || !user?.employee?.empno) return;
-    
+
     // 找到對應的報告 - 使用 sopno 精確識別
     const report = reports.find((r) => r.sopno === sopno);
     if (!report) {
       throw new Error("找不到對應的報告");
     }
-    
+
     // 使用 daily_no + sopno 作為唯一識別符
     const reportKey = `${report.daily_no}-${report.sopno}`;
     setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
-    
-    try {
 
+    try {
       // 驗證必要字段
       if (!report.daily_no) {
         throw new Error("找不到該報告的daily_no");
@@ -194,8 +193,11 @@ const DailyReportTab: React.FC = () => {
         throw new Error("找不到執行工作編號(sopno)，無法進行AI增強");
       }
 
+      // 檢查 planno 是否存在，如果不存在則使用空字串
+      const planno = report.project?.planno || "";
+
       const response = await authFetch(
-        `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
+        `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}`,
         {
           method: "POST",
           headers: {
@@ -250,15 +252,18 @@ const DailyReportTab: React.FC = () => {
           return;
         }
 
+        // 檢查 planno 是否存在，如果不存在則使用空字串
+        const planno = report.project?.planno || "";
+
         // 使用 daily_no + sopno 作為唯一識別符
         const reportKey = `${report.daily_no}-${report.sopno}`;
-        
+
         try {
           // 設置該專案為生成中狀態
           setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
 
           const response = await authFetch(
-            `/api/ai/enhance_one/${report.daily_no}/${report.sopno}`,
+            `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}`,
             {
               method: "POST",
               headers: {
@@ -335,9 +340,7 @@ const DailyReportTab: React.FC = () => {
     if (editingSopno === null || !authFetch) return;
     setIsSaving(true);
     try {
-      const reportToUpdate = reports.find(
-        (r) => r.sopno === editingSopno
-      );
+      const reportToUpdate = reports.find((r) => r.sopno === editingSopno);
       if (!reportToUpdate) throw new Error("找不到原始報告");
 
       // 使用sopno來精確識別要更新的記錄
@@ -345,8 +348,11 @@ const DailyReportTab: React.FC = () => {
         throw new Error("找不到執行工作編號，無法更新記錄");
       }
 
+      // 檢查 planno 是否存在，如果不存在則使用空字串
+      const planno = reportToUpdate.project?.planno || "";
+
       const response = await authFetch(
-        `/api/drafts/by-daily-sopno/${reportToUpdate.daily_no}/${reportToUpdate.sopno}`,
+        `/api/drafts/by-daily-planno-sopno/${reportToUpdate.daily_no}/${planno}/${reportToUpdate.sopno}`,
         {
           method: "PUT",
           headers: {
@@ -798,7 +804,9 @@ const DailyReportTab: React.FC = () => {
                           }
                           className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
                         >
-                          {generatingAiFor.has(`${report.daily_no}-${report.sopno}`) ? (
+                          {generatingAiFor.has(
+                            `${report.daily_no}-${report.sopno}`
+                          ) ? (
                             <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
                           ) : (
                             <Wand2 className="w-4 h-4 mr-2" />

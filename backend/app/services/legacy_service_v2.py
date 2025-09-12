@@ -100,9 +100,9 @@ class LegacyReportServiceV2:
                         att_file2_list.append(file_url)
                     files_json_list.append(file_info)
             
-            att_file1 = ','.join(att_file1_list) if att_file1_list else None
-            att_file2 = ','.join(att_file2_list) if att_file2_list else None
-            files_json = json.dumps(files_json_list, ensure_ascii=False) if files_json_list else None
+            att_file1 = ','.join(att_file1_list) if att_file1_list else ""
+            att_file2 = ','.join(att_file2_list) if att_file2_list else ""
+            files_json = json.dumps(files_json_list, ensure_ascii=False) if files_json_list else "[]"
             
             logger.info(f"DRAFT 多檔案處理: att_file1={att_file1}, att_file2={att_file2}")
             
@@ -198,8 +198,8 @@ class LegacyReportServiceV2:
                     merged_files = existing_files
                 
                 # 合併 att_file1 (檔案名稱) 和 att_file2 (檔案路徑)
-                merged_att_file1 = existing_att_file1
-                merged_att_file2 = existing_att_file2
+                merged_att_file1 = existing_att_file1 or ""
+                merged_att_file2 = existing_att_file2 or ""
                 
                 if att_file1:  # 有新的檔案名稱
                     if merged_att_file1:
@@ -226,8 +226,8 @@ class LegacyReportServiceV2:
                         CONTENT = :content,
                         EXECUTION_TIME_MINUTES = :execution_time_minutes,
                         WORD_COUNT = :word_count,
-                        ATT_FILE1 = COALESCE(:att_file1, ATT_FILE1),
-                        ATT_FILE2 = COALESCE(:att_file2, ATT_FILE2),
+                        ATT_FILE1 = :att_file1,
+                        ATT_FILE2 = :att_file2,
                         FILES = :files,
                         UPDATED_DATE = :updated_date,
                         UPDATED_TIME = :updated_time
