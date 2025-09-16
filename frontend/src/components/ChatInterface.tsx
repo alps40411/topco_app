@@ -157,13 +157,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   }, [fetchComments, authFetch]);
 
-  const handleSubmitMessage = async () => {
-    if (!newMessage.trim() || !authFetch) return;
+  const handleSubmitMessage = async (useDefaultMessage = false) => {
+    const finalMessage = useDefaultMessage ? "瞭解!" : newMessage.trim();
+    if (!finalMessage || !authFetch) return;
     setIsSubmitting(true);
     try {
       const response = await authFetch(`/api/reports/${reportId}/comments`, {
         method: "POST",
-        body: JSON.stringify({ content: newMessage }),
+        body: JSON.stringify({ content: finalMessage }),
       });
       if (response.ok) {
         setNewMessage("");
@@ -180,8 +181,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  const handleSubmitReview = async () => {
-    if (!reviewComment.trim()) {
+  const handleSubmitReview = async (useDefaultComment = false) => {
+    const finalComment = useDefaultComment ? "瞭解!" : reviewComment.trim();
+    if (!finalComment) {
       toast.error("請輸入審閱意見");
       return;
     }
@@ -194,7 +196,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         body: JSON.stringify({
           daily_no: reportId.toString(),
           score: selectedRating,
-          reply_memo: reviewComment.trim(),
+          reply_memo: finalComment,
           forward_users:
             selectedForwardUsers.length > 0 ? selectedForwardUsers : null,
         }),
@@ -235,7 +237,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmitMessage();
+      handleSubmitMessage(!newMessage.trim());
     }
   };
 
@@ -435,7 +437,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     "Go Ahead !",
     "Well Done & Thanks !",
     "內容過於簡單 !",
-    "瞭解 !",
+    "瞭解!",
   ];
   if (isLoading) {
     return (
@@ -516,7 +518,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   {/* 建議回復區塊 */}
                   <div className="mb-3">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-blue-700">快速回復建議：</p>
+                      <p className="text-xs text-blue-700">快速回覆建議：</p>
                       <button
                         onClick={handleGetAISuggestions}
                         disabled={isLoadingAI}
@@ -616,14 +618,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     disabled={isSubmitting}
                   />
 
-
                   <div className="flex space-x-2">
                     <button
-                      onClick={handleSubmitReview}
-                      disabled={!reviewComment.trim() || isSubmitting}
+                      onClick={() => handleSubmitReview(!reviewComment.trim())}
+                      disabled={isSubmitting}
                       className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                     >
-                      {isSubmitting ? "提交中..." : "提交評分"}
+                      {isSubmitting ? "提交中..." : (reviewComment.trim() ? "提交評分" : "瞭解!")}
                     </button>
                     <button
                       onClick={() => {
@@ -661,10 +662,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <User className="w-4 h-4 mr-2" />
                   {isReportSupervisor && user.employee?.id !== reportOwnerId
                     ? "追加留言"
-                    : "員工回復"}
+                    : "員工回覆"}
                 </h4>
                 <div className="mb-3">
-                  <p className="text-xs text-slate-700 mb-2">快速回復建議：</p>
+                  <p className="text-xs text-slate-700 mb-2">快速回覆建議：</p>
                   <div className="flex flex-wrap gap-2">
                     {(isReportSupervisor &&
                     hasSubmittedReview &&
@@ -689,7 +690,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   placeholder={
                     user?.is_supervisor && user.employee?.id !== reportOwnerId
                       ? "輸入追加留言..."
-                      : "輸入您的回復..."
+                      : "輸入您的回覆..."
                   }
                   className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3"
                   rows={4}
@@ -697,11 +698,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 />
                 <div className="flex space-x-2">
                   <button
-                    onClick={handleSubmitMessage}
-                    disabled={!newMessage.trim() || isSubmitting}
+                    onClick={() => handleSubmitMessage(!newMessage.trim())}
+                    disabled={isSubmitting}
                     className="px-4 py-2 bg-slate-500 text-white rounded hover:bg-slate-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
-                    {isSubmitting ? "提交中..." : "確定送出"}
+                    {isSubmitting ? "提交中..." : (newMessage.trim() ? "確定送出" : "瞭解!")}
                   </button>
                   <button
                     onClick={() => setNewMessage("")}
