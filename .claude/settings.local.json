@@ -34,7 +34,11 @@
       "Read(/D:\\topco\\Desktop\\topco_app\\backend/**)",
       "Bash(cd:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(dir:*)",
+      "Bash(powershell:*)",
+      "Bash(where python)",
+      "Bash(telnet:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

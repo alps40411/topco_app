@@ -658,12 +658,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             user.employee?.id === reportOwnerId) && (
             <div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-slate-900 mb-3 flex items-center">
-                  <User className="w-4 h-4 mr-2" />
-                  {isReportSupervisor && user.employee?.id !== reportOwnerId
-                    ? "追加留言"
-                    : "員工回覆"}
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-slate-900 flex items-center">
+                    <User className="w-4 h-4 mr-2" />
+                    {isReportSupervisor && user.employee?.id !== reportOwnerId
+                      ? "追加留言"
+                      : "員工回覆"}
+                  </h4>
+                  <button
+                    onClick={() => handleSubmitMessage(true)}
+                    disabled={isSubmitting}
+                    className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isSubmitting ? "送出中..." : "瞭解!"}
+                  </button>
+                </div>
                 <div className="mb-3">
                   <p className="text-xs text-slate-700 mb-2">快速回覆建議：</p>
                   <div className="flex flex-wrap gap-2">
@@ -698,11 +707,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 />
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => handleSubmitMessage(!newMessage.trim())}
+                    onClick={() => handleSubmitMessage()}
                     disabled={isSubmitting}
                     className="px-4 py-2 bg-slate-500 text-white rounded hover:bg-slate-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
-                    {isSubmitting ? "提交中..." : (newMessage.trim() ? "確定送出" : "瞭解!")}
+                    {isSubmitting ? "提交中..." : "確認送出"}
                   </button>
                   <button
                     onClick={() => setNewMessage("")}

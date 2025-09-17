@@ -14,6 +14,7 @@ import AttachedFilesManager from "./AttachedFilesManager";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import ServiceSelector from "./ServiceSelector";
+import DateSelector from "./DateSelector";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 
@@ -43,25 +44,45 @@ const DataInputTab: React.FC = () => {
   const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
   const [serviceTargets, setServiceTargets] = useState<any[]>([]);
   const [hasWorkItems, setHasWorkItems] = useState<boolean>(true);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  const fetchConsolidatedToday = useCallback(async () => {
+  const fetchConsolidatedRecords = useCallback(async (docDate?: string) => {
+    if (!authFetch) return;
     setIsLoading(true);
     try {
-      const response = await authFetch("/api/records/consolidated/today");
+      const url = docDate 
+        ? `/api/records/consolidated/today?doc_date=${docDate}`
+        : "/api/records/consolidated/today";
+      const response = await authFetch(url);
       if (response.ok) {
         setConsolidatedRecords(await response.json());
       }
     } catch (error) {
-      console.error("取得今日彙整筆記失敗:", error);
-      toast.error("取得今日彙整筆記失敗");
+      console.error("取得彙整筆記失敗:", error);
+      toast.error("取得彙整筆記失敗");
     } finally {
       setIsLoading(false);
     }
-  }, []); // 移除authFetch依賴
+  }, [authFetch]);
 
+  // 初始化時載入今日資料
   useEffect(() => {
-    fetchConsolidatedToday();
-  }, [fetchConsolidatedToday]);
+    if (authFetch && selectedDate === null) {
+      fetchConsolidatedRecords(undefined);
+    }
+  }, [authFetch, fetchConsolidatedRecords]);
+
+  // 當日期變更時載入指定日期的資料
+  useEffect(() => {
+    if (authFetch && selectedDate !== null) {
+      fetchConsolidatedRecords(selectedDate || undefined);
+    }
+  }, [authFetch, selectedDate, fetchConsolidatedRecords]);
+
+  // 處理日期變更
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+  };
 
   const onSave = async () => {
     // 工作計畫現在為非必選項
@@ -143,7 +164,7 @@ const DataInputTab: React.FC = () => {
         daily_no,
         empno: user.employee.empno,
         cocode: user.employee.cocode || "001", // 預設公司代碼
-        doc_date: new Date().toISOString().slice(0, 10).replace(/-/g, ""), // YYYYMMDD
+        doc_date: selectedDate || new Date().toISOString().slice(0, 10).replace(/-/g, ""), // YYYYMMDD
         draft_type: "TEMP",
         draft_content: {
           content: currentRecord.content || "",
@@ -175,7 +196,7 @@ const DataInputTab: React.FC = () => {
         throw new Error("保存暫存失敗");
       }
 
-      await fetchConsolidatedToday(); // Re-fetch consolidated records
+      await fetchConsolidatedRecords(); // Re-fetch consolidated records
       setCurrentRecord({
         content: "",
         planno: undefined,
@@ -253,9 +274,16 @@ const DataInputTab: React.FC = () => {
     <div className="flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
       <div className="w-full lg:w-1/2">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 h-6 flex items-center">
-            記錄新筆記
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 h-6 flex items-center">
+              記錄新筆記
+            </h2>
+            <DateSelector
+              selectedDate={selectedDate || ""}
+              onDateChange={handleDateChange}
+              className="mt-2 sm:mt-0"
+            />
+          </div>
           <div className="space-y-6">
             {/* 級聯工作選擇器 */}
             <CascadingWorkSelector

@@ -25,6 +25,7 @@ import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import ServiceSelector from "./ServiceSelector";
+import DateSelector from "./DateSelector";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 
@@ -52,6 +53,7 @@ const DailyReportTab: React.FC = () => {
   const [editingSopno, setEditingSopno] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { authFetch, user } = useAuth();
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
@@ -116,11 +118,14 @@ const DailyReportTab: React.FC = () => {
     }));
   }, []);
 
-  const fetchReports = async () => {
+  const fetchReports = async (docDate?: string) => {
     if (!authFetch) return;
     setIsLoading(true);
     try {
-      const response = await authFetch("/api/records/consolidated/today");
+      const url = docDate 
+        ? `/api/records/consolidated/today?doc_date=${docDate}`
+        : "/api/records/consolidated/today";
+      const response = await authFetch(url);
       if (response.ok) {
         const data: ConsolidatedReport[] = await response.json();
         setReports(data);
@@ -162,13 +167,29 @@ const DailyReportTab: React.FC = () => {
     }
   };
 
+  // 初始化時載入專案、寫入狀態和今日報告
   useEffect(() => {
     if (authFetch) {
-      fetchReports();
       fetchProjects();
       fetchWritingStatus();
+      // 如果還沒有選擇日期，先載入今日資料
+      if (selectedDate === null) {
+        fetchReports(undefined);
+      }
     }
   }, [authFetch]);
+
+  // 當日期變更時載入報告
+  useEffect(() => {
+    if (authFetch && selectedDate !== null) {
+      fetchReports(selectedDate || undefined);
+    }
+  }, [authFetch, selectedDate]);
+
+  // 處理日期變更
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+  };
 
   const handleEnhanceOne = async (sopno: string) => {
     if (!authFetch || !user?.employee?.empno) return;
@@ -698,18 +719,25 @@ const DailyReportTab: React.FC = () => {
     <>
       <div className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 sm:mb-6 space-y-4 lg:space-y-0">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 h-6 sm:h-8 flex items-center">
-              日報編輯
-            </h2>
-            {writingStatus && (
-              <div className="flex flex-col sm:flex-row sm:items-center mt-1 text-sm text-gray-600">
-                <span className="mr-0 sm:mr-2">
-                  🕐 {writingStatus.current_time}
-                </span>
-                <span className="text-blue-600">{writingStatus.message}</span>
-              </div>
-            )}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:space-x-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 h-6 sm:h-8 flex items-center">
+                日報編輯
+              </h2>
+              {writingStatus && (
+                <div className="flex flex-col sm:flex-row sm:items-center mt-1 text-sm text-gray-600">
+                  <span className="mr-0 sm:mr-2">
+                    🕐 {writingStatus.current_time}
+                  </span>
+                  <span className="text-blue-600">{writingStatus.message}</span>
+                </div>
+              )}
+            </div>
+            <DateSelector
+              selectedDate={selectedDate || ""}
+              onDateChange={handleDateChange}
+              className="mt-2 lg:mt-0"
+            />
           </div>
           <div className="flex flex-row items-center gap-3">
             <button

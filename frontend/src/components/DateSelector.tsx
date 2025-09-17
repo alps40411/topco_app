@@ -1,0 +1,149 @@
+// frontend/src/components/DateSelector.tsx
+
+import React, { useState, useEffect } from "react";
+import { Calendar, ChevronDown } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
+
+interface DateOption {
+  value: string;
+  display: string;
+  date: string;
+  is_weekday: boolean;
+  is_today: boolean;
+  is_default: boolean;
+}
+
+interface DateSelectorProps {
+  selectedDate: string;
+  onDateChange: (date: string) => void;
+  className?: string;
+  disabled?: boolean;
+}
+
+const DateSelector: React.FC<DateSelectorProps> = ({
+  selectedDate,
+  onDateChange,
+  className = "",
+  disabled = false,
+}) => {
+  const [availableDates, setAvailableDates] = useState<DateOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentReportDate, setCurrentReportDate] = useState<string>("");
+  const { authFetch } = useAuth();
+
+  const fetchAvailableDates = async () => {
+    if (!authFetch) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await authFetch("/api/legacy/daily-date-range");
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableDates(data.data || []);
+        setCurrentReportDate(data.current_report_date || "");
+        
+        // 如果沒有選擇日期，使用預設日期
+        if (!selectedDate && data.current_report_date) {
+          onDateChange(data.current_report_date);
+        }
+      } else {
+        throw new Error("取得日期範圍失敗");
+      }
+    } catch (error) {
+      console.error("獲取可用日期失敗:", error);
+      toast.error("載入日期選項失敗");
+      
+      // 失敗時使用當前日期作為備選
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+      if (!selectedDate) {
+        onDateChange(todayStr);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAvailableDates();
+  }, [authFetch]);
+
+  const handleDateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newDate = event.target.value;
+    onDateChange(newDate);
+    
+    // 顯示選擇的日期信息
+    const selectedOption = availableDates.find(date => date.value === newDate);
+    if (selectedOption) {
+      if (selectedOption.is_today) {
+        toast.success(`已選擇今日日報 (${selectedOption.display})`);
+      } else {
+        toast.success(`已切換至 ${selectedOption.display} 的日報`);
+      }
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className={`flex items-center space-x-2 ${className}`}>
+        <Calendar className="w-4 h-4 text-gray-400" />
+        <div className="animate-pulse bg-gray-200 h-8 w-32 rounded"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center space-x-2 ${className}`}>
+      <Calendar className="w-4 h-4 text-gray-600" />
+      <div className="relative">
+        <select
+          value={selectedDate}
+          onChange={handleDateChange}
+          disabled={disabled}
+          className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed min-w-[160px]"
+        >
+          {availableDates.map((dateOption) => (
+            <option 
+              key={dateOption.value} 
+              value={dateOption.value}
+              className={
+                dateOption.is_today 
+                  ? "font-semibold" 
+                  : !dateOption.is_weekday 
+                    ? "text-gray-500" 
+                    : ""
+              }
+            >
+              {dateOption.display}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+      </div>
+      
+      {/* 日期信息提示 */}
+      {selectedDate && (
+        <div className="hidden sm:block text-xs text-gray-500">
+          {(() => {
+            const selectedOption = availableDates.find(date => date.value === selectedDate);
+            if (!selectedOption) return "";
+            
+            if (selectedOption.is_today) {
+              return "當前日報";
+            } else if (selectedOption.value === currentReportDate) {
+              return "預設日期";
+            } else if (!selectedOption.is_weekday) {
+              return "假日補報";
+            } else {
+              return "補報/預報";
+            }
+          })()}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DateSelector;
