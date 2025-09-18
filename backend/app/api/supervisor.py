@@ -590,18 +590,20 @@ async def get_report_detail(
                     execution_work_name_c = exec_work_row[0]
             
             # 處理工作計畫名稱，如果有編碼問題則使用預設值
-            plan_name = "基本工作項目"  # 預設使用基本工作項目
-            if detail_row[61]:
+            
+            if detail_row[35]:
                 try:
+                    plan_sql = text("SELECT plan_subj_c FROM jps.tjp_master WHERE planno = :planno")
+                    plan_result = legacy_db.execute(plan_sql, {"planno": detail_row[35]}).fetchone()
                     # 檢查中文字是否正常顯示
-                    test_str = str(detail_row[61])
+                    test_str = str(plan_result[0])
                     # 如果包含亂碼字符則使用預設值
                     if not any(c in test_str for c in ['？', '�', '?']) and len(test_str) > 0:
-                        # 進一步檢查是否包含正常中文字符
-                        if any('\u4e00' <= c <= '\u9fff' for c in test_str):
-                            plan_name = test_str
+                        plan_name = test_str
+                    else:
+                        plan_name = "基本工作項目"
                 except:
-                    pass  # 保持預設值
+                    plan_name = "基本工作項目"
             
             # 查詢該 daily_sub_nos 對應的檔案
             daily_sub_nos = detail_row[1]  # daily_sub_nos

@@ -17,8 +17,17 @@ import ServiceSelector from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
+import { useDataSync } from "../hooks/useDataSync";
 
-const DataInputTab: React.FC = () => {
+interface DataInputTabProps {
+  selectedDate: string | null;
+  onDateChange: (date: string) => void;
+}
+
+const DataInputTab: React.FC<DataInputTabProps> = ({
+  selectedDate,
+  onDateChange,
+}) => {
   const [consolidatedRecords, setConsolidatedRecords] = useState<
     ConsolidatedReport[]
   >([]);
@@ -44,26 +53,51 @@ const DataInputTab: React.FC = () => {
   const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
   const [serviceTargets, setServiceTargets] = useState<any[]>([]);
   const [hasWorkItems, setHasWorkItems] = useState<boolean>(true);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [writingStatus, setWritingStatus] = useState<any>(null);
 
-  const fetchConsolidatedRecords = useCallback(async (docDate?: string) => {
-    if (!authFetch) return;
-    setIsLoading(true);
-    try {
-      const url = docDate 
-        ? `/api/records/consolidated/today?doc_date=${docDate}`
-        : "/api/records/consolidated/today";
-      const response = await authFetch(url);
-      if (response.ok) {
-        setConsolidatedRecords(await response.json());
+  // 資料同步hook
+  const { immediateSync, batchSync } = useDataSync({ debounceMs: 200 });
+
+  const fetchWritingStatus = useCallback(
+    async (docDate?: string) => {
+      if (!authFetch) return;
+      try {
+        const url = docDate
+          ? `/api/records/writing-status?doc_date=${docDate}`
+          : "/api/records/writing-status";
+        const response = await authFetch(url);
+        if (response.ok) {
+          const status = await response.json();
+          setWritingStatus(status);
+        }
+      } catch (error) {
+        console.error("無法獲取填寫狀態:", error);
       }
-    } catch (error) {
-      console.error("取得彙整筆記失敗:", error);
-      toast.error("取得彙整筆記失敗");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authFetch]);
+    },
+    [authFetch]
+  );
+
+  const fetchConsolidatedRecords = useCallback(
+    async (docDate?: string) => {
+      if (!authFetch) return;
+      setIsLoading(true);
+      try {
+        const url = docDate
+          ? `/api/records/consolidated/today?doc_date=${docDate}`
+          : "/api/records/consolidated/today";
+        const response = await authFetch(url);
+        if (response.ok) {
+          setConsolidatedRecords(await response.json());
+        }
+      } catch (error) {
+        console.error("取得彙整筆記失敗:", error);
+        toast.error("取得彙整筆記失敗");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [authFetch]
+  );
 
   // 初始化時載入今日資料
   useEffect(() => {
@@ -76,12 +110,13 @@ const DataInputTab: React.FC = () => {
   useEffect(() => {
     if (authFetch && selectedDate !== null) {
       fetchConsolidatedRecords(selectedDate || undefined);
+      fetchWritingStatus(selectedDate || undefined);
     }
-  }, [authFetch, selectedDate, fetchConsolidatedRecords]);
+  }, [authFetch, selectedDate, fetchConsolidatedRecords, fetchWritingStatus]);
 
   // 處理日期變更
   const handleDateChange = (newDate: string) => {
-    setSelectedDate(newDate);
+    onDateChange(newDate);
   };
 
   const onSave = async () => {
@@ -133,11 +168,14 @@ const DataInputTab: React.FC = () => {
         return;
       }
 
-      // 檢查今天是否已經有暫存記錄（後端會自動處理8:30-8:30邏輯）
+      // 檢查今天是否已經有暫存記錄
       let daily_no;
       try {
+        const docDate = selectedDate
+          ? selectedDate.replace(/-/g, "")
+          : new Date().toISOString().slice(0, 10).replace(/-/g, "");
         const existingDraftsResponse = await authFetch(
-          `/api/drafts/${user.employee.empno}?draft_type=TEMP`
+          `/api/drafts/${user.employee.empno}?doc_date=${docDate}&draft_type=TEMP`
         );
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
@@ -164,7 +202,9 @@ const DataInputTab: React.FC = () => {
         daily_no,
         empno: user.employee.empno,
         cocode: user.employee.cocode || "001", // 預設公司代碼
-        doc_date: selectedDate || new Date().toISOString().slice(0, 10).replace(/-/g, ""), // YYYYMMDD
+        doc_date:
+          selectedDate ||
+          new Date().toISOString().slice(0, 10).replace(/-/g, ""), // YYYYMMDD
         draft_type: "TEMP",
         draft_content: {
           content: currentRecord.content || "",
@@ -196,7 +236,12 @@ const DataInputTab: React.FC = () => {
         throw new Error("保存暫存失敗");
       }
 
-      await fetchConsolidatedRecords(); // Re-fetch consolidated records
+      // 使用批次同步重新獲取最新資料，確保顯示正確的整合狀態
+      await batchSync([
+        () => fetchConsolidatedRecords(selectedDate || undefined),
+        () => fetchWritingStatus(selectedDate || undefined),
+      ]);
+
       setCurrentRecord({
         content: "",
         planno: undefined,
@@ -269,6 +314,49 @@ const DataInputTab: React.FC = () => {
       files: (prev.files || []).filter((file) => file.url !== fileUrl),
     }));
   };
+
+  // 只有在完全沒有其他可填寫日期時才顯示禁用提示
+  if (
+    writingStatus &&
+    !writingStatus.allowed &&
+    selectedDate &&
+    !writingStatus.has_other_writable_dates
+  ) {
+    return (
+      <div className="flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
+        <div className="w-full">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-yellow-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  無法填寫此日期的日報
+                </h3>
+                <p className="mt-1 text-sm text-yellow-700">
+                  {writingStatus.message}
+                </p>
+                <p className="mt-2 text-sm text-yellow-700">
+                  請等待隔天8:30後填寫新的日報。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 p-4 sm:p-6">

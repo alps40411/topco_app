@@ -1,6 +1,6 @@
 // frontend/src/components/DailyReportTab.tsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Upload,
   Edit,
@@ -39,9 +39,22 @@ interface WritingStatus {
   allowed: boolean;
   message: string;
   current_time: string;
+  has_other_writable_dates?: boolean;
 }
 
-const DailyReportTab: React.FC = () => {
+interface DailyReportTabProps {
+  selectedDate: string | null;
+  onDateChange: (date: string) => void;
+  onUploadComplete?: (uploadedDate: string) => void;
+  onSwitchToDaily?: () => void;
+}
+
+const DailyReportTab: React.FC<DailyReportTabProps> = ({
+  selectedDate,
+  onDateChange,
+  onUploadComplete,
+  onSwitchToDaily,
+}) => {
   const [reports, setReports] = useState<ConsolidatedReport[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(
@@ -53,7 +66,6 @@ const DailyReportTab: React.FC = () => {
   const [editingSopno, setEditingSopno] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { authFetch, user } = useAuth();
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
@@ -78,6 +90,11 @@ const DailyReportTab: React.FC = () => {
   const [isUploadingNewFile, setIsUploadingNewFile] = useState(false);
   const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
   const [serviceTargets, setServiceTargets] = useState<any[]>([]);
+
+  // 移除未使用的資料同步hook（避免不必要的性能開銷）
+
+  // DateSelector刷新函數的ref
+  const dateRefreshRef = useRef<(() => Promise<void>) | null>(null);
 
   // 服務資料載入回調
   const handleServiceDataLoaded = useCallback(
@@ -122,7 +139,7 @@ const DailyReportTab: React.FC = () => {
     if (!authFetch) return;
     setIsLoading(true);
     try {
-      const url = docDate 
+      const url = docDate
         ? `/api/records/consolidated/today?doc_date=${docDate}`
         : "/api/records/consolidated/today";
       const response = await authFetch(url);
@@ -141,10 +158,13 @@ const DailyReportTab: React.FC = () => {
     }
   };
 
-  const fetchWritingStatus = async () => {
+  const fetchWritingStatus = async (docDate?: string) => {
     if (!authFetch) return;
     try {
-      const response = await authFetch("/api/records/writing-status");
+      const url = docDate
+        ? `/api/records/writing-status?doc_date=${docDate}`
+        : "/api/records/writing-status";
+      const response = await authFetch(url);
       if (response.ok) {
         const status: WritingStatus = await response.json();
         setWritingStatus(status);
@@ -179,16 +199,17 @@ const DailyReportTab: React.FC = () => {
     }
   }, [authFetch]);
 
-  // 當日期變更時載入報告
+  // 當日期變更時載入報告和寫作狀態
   useEffect(() => {
     if (authFetch && selectedDate !== null) {
       fetchReports(selectedDate || undefined);
+      fetchWritingStatus(selectedDate || undefined);
     }
   }, [authFetch, selectedDate]);
 
   // 處理日期變更
   const handleDateChange = (newDate: string) => {
-    setSelectedDate(newDate);
+    onDateChange(newDate);
   };
 
   const handleEnhanceOne = async (sopno: string) => {
@@ -214,8 +235,8 @@ const DailyReportTab: React.FC = () => {
         throw new Error("找不到執行工作編號(sopno)，無法進行AI增強");
       }
 
-      // 檢查 planno 是否存在，如果不存在則使用空字串
-      const planno = report.project?.planno || "";
+      // 檢查 planno 是否存在，如果不存在則使用 "NULL" 作為佔位符
+      const planno = report.project?.planno || "NULL";
 
       const response = await authFetch(
         `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}`,
@@ -273,8 +294,8 @@ const DailyReportTab: React.FC = () => {
           return;
         }
 
-        // 檢查 planno 是否存在，如果不存在則使用空字串
-        const planno = report.project?.planno || "";
+        // 檢查 planno 是否存在，如果不存在則使用 "NULL" 作為佔位符
+        const planno = report.project?.planno || "NULL";
 
         // 使用 daily_no + sopno 作為唯一識別符
         const reportKey = `${report.daily_no}-${report.sopno}`;
@@ -369,8 +390,8 @@ const DailyReportTab: React.FC = () => {
         throw new Error("找不到執行工作編號，無法更新記錄");
       }
 
-      // 檢查 planno 是否存在，如果不存在則使用空字串
-      const planno = reportToUpdate.project?.planno || "";
+      // 檢查 planno 是否存在，如果不存在則使用 "NULL" 作為佔位符
+      const planno = reportToUpdate.project?.planno || "NULL";
 
       const response = await authFetch(
         `/api/drafts/by-daily-planno-sopno/${reportToUpdate.daily_no}/${planno}/${reportToUpdate.sopno}`,
@@ -388,17 +409,8 @@ const DailyReportTab: React.FC = () => {
 
       if (!response.ok) throw new Error("更新報告失敗");
 
-      setReports((prevReports) =>
-        prevReports.map((r) =>
-          r.sopno === editingSopno
-            ? {
-                ...r,
-                content: editContent,
-                files: editFiles as FileAttachment[],
-              }
-            : r
-        )
-      );
+      // 重新獲取最新內容
+      await fetchReports(selectedDate || undefined);
       toast.success("報告草稿更新成功！");
       cancelEdit();
     } catch (error) {
@@ -415,16 +427,25 @@ const DailyReportTab: React.FC = () => {
       toast.error("沒有可提交的報告內容。");
       return;
     }
+    if (!selectedDate) {
+      toast.error("請先選擇日期。");
+      return;
+    }
     if (!window.confirm("確定要提交此版本作為今日的最終日報嗎？")) return;
 
     setIsSubmitting(true);
     try {
-      const response = await authFetch("/api/legacy/upload-daily-report", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      // 將選中的日期轉換為 YYYYMMDD 格式
+      const docDate = selectedDate.replace(/-/g, "");
+      const response = await authFetch(
+        `/api/legacy/upload-daily-report?doc_date=${docDate}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
       if (!response.ok) {
         const errData = await response
           .json()
@@ -433,7 +454,19 @@ const DailyReportTab: React.FC = () => {
       }
       const result = await response.json();
       toast.success(`日報已成功上傳！日報編號: ${result.daily_no}`);
-      await fetchReports();
+
+      // 立即跳轉到日報首頁
+      if (onSwitchToDaily) {
+        console.log("Switching to daily homepage");
+        onSwitchToDaily();
+      }
+
+      // 重新獲取日期範圍（因為補教只會補教一次，當天就會從可用日期中移除）
+      if (dateRefreshRef.current) {
+        await dateRefreshRef.current();
+      }
+
+      // 用戶將跳轉到日報首頁，不需要重新獲取狀態
     } catch (error: any) {
       console.error(error);
       toast.error(`上傳日報時發生錯誤: ${error.message}`);
@@ -582,11 +615,14 @@ const DailyReportTab: React.FC = () => {
         return;
       }
 
-      // 檢查今天是否已經有暫存記錄（後端會自動處理8:30-8:30邏輯）
+      // 檢查今天是否已經有暫存記錄
       let daily_no;
       try {
+        const docDate = selectedDate
+          ? selectedDate.replace(/-/g, "")
+          : new Date().toISOString().slice(0, 10).replace(/-/g, "");
         const existingDraftsResponse = await authFetch(
-          `/api/drafts/${user.employee.empno}?draft_type=TEMP`
+          `/api/drafts/${user.employee.empno}?doc_date=${docDate}&draft_type=TEMP`
         );
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
@@ -613,7 +649,9 @@ const DailyReportTab: React.FC = () => {
         daily_no,
         empno: user.employee.empno,
         cocode: user.employee.cocode || "001", // 預設公司代碼
-        doc_date: new Date().toISOString().slice(0, 10).replace(/-/g, ""), // YYYYMMDD
+        doc_date: selectedDate
+          ? selectedDate.replace(/-/g, "")
+          : new Date().toISOString().slice(0, 10).replace(/-/g, ""), // YYYYMMDD
         draft_type: "TEMP",
         draft_content: {
           content: newRecord.content || "",
@@ -647,7 +685,9 @@ const DailyReportTab: React.FC = () => {
         throw new Error("保存暫存失敗");
       }
 
-      await fetchReports(); // Re-fetch consolidated records
+      // 重新獲取最新內容
+      await fetchReports(selectedDate || undefined);
+
       setNewRecord({
         content: "",
         project_id: undefined,
@@ -679,8 +719,13 @@ const DailyReportTab: React.FC = () => {
     return <div className="p-6 text-center">載入中...</div>;
   }
 
-  // 如果主管已審閱，顯示提示信息並禁止編輯
-  if (writingStatus && !writingStatus.allowed) {
+  // 只有在完全沒有其他可填寫日期時才顯示禁用提示
+  if (
+    writingStatus &&
+    !writingStatus.allowed &&
+    selectedDate &&
+    !writingStatus.has_other_writable_dates
+  ) {
     return (
       <div className="p-6">
         <div className="max-w-2xl mx-auto text-center">
@@ -703,11 +748,11 @@ const DailyReportTab: React.FC = () => {
               </div>
             </div>
             <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-              日報編輯已鎖定
+              無法填寫此日期的日報
             </h3>
             <p className="text-yellow-700 mb-4">{writingStatus.message}</p>
-            <p className="text-sm text-yellow-600">
-              當前時間: {writingStatus.current_time}
+            <p className="text-sm text-yellow-600 mb-4">
+              請等待隔天8:30後填寫新的日報。
             </p>
           </div>
         </div>
@@ -737,6 +782,8 @@ const DailyReportTab: React.FC = () => {
               selectedDate={selectedDate || ""}
               onDateChange={handleDateChange}
               className="mt-2 lg:mt-0"
+              onRefreshRef={dateRefreshRef}
+              showOnlyWritableDates={false}
             />
           </div>
           <div className="flex flex-row items-center gap-3">

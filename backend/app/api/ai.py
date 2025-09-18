@@ -140,14 +140,18 @@ async def enhance_record(
 ):
     """AI 增強單個記錄"""
     try:
+        # 處理空的 planno - 前端傳入 "NULL" 表示空值
+        if planno == "NULL":
+            planno = ""
+
         print("!!! FUNCTION CALLED !!!")  # 強制輸出
-        logger.error(f"! [FORCE] 函數被調用: daily_no={daily_no}, planno={planno}, sopno={sopno}")
-        
+        logger.error(f"! [FORCE] 函數被調用: daily_no={daily_no}, planno='{planno}', sopno={sopno}")
+
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="User has no employee information")
-        
+
         empno = current_user.employee.empno
-        logger.info(f"[DEBUG] 請求參數: daily_no={daily_no}, planno={planno}, sopno={sopno}, empno={empno}")
+        logger.info(f"[DEBUG] 請求參數: daily_no={daily_no}, planno='{planno}', sopno={sopno}, empno={empno}")
         
         # 查詢記錄內容 - 使用 daily_no + planno + sopno 來精確識別單一記錄，同時取得FILES欄位
         record_sql = text("""

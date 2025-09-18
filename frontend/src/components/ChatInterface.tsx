@@ -482,10 +482,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             user.employee?.id !== reportOwnerId && (
               <div className="mb-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
-                    <Crown className="w-4 h-4 mr-2" />
-                    主管評分與回饋
-                  </h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-medium text-blue-900 flex items-center">
+                      <Crown className="w-4 h-4 mr-2" />
+                      主管評分與回饋
+                    </h4>
+                    <button
+                      onClick={() => handleSubmitReview(true)}
+                      disabled={isSubmitting}
+                      className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isSubmitting ? "送出中..." : "瞭解!"}
+                    </button>
+                  </div>
                   <div className="mb-4">
                     <span className="text-sm font-medium text-gray-700 mr-4">
                       評分:
@@ -620,11 +629,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleSubmitReview(!reviewComment.trim())}
+                      onClick={() => handleSubmitReview(false)}
                       disabled={isSubmitting}
                       className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                     >
-                      {isSubmitting ? "提交中..." : (reviewComment.trim() ? "提交評分" : "瞭解!")}
+                      {isSubmitting ? "提交中..." : "提交評分"}
                     </button>
                     <button
                       onClick={() => {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { LogOut } from "lucide-react";
+import { toast } from "react-hot-toast";
 import DataInputTab from "./components/DataInputTab";
 import DailyReportTab from "./components/DailyReportTab";
 // import MyReportsTab from "./components/MyReportsTab"; // 已移除我的日報功能
@@ -19,6 +20,7 @@ interface WritingStatus {
   current_date: string;
   current_time: string;
   next_available_time: string;
+  has_other_writable_dates?: boolean;
 }
 // --- Interface Definitions ---
 export interface Project {
@@ -162,21 +164,33 @@ function App() {
     null
   );
 
+  // 全局日期狀態，讓隨筆紀錄頁和日報編輯頁共享
+  const [globalSelectedDate, setGlobalSelectedDate] = useState<string | null>(
+    null
+  );
+
   // 添加歷史管理的標籤切換函數
-  const changeTab = useCallback((tab: "input" | "daily" | "supervisor" | "ai" | "comprehensive") => {
-    setActiveTab(tab);
-    setSelectedEmployee(null);
-    setSelectedReportId(null);
-    // 為每個標籤創建瀏覽器歷史記錄
-    window.history.pushState({ tab }, "", `/?tab=${tab}`);
-  }, []);
+  const changeTab = useCallback(
+    (tab: "input" | "daily" | "supervisor" | "ai" | "comprehensive") => {
+      setActiveTab(tab);
+      setSelectedEmployee(null);
+      setSelectedReportId(null);
+      // 為每個標籤創建瀏覽器歷史記錄
+      window.history.pushState({ tab }, "", `/?tab=${tab}`);
+    },
+    []
+  );
 
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
     setSelectedEmployee(employee);
     setSelectedReportId(reportId);
     setActiveTab("supervisor"); // 切換到審閱模式
     // 為員工詳情創建歷史記錄
-    window.history.pushState({ tab: "supervisor", employee: employee.id, report: reportId }, "", `/?tab=supervisor&employee=${employee.id}&report=${reportId}`);
+    window.history.pushState(
+      { tab: "supervisor", employee: employee.id, report: reportId },
+      "",
+      `/?tab=supervisor&employee=${employee.id}&report=${reportId}`
+    );
   };
 
   const handleBackFromDetail = () => {
@@ -198,25 +212,53 @@ function App() {
     fetchWritingStatus();
   };
 
-  const fetchWritingStatus = useCallback(async () => {
-    if (!authFetch || !user?.employee) return;
+  // 處理上傳完成後的跳轉
+  const handleUploadComplete = useCallback((uploadedDate: string) => {
+    console.log("handleUploadComplete called with:", uploadedDate);
 
-    try {
-      const response = await authFetch("/api/records/writing-status");
-      if (response.ok) {
-        const status: WritingStatus = await response.json();
-        setWritingStatus(status);
+    // 立即跳轉到日報首頁（daily tab）
+    setActiveTab("daily");
+    // 設定顯示上傳的那天日報
+    setGlobalSelectedDate(uploadedDate);
+    // 更新URL
+    window.history.pushState(
+      { tab: "daily", date: uploadedDate },
+      "",
+      `/?tab=daily&date=${uploadedDate}`
+    );
+
+    // 延遲顯示成功訊息，確保跳轉完成
+    setTimeout(() => {
+      toast.success("已跳轉到日報首頁查看上傳的日報");
+    }, 100);
+  }, []);
+
+  const fetchWritingStatus = useCallback(
+    async (docDate?: string) => {
+      if (!authFetch || !user?.employee) return;
+
+      try {
+        const url = docDate
+          ? `/api/records/writing-status?doc_date=${docDate}`
+          : "/api/records/writing-status";
+        const response = await authFetch(url);
+        if (response.ok) {
+          const status: WritingStatus = await response.json();
+          setWritingStatus(status);
+        }
+      } catch (error) {
+        console.error("獲取寫入狀態失敗:", error);
       }
-    } catch (error) {
-      console.error("獲取寫入狀態失敗:", error);
-    }
-  }, [authFetch, user?.employee]);
+    },
+    [authFetch, user?.employee]
+  );
 
   useEffect(() => {
     if (authFetch && user?.employee) {
-      fetchWritingStatus();
+      // 使用全局選中的日期，如果沒有則不傳入doc_date讓後端使用預設邏輯
+      fetchWritingStatus(globalSelectedDate || undefined);
     }
-  }, [authFetch, user?.employee, fetchWritingStatus]);
+  }, [authFetch, user?.employee, fetchWritingStatus, globalSelectedDate]);
 
   // 監聽瀏覽器歷史變化並恢復狀態
   useEffect(() => {
@@ -235,7 +277,13 @@ function App() {
       } else {
         // 沒有狀態信息時，檢查URL參數
         const urlParams = new URLSearchParams(window.location.search);
-        const tabParam = urlParams.get('tab') as "input" | "daily" | "supervisor" | "ai" | "comprehensive" || "supervisor";
+        const tabParam =
+          (urlParams.get("tab") as
+            | "input"
+            | "daily"
+            | "supervisor"
+            | "ai"
+            | "comprehensive") || "supervisor";
         setActiveTab(tabParam);
         setSelectedEmployee(null);
         setSelectedReportId(null);
@@ -244,12 +292,27 @@ function App() {
 
     // 初始化時檢查URL參數
     const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab') as "input" | "daily" | "supervisor" | "ai" | "comprehensive";
+    const tabParam = urlParams.get("tab") as
+      | "input"
+      | "daily"
+      | "supervisor"
+      | "ai"
+      | "comprehensive";
+    const dateParam = urlParams.get("date");
+
     if (tabParam) {
       setActiveTab(tabParam);
     } else {
       // 如果沒有URL參數，創建初始歷史記錄
-      window.history.replaceState({ tab: "supervisor" }, "", "/?tab=supervisor");
+      window.history.replaceState(
+        { tab: "supervisor" },
+        "",
+        "/?tab=supervisor"
+      );
+    }
+
+    if (dateParam) {
+      setGlobalSelectedDate(dateParam);
     }
 
     window.addEventListener("popstate", handlePopState);
@@ -370,38 +433,50 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
-        {/* 顯示寫入狀態消息 */}
-        {writingStatus && !writingStatus.allowed && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-5 w-5 text-yellow-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700">
-                  {writingStatus.message}
-                </p>
+        {/* 顯示寫入狀態消息 - 只有在完全沒有其他可填寫日期時才顯示 */}
+        {writingStatus &&
+          !writingStatus.allowed &&
+          !writingStatus.has_other_writable_dates && (
+            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-yellow-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    {writingStatus.message}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* 內容區域 */}
-        {activeTab === "input" && writingStatus?.allowed && (
-          <DataInputTab key="data-input" />
+        {activeTab === "input" && (
+          <DataInputTab
+            key="data-input"
+            selectedDate={globalSelectedDate}
+            onDateChange={setGlobalSelectedDate}
+          />
         )}
-        {activeTab === "daily" && writingStatus?.allowed && (
-          <DailyReportTab key="daily-report" />
+        {activeTab === "daily" && (
+          <DailyReportTab
+            key="daily-report"
+            selectedDate={globalSelectedDate}
+            onDateChange={setGlobalSelectedDate}
+            onUploadComplete={handleUploadComplete}
+            onSwitchToDaily={() => changeTab("daily")}
+          />
         )}
 
         {/* 日報首頁區域 */}

@@ -19,7 +19,7 @@ async def save_draft(
     draft_data: Dict[str, Any],
     db: Session = Depends(get_legacy_db)
 ):
-    """保存日報暫存，使用8:30-8:30邏輯重新計算doc_date"""
+    """保存日報暫存，使用前端傳入的doc_date"""
     try:
         logger.info(f"🔥 DRAFTS API - 收到暫存數據: {draft_data}")
         
@@ -29,25 +29,13 @@ async def save_draft(
         cocode = draft_data.get("cocode", "001")
         draft_type = draft_data.get("draft_type", "TEMP")
         draft_content = draft_data.get("draft_content", {})
+        doc_date = draft_data.get("doc_date")  # 從前端傳入的doc_date
         
-        logger.info(f"🔥 DRAFTS API - 解析參數: daily_no={daily_no}, empno={empno}, cocode={cocode}, draft_type={draft_type}")
+        logger.info(f"🔥 DRAFTS API - 解析參數: daily_no={daily_no}, empno={empno}, cocode={cocode}, draft_type={draft_type}, doc_date={doc_date}")
         logger.info(f"🔥 DRAFTS API - draft_content: {draft_content}")
         
-        # 重新計算正確的doc_date（8:30-8:30邏輯）
-        now = datetime.now()
-        current_time = now.time()
-        cutoff_time = time(8, 30)  # 8:30 AM
-        
-        # 如果現在時間早於8:30，則使用昨天的日期
-        if current_time < cutoff_time:
-            doc_date = (now - timedelta(days=1)).strftime('%Y%m%d')
-        else:
-            doc_date = now.strftime('%Y%m%d')
-        
-        logger.info(f"根據8:30邏輯重新計算doc_date: {doc_date}, 當前時間: {now}")
-        
-        if not all([daily_no, empno]):
-            raise HTTPException(status_code=400, detail="缺少必要欄位: daily_no, empno")
+        if not all([daily_no, empno, doc_date]):
+            raise HTTPException(status_code=400, detail="缺少必要欄位: daily_no, empno, doc_date")
         
         # 保存暫存
         logger.info(f"🔥 DRAFTS API - 開始調用 LegacyReportServiceV2.save_draft")
@@ -55,7 +43,7 @@ async def save_draft(
             db=db,
             empno=empno,
             cocode=cocode,
-            doc_date=doc_date,  # 使用重新計算的doc_date
+            doc_date=doc_date,  # 使用前端傳入的doc_date
             draft_type=draft_type,
             draft_content=draft_content,
             daily_no=daily_no
@@ -84,8 +72,12 @@ async def update_draft_by_daily_planno_sopno(
 ):
     """根據 daily_no、planno 和 sopno 更新特定的暫存記錄"""
     try:
-        logger.info(f"🔥 UPDATE DRAFT API - 收到更新數據: daily_no={daily_no}, planno={planno}, sopno={sopno}, data={update_data}")
-        
+        # 處理空的 planno - 前端傳入 "NULL" 表示空值
+        if planno == "NULL":
+            planno = ""
+
+        logger.info(f"🔥 UPDATE DRAFT API - 收到更新數據: daily_no={daily_no}, planno='{planno}', sopno={sopno}, data={update_data}")
+
         # 檢查記錄是否存在 - 使用 planno + sopno 組合
         check_sql = text("""
             SELECT RECORD_ID, CONTENT, FILES, ATT_FILE1, ATT_FILE2
@@ -179,23 +171,13 @@ async def update_draft_by_daily_planno_sopno(
 @router.get("/{empno}")
 async def get_drafts(
     empno: str,
+    doc_date: str = Query(..., description="日報日期 (YYYYMMDD)"),
     draft_type: Optional[str] = Query(None, description="暫存類型: TEMP 或 AI"),
     db: Session = Depends(get_legacy_db)
 ):
-    """取得員工的暫存資料，根據8:30-8:30邏輯計算今天的DOC_DATE"""
+    """取得員工的暫存資料，使用前端傳入的doc_date"""
     try:
-        # 計算當前日報的日期（8:30-8:30邏輯）
-        now = datetime.now()
-        current_time = now.time()
-        cutoff_time = time(8, 30)  # 8:30 AM
-        
-        # 如果現在時間早於8:30，則使用昨天的日期
-        if current_time < cutoff_time:
-            doc_date = (now - timedelta(days=1)).strftime('%Y%m%d')
-        else:
-            doc_date = now.strftime('%Y%m%d')
-        
-        logger.info(f"根據8:30邏輯，當前日報日期為: {doc_date}, 當前時間: {now}")
+        logger.info(f"取得員工 {empno} 在 {doc_date} 的暫存資料")
         
         # 構建查詢條件，不使用STATUS
         where_clause = "WHERE EMPNO = :empno AND DOC_DATE = :doc_date"

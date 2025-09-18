@@ -38,7 +38,14 @@
       "Bash(dir:*)",
       "Bash(powershell:*)",
       "Bash(where python)",
-      "Bash(telnet:*)"
+      "Bash(telnet:*)",
+      "Bash(copy:*)",
+      "Bash(csc:*)",
+      "Bash(where:*)",
+      "Bash(./DllBridgeService.exe)",
+      "Bash(./DllBridgeService.exe --headless)",
+      "Bash(./SimpleReportService.exe)",
+      "Bash(TestDailyDate.exe)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

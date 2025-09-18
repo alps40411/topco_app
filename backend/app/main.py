@@ -1,6 +1,7 @@
 # backend/app/main.py
 
 from fastapi import FastAPI, Request
+from fastapi.security import OAuth2PasswordBearer
 from starlette.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from typing import Dict
@@ -15,6 +16,20 @@ app = FastAPI(
     title="TSC 業務日誌 API",
     description="這是 TSC 業務日誌的後端 API 服務。",
     version="0.1.0",
+    openapi_tags=[
+        {
+            "name": "Authentication",
+            "description": "認證相關操作",
+        },
+        {
+            "name": "Reports",
+            "description": "日報相關操作",
+        },
+        {
+            "name": "Users",
+            "description": "用戶相關操作",
+        },
+    ],
 )
 
 # --- 掛載 storage 資料夾為靜態檔案目錄 ---

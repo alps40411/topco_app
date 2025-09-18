@@ -18,7 +18,7 @@ import json
 import os
 import uuid
 import aiofiles
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from pathlib import Path
 from functools import lru_cache
 
@@ -141,8 +141,7 @@ async def get_next_daily_no(db: Session = Depends(get_legacy_db)):
         logger.error(f"Error getting next daily no: {str(e)}")
         raise HTTPException(status_code=500, detail=f"取得日報編號失敗: {str(e)}")
 
-# === 暫存和提交相關 API ===
-# 注意：drafts 相關 API 已移至 app/api/drafts.py
+
 
 @router.post("/attachments")
 async def save_attachment(
@@ -647,17 +646,24 @@ async def get_consolidated_today(
 
 @records_router.get("/writing-status")
 async def get_writing_status(
+    doc_date: Optional[str] = Query(None, description="日報日期 (YYYYMMDD)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
     """取得寫作狀態"""
     try:
+        from datetime import datetime
+        
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
             
-        from datetime import datetime
-        today = datetime.now().strftime('%Y%m%d')
         empno = current_user.employee.empno
+        
+        # 如果沒有提供doc_date，使用當前日期
+        if not doc_date:
+            doc_date = datetime.now().strftime('%Y%m%d')
+        
+        logger.info(f"取得寫作狀態，empno={empno}, doc_date={doc_date}")
         
         # 檢查是否有暫存
         draft_sql = text("""
@@ -665,12 +671,11 @@ async def get_writing_status(
             FROM jps.tdr_draft 
             WHERE EMPNO = :empno 
             AND DOC_DATE = :doc_date 
-            
         """)
         
         draft_count = db.execute(draft_sql, {
             "empno": empno,
-            "doc_date": today
+            "doc_date": doc_date
         }).scalar()
         
         # 檢查是否已提交
@@ -683,7 +688,7 @@ async def get_writing_status(
         
         submitted_count = db.execute(submitted_sql, {
             "empno": empno,
-            "doc_date": today
+            "doc_date": doc_date
         }).scalar()
         
         # 檢查是否有主管已經評分或回覆（任一主管有評分就鎖定）
@@ -699,60 +704,50 @@ async def get_writing_status(
         
         review_result = db.execute(review_status_sql, {
             "empno": empno,
-            "doc_date": today
+            "doc_date": doc_date
         }).fetchone()
         
         score_count = review_result[0] if review_result else 0
         reply_count = review_result[1] if review_result else 0
         has_supervisor_review = score_count > 0 or reply_count > 0
         
-        # 檢查時間範圍（8:30 - 隔天8:30）
-        from datetime import datetime, time
-        now = datetime.now()
-        current_time = now.time()
-        cutoff_time = time(8, 30)  # 8:30 AM
-        
-        # 如果現在時間早於8:30，則是前一天的填寫時間
-        if current_time < cutoff_time:
-            # 當前日期減一天作為doc_date
-            from datetime import timedelta
-            actual_date = (now - timedelta(days=1)).strftime('%Y%m%d')
-            is_within_writing_period = True
-        else:
-            # 當前日期作為doc_date
-            actual_date = now.strftime('%Y%m%d')
-            is_within_writing_period = True
-            
-        # 確保查詢的是正確的日期
-        if today != actual_date:
-            # 重新查詢正確日期的數據
-            draft_count = db.execute(draft_sql, {
-                "empno": empno,
-                "doc_date": actual_date
-            }).scalar()
-            
-            submitted_count = db.execute(submitted_sql, {
-                "empno": empno,
-                "doc_date": actual_date
-            }).scalar()
-            
-            review_result = db.execute(review_status_sql, {
-                "empno": empno,
-                "doc_date": actual_date
-            }).fetchone()
-            
-            score_count = review_result[0] if review_result else 0
-            reply_count = review_result[1] if review_result else 0
-            has_supervisor_review = score_count > 0 or reply_count > 0
-        
         # 決定狀態和是否允許編輯
         allowed = True
         message = "可以填寫日報"
+        has_other_writable_dates = False
         
         if has_supervisor_review:
-            allowed = False
-            message = "主管已審閱，今日無法編輯，請等待隔天8:30後填寫新的日報"
-            status = "reviewed"
+            # 檢查是否還有其他可填寫的日期
+            try:
+                from ..services.daily_date_service import DailyDateService
+                daily_service = DailyDateService()
+                date_range = daily_service.get_daily_date_range(
+                    current_user.employee.cocode, 
+                    empno
+                )
+                
+                # 檢查除了當前日期外是否還有其他可填寫的日期
+                other_writable_dates = [
+                    d for d in date_range 
+                    if d.get("can_write", False) and d.get("date") != doc_date
+                ]
+                has_other_writable_dates = len(other_writable_dates) > 0
+                
+                if has_other_writable_dates:
+                    # 如果還有其他可填寫日期，允許用戶繼續使用頁面
+                    allowed = True
+                    message = f"此日期已被主管審閱，但您還有 {len(other_writable_dates)} 個日期可以填寫日報"
+                    status = "reviewed_but_has_other_dates"
+                else:
+                    # 如果沒有其他可填寫日期，完全禁用
+                    allowed = False
+                    message = "主管已審閱，今日無法編輯，請等待隔天8:30後填寫新的日報"
+                    status = "reviewed"
+            except Exception as e:
+                logger.warning(f"檢查其他可填寫日期時發生錯誤: {e}")
+                allowed = False
+                message = "主管已審閱，今日無法編輯，請等待隔天8:30後填寫新的日報"
+                status = "reviewed"
         elif submitted_count > 0:
             status = "submitted"
             message = "日報已提交，等待主管審閱"
@@ -766,13 +761,14 @@ async def get_writing_status(
         return {
             "allowed": allowed,
             "message": message,
-            "current_time": now.strftime('%Y-%m-%d %H:%M:%S'),
+            "current_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             "empno": empno,
-            "doc_date": actual_date,
+            "doc_date": doc_date,
             "status": status,
             "draft_count": draft_count,
             "submitted_count": submitted_count,
             "has_supervisor_review": has_supervisor_review,
+            "has_other_writable_dates": has_other_writable_dates,
             "score_count": score_count,
             "reply_count": reply_count
         }
@@ -926,6 +922,7 @@ async def create_record(
 
 @router.post("/upload-daily-report")
 async def upload_daily_report(
+    doc_date: str = Query(..., description="日報日期 (YYYYMMDD)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
@@ -945,7 +942,8 @@ async def upload_daily_report(
         
         empno = current_user.employee.empno
         cocode = current_user.employee.cocode or 'A'
-        doc_date = now.strftime('%Y%m%d')
+        
+        logger.info(f"上傳日報，使用前端傳入的doc_date: {doc_date}")
         
         # 查詢今日所有暫存資料
         draft_sql = text("""
@@ -972,18 +970,21 @@ async def upload_daily_report(
         daily_no = draft_results[0][0]
         logger.info(f"上傳日報 daily_no: {daily_no}")
         
-        # 檢查是否已被主管審閱
+        # 檢查是否已被主管審閱（status = 'T' 表示已被主管標記為拒絕）
         review_check_sql = text("""
-            SELECT STATUS FROM jps.tdr_master 
+            SELECT STATUS FROM jps.tdr_master
             WHERE DAILY_NO = :daily_no
         """)
         review_result = db.execute(review_check_sql, {"daily_no": daily_no}).fetchone()
-        
+
         if review_result and review_result[0] in ['Y', 'A']:  # Y=已審閱, A=已核准
             raise HTTPException(
-                status_code=403, 
+                status_code=403,
                 detail="此日報已被主管審閱，無法再進行修改"
             )
+
+        # 檢查是否需要更新 tdr_daily_open 狀態（當 tdr_master.status != 'T' 時）
+        should_update_daily_open = not (review_result and review_result[0] == 'T')
         
         # 查詢員工詳細資訊
         emp_sql = text("""
@@ -1289,7 +1290,27 @@ async def upload_daily_report(
             UPDATE jps.tdr_draft SET STATUS = 'S' WHERE DAILY_NO = :daily_no
         """)
         db.execute(update_draft_sql, {"daily_no": daily_no})
-        
+
+        # 如果 tdr_master.status != 'T'，更新 tdr_daily_open 狀態為 'Complete'
+        if should_update_daily_open:
+            logger.info(f"更新 tdr_daily_open 狀態為 Complete: cocode={cocode}, empno={empno}, doc_date={doc_date}")
+            update_daily_open_sql = text("""
+                UPDATE jps.tdr_daily_open
+                SET status = 'Complete'
+                WHERE cocode = :cocode
+                AND empno = :empno
+                AND status = 'Active'
+                AND doc_date = :doc_date
+            """)
+            db.execute(update_daily_open_sql, {
+                "cocode": cocode,
+                "empno": empno,
+                "doc_date": doc_date
+            })
+            logger.info(f"已更新 tdr_daily_open 狀態")
+        else:
+            logger.info(f"tdr_master.status = 'T'，跳過 tdr_daily_open 狀態更新")
+
         db.commit()
         logger.info(f"日報 {daily_no} 上傳成功，包含 {len(draft_results)} 個工作項目")
         
@@ -1443,168 +1464,109 @@ async def get_daily_date_range(
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
             
         empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or "T01"
+        cocode = current_user.employee.cocode
         
-        # 調用 C# DLL 中的 getDailyDate 函數
-        date_array = None
-        try:
-            import clr
-            from System.Reflection import Assembly
-            from System import Activator
-            import os
-            
-            # 使用 Assembly.LoadFrom 載入 DLL
-            assembly = Assembly.LoadFrom(os.path.abspath("MyReport.dll"))
-            logger.info(f"成功載入 Assembly: {assembly.FullName}")
-            
-            # 查找 DailyDateService 類型
-            service_type = None
-            types = assembly.GetExportedTypes()
-            for t in types:
-                if "DailyDateService" in str(t.Name):
-                    service_type = t
-                    break
-                    
-            if not service_type:
-                raise Exception("找不到 DailyDateService 類型")
-                
-            logger.info(f"找到服務類型: {service_type.FullName}")
-            
-            # 創建實例並調用方法
-            service_instance = Activator.CreateInstance(service_type)
-            get_daily_date_method = service_type.GetMethod("getDailyDate")
-            
-            if not get_daily_date_method:
-                raise Exception("找不到 getDailyDate 方法")
-                
-            # 調用方法
-            result = get_daily_date_method.Invoke(service_instance, [cocode, empno])
-            
-            if result is not None:
-                # 將 .NET 陣列轉換為 Python 列表
-                date_array = []
-                for i in range(result.Length):
-                    row = result[i]
-                    row_list = []
-                    for j in range(row.Length):
-                        row_list.append(str(row[j]))
-                    date_array.append(row_list)
-                    
-                logger.info(f"成功從 DLL 取得日期範圍: {len(date_array)} 個選項")
-            else:
-                logger.warning("DLL 返回 null 結果")
-                
-        except Exception as dll_error:
-            logger.warning(f"DLL 調用失敗: {dll_error}")
-            
-            # 針對特定用戶提供硬編碼的日期範圍 (測試用)
-            if empno == "03252":
-                # 為 03252 用戶提供今日、0911、0912 的日期選項
-                now = datetime.now()
-                today_str = now.strftime('%Y%m%d')
-                
-                date_array = [
-                    [today_str, f"{now.strftime('%m/%d')} (今日)", "TODAY"],
-                    ["20250911", "09/11 (週四)", "WORKDAY"],
-                    ["20250912", "09/12 (週五)", "WORKDAY"]
-                ]
-                logger.info(f"為用戶 {empno} 提供硬編碼日期範圍: {len(date_array)} 個選項")
-            else:
-                logger.warning(f"用戶 {empno} 不在硬編碼範圍內，將使用通用備用邏輯")
+        if not cocode:
+            raise HTTPException(status_code=400, detail="用戶沒有公司別資訊")
         
-        # 處理返回的 string[][] 數據
+        # 使用新的 DailyDateService (subprocess 方式)
+        from ..services.daily_date_service import DailyDateService
+
+        daily_service = DailyDateService()
+        result = daily_service.get_daily_date_range(cocode, empno)
+
+        if not result:
+            logger.warning("getDailyDate 查詢結果為空")
+            return {
+                "success": True,
+                "data": [],
+                "current_report_date": "",
+                "empno": empno,
+                "cocode": cocode,
+                "message": "沒有可用的日期範圍"
+            }
+
+        logger.info(f"成功從 getDailyDate 取得日期範圍: {len(result)} 個選項")
+
+        # 處理返回的日期數據
         available_dates = []
         current_report_date = ""
-        
-        if date_array and len(date_array) > 0:
-            for date_info in date_array:
-                if len(date_info) >= 2:
-                    date_value = date_info[0]  # YYYYMMDD 格式
-                    date_display = date_info[1]  # 顯示名稱
-                    
-                    # 解析日期
-                    try:
-                        date_obj = datetime.strptime(date_value, '%Y%m%d')
-                        is_weekday = date_obj.weekday() < 5
-                        display_date = date_obj.strftime('%Y-%m-%d')
-                        
-                        # 檢查是否為今日或預設日期
-                        is_today = len(date_info) > 2 and date_info[2] == "TODAY"
-                        is_default = len(date_info) > 2 and date_info[2] == "DEFAULT"
-                        
-                        if is_today or is_default:
-                            current_report_date = date_value
-                        
-                        available_dates.append({
-                            "value": date_value,
-                            "display": date_display,
-                            "date": display_date,
-                            "is_weekday": is_weekday,
-                            "is_today": is_today,
-                            "is_default": is_default or is_today
-                        })
-                    except ValueError:
-                        logger.warning(f"無法解析日期: {date_value}")
-                        continue
-        else:
-            # 如果 DLL 調用失敗，使用備用邏輯
-            logger.warning("DLL 調用失敗，使用備用邏輯")
-            now = datetime.now()
+
+        for date_info in result:
+            date_value = date_info["date"]  # YYYYMMDD 格式
+            status = date_info["status"]    # OpenWrite 或其他狀態
+            can_write = date_info["can_write"]  # 是否可以填寫
+
+            # 檢查該日期是否已被主管審閱
+            review_status_sql = text("""
+                SELECT 
+                    (SELECT COUNT(*) FROM jps.tdr_score s 
+                     JOIN jps.tdr_master m ON s.daily_no = m.daily_no 
+                     WHERE m.empno = :empno AND m.doc_date = :doc_date) as score_count,
+                    (SELECT COUNT(*) FROM jps.tdr_reply r 
+                     JOIN jps.tdr_master m ON r.daily_no = m.daily_no 
+                     WHERE m.empno = :empno AND m.doc_date = :doc_date) as reply_count
+            """)
             
-            if now.hour < 8 or (now.hour == 8 and now.minute < 30):
-                current_report_date = (now - timedelta(days=1)).strftime('%Y%m%d')
-            else:
-                current_report_date = now.strftime('%Y%m%d')
+            review_result = db.execute(review_status_sql, {
+                "empno": empno,
+                "doc_date": date_value
+            }).fetchone()
             
-            # 生成基本的日期範圍
-            base_date = datetime.strptime(current_report_date, '%Y%m%d')
-            for i in range(-7, 3):
-                date_obj = base_date + timedelta(days=i)
-                date_str = date_obj.strftime('%Y%m%d')
-                display_name = date_obj.strftime('%m/%d')
-                weekdays = ['週一', '週二', '週三', '週四', '週五', '週六', '週日']
-                weekday_name = weekdays[date_obj.weekday()]
-                
-                if date_str == current_report_date:
-                    display_name += ' (今日)'
-                
+            score_count = review_result[0] if review_result else 0
+            reply_count = review_result[1] if review_result else 0
+            has_supervisor_review = score_count > 0 or reply_count > 0
+            
+            # 如果已被主管審閱，則不加入可填寫列表
+            if has_supervisor_review:
+                logger.info(f"日期 {date_value} 已被主管審閱，從可填寫列表中移除")
+                continue
+
+            # 解析日期
+            try:
+                date_obj = datetime.strptime(date_value, '%Y%m%d')
+                is_weekday = date_obj.weekday() < 5
+                display_date = date_obj.strftime('%Y-%m-%d')
+
+                # 判斷是否為今日
+                today = datetime.now().strftime('%Y%m%d')
+                is_today = date_value == today
+
                 available_dates.append({
-                    "value": date_str,
-                    "display": f"{display_name} {weekday_name}",
-                    "date": date_obj.strftime('%Y-%m-%d'),
-                    "is_weekday": date_obj.weekday() < 5,
-                    "is_today": date_str == current_report_date,
-                    "is_default": date_str == current_report_date
+                    "value": date_value,
+                    "display": display_date,
+                    "date": display_date,
+                    "is_weekday": is_weekday,
+                    "is_today": is_today,
+                    "is_default": False,  # 稍後統一設定
+                    "can_write": can_write,
+                    "status": status or "Available"
                 })
-        
+            except ValueError:
+                logger.warning(f"無法解析日期: {date_value}")
+                continue
+
         # 按日期排序（最新的在前）
         available_dates.sort(key=lambda x: x["value"], reverse=True)
         
+        # 找到最新的可填寫日期作為預設日期
+        for date_option in available_dates:
+            if date_option["can_write"]:
+                current_report_date = date_option["value"]
+                date_option["is_default"] = True
+                break
+
         return {
             "success": True,
             "data": available_dates,
             "current_report_date": current_report_date,
             "empno": empno,
-            "cocode": cocode
+            "cocode": cocode,
+            "total_dates": len(available_dates),
+            "writable_dates": len([d for d in available_dates if d["can_write"]])
         }
         
     except Exception as e:
         logger.error(f"Error getting daily date range: {str(e)}")
-        # 如果出錯，回退到簡單的當日邏輯
-        now = datetime.now()
-        today_str = now.strftime('%Y%m%d')
-        
-        return {
-            "success": True,
-            "data": [{
-                "value": today_str,
-                "display": f"{now.strftime('%m/%d')} (今日)",
-                "date": now.strftime('%Y-%m-%d'),
-                "is_weekday": now.weekday() < 5,
-                "is_today": True,
-                "is_default": True
-            }],
-            "current_report_date": today_str,
-            "empno": current_user.employee.empno if current_user.employee else "",
-            "cocode": current_user.employee.cocode if current_user.employee else "T01"
-        }
+        raise HTTPException(status_code=500, detail=f"取得日期範圍失敗: {str(e)}")
+
