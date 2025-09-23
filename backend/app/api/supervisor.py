@@ -590,7 +590,8 @@ async def get_report_detail(
                     execution_work_name_c = exec_work_row[0]
             
             # 處理工作計畫名稱，如果有編碼問題則使用預設值
-            
+            plan_name = "基本工作項目"  # 初始化預設值
+
             if detail_row[35]:
                 try:
                     plan_sql = text("SELECT plan_subj_c FROM jps.tjp_master WHERE planno = :planno")
