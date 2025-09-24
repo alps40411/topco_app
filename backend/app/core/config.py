@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     # JWT settings
     SECRET_KEY: str = ""
 
+    # SSO 配置
+    SSO_ENABLED: bool = True
+    SSO_MOCK_ENABLED: bool = False  # 關閉 Mock，避免自動登入
+    SSO_MOCK_EMPNO: str = "05489"
+    SSO_MOCK_COCODE: str = "A"
+
+    # JWT 配置
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 小時
+
     # CORS origins (comma-separated). Example: http://localhost:5173,https://your.domain
     CORS_ORIGINS: str = ""
     

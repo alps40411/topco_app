@@ -10,8 +10,46 @@ const LoginPage: React.FC = () => {
   const [empno, setEmpno] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSSO, setIsSSO] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // 檢查是否自動啟用 SSO 登入
+  React.useEffect(() => {
+    const checkSSO = async () => {
+      // 檢查是否是手動登出（避免自動重新登入）
+      const wasManualLogout = sessionStorage.getItem("manual_logout");
+      if (wasManualLogout) {
+        console.log("手動登出，跳過自動 SSO");
+        sessionStorage.removeItem("manual_logout");
+        setIsSSO(false);
+        return;
+      }
+
+      try {
+        // 嘗試調用 SSO 登入端點看是否有有效的 SSO headers
+        const response = await fetch(buildApiUrl("/api/auth/sso"), {
+          method: "POST",
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("SSO login successful:", data);
+          login(data.token.access_token, data.user);
+          navigate("/");
+        } else {
+          // SSO 失敗，顯示傳統登入界面
+          setIsSSO(false);
+        }
+      } catch (error) {
+        // SSO 不可用，使用傳統登入
+        console.log("SSO not available, falling back to traditional login");
+        setIsSSO(false);
+      }
+    };
+
+    checkSSO();
+  }, [login, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,11 +72,33 @@ const LoginPage: React.FC = () => {
       }
 
       const data = await response.json();
-      // --- ↓↓↓ 關鍵修改：將 token 和 user 物件一起傳入 login 函式 ↓↓↓ ---
       login(data.token.access_token, data.user);
       navigate("/");
     } catch (err: any) {
       setError(err.message || "發生未知錯誤");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSSOLogin = async () => {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(buildApiUrl("/api/auth/sso"), {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("SSO 登入失敗，請使用傳統登入方式。");
+      }
+
+      const data = await response.json();
+      login(data.token.access_token, data.user);
+      navigate("/");
+    } catch (err: any) {
+      setError(err.message || "SSO 登入失敗");
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +117,28 @@ const LoginPage: React.FC = () => {
             登入 TSC 業務日誌
           </h2>
           <p className="mt-1 text-sm text-gray-500">崇越科技</p>
+        </div>
+
+        {/* SSO 登入按鈕 */}
+        <div className="space-y-4">
+          <button
+            onClick={handleSSOLogin}
+            disabled={isLoading}
+            className="w-full flex justify-center items-center px-4 py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:bg-green-300 transition-colors"
+          >
+            <LogIn className="w-4 h-4 mr-2" />
+            {isLoading ? "登入中..." : "SSO 單一登入"}
+          </button>
+
+          {/* 分隔線 */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">或</span>
+            </div>
+          </div>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
@@ -81,7 +163,7 @@ const LoginPage: React.FC = () => {
               className="w-full flex justify-center items-center px-4 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
             >
               <LogIn className="w-4 h-4 mr-2" />
-              {isLoading ? "登入中..." : "登入"}
+              {isLoading ? "登入中..." : "手動登入"}
             </button>
           </div>
         </form>

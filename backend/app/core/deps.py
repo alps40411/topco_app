@@ -1,35 +1,65 @@
 # backend/app/core/deps.py
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from jose import jwt, JWTError
+from typing import Optional
+import logging
 
 from app.core.database import get_db
 from app.models.user import User
 from app.models.employee import Employee
 from app.schemas.user import TokenData
-# from app.services import user_service  # 已移除，改用 JPS Legacy 資料庫
 from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.sso import get_sso_headers_with_mock
 
-security = HTTPBearer()
+logger = logging.getLogger(__name__)
+security = HTTPBearer(auto_error=False)  # 設置為 False，允許我們自定義錯誤處理
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ):
+    """
+    獲取當前用戶 - 支援 JWT Token 和 SSO Headers 雙重認證
+    優先順序：JWT Token > SSO Headers
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        empno: str | None = payload.get("sub")
-        if empno is None: raise credentials_exception
-        token_data = TokenData(empno=empno)
-    except JWTError:
+
+    empno = None
+
+    # 方法1：嘗試從 JWT Token 獲取用戶信息
+    if credentials and credentials.credentials:
+        try:
+            payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+            empno = payload.get("sub")
+            logger.info(f"Authentication via JWT token: empno={empno}")
+        except JWTError as e:
+            logger.warning(f"JWT decode failed: {str(e)}")
+
+    # 方法2：如果 JWT Token 失敗，嘗試從 SSO Headers 獲取 (開發環境後備)
+    if not empno:
+        try:
+            sso_headers = get_sso_headers_with_mock(request, enable_mock=False)
+            sso_empno = sso_headers.get_empno()
+            if sso_empno:
+                empno = sso_empno
+                logger.info(f"Authentication via SSO headers: empno={empno}")
+        except Exception as e:
+            logger.warning(f"SSO headers fallback failed: {str(e)}")
+
+    # 如果兩種方法都失敗，拋出異常
+    if not empno:
+        logger.error("Authentication failed: no valid JWT token or SSO headers")
         raise credentials_exception
+
+    token_data = TokenData(empno=empno)
     
     # 從 JPS Legacy 資料庫查詢用戶資訊
     from app.core.legacy_database import get_legacy_db
@@ -74,6 +104,7 @@ async def get_current_user(
     return user
 
 async def get_current_user_with_employee(
+    request: Request,
     current_user = Depends(get_current_user)
 ):
     """Get current user ensuring they have an employee relationship"""

@@ -72,7 +72,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem("authToken");
-    localStorage.removeItem("user"); // <-- 登出時一併移除
+    localStorage.removeItem("user");
+
+    // 強制重新加載頁面確保完全清除狀態
+    window.location.href = '/login';
   }, []);
 
   const isAuthenticated = isInitialized && !!token;
