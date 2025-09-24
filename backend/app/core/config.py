@@ -7,7 +7,6 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     # Database settings
-    DATABASE_URL: str = ""
     SOURCE_DB_USER: str = ""
     SOURCE_DB_PASSWORD: str = ""
     
@@ -47,12 +46,6 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
 
-    @field_validator("DATABASE_URL", mode="before")
-    def _clean_database_url(cls, v: str) -> str:
-        if isinstance(v, str):
-            cleaned = v.strip().strip('"').strip("'")
-            return cleaned
-        return v
 
     class Config:
         # 將 .env 鎖定為 backend 目錄下的 .env，避免從不同工作目錄啟動時找不到

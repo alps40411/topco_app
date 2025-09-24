@@ -1,14 +1,11 @@
 # backend/app/core/deps.py
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy import select
+from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from typing import Optional
 import logging
 
-from app.core.database import get_db
 from app.models.user import User
 from app.models.employee import Employee
 from app.schemas.user import TokenData

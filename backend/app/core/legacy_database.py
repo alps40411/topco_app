@@ -11,7 +11,7 @@ def get_legacy_database_url():
         return settings.LEGACY_DB_URL
     
     # 使用個別參數構建 PostgreSQL 連接字串
-    return f"postgresql://{settings.LEGACY_DB_USER}:{settings.LEGACY_DB_PASSWORD}@{settings.LEGACY_DB_HOST}:{settings.LEGACY_DB_PORT}/{settings.LEGACY_DB_SERVICE}"
+    return f"postgresql+psycopg2://{settings.LEGACY_DB_USER}:{settings.LEGACY_DB_PASSWORD}@{settings.LEGACY_DB_HOST}:{settings.LEGACY_DB_PORT}/{settings.LEGACY_DB_SERVICE}"
 
 # Create legacy database engine
 legacy_engine = create_engine(

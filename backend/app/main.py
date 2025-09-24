@@ -67,7 +67,6 @@ async def log_requests(request: Request, call_next):
 
 # 基本啟動前檢查：確保必要環境變數已設定
 required_settings: Dict[str, str] = {
-    "DATABASE_URL": settings.DATABASE_URL,
     "SECRET_KEY": settings.SECRET_KEY,
 }
 missing = [name for name, value in required_settings.items() if not value]

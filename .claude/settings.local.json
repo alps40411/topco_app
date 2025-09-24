@@ -48,7 +48,8 @@
       "Bash(TestDailyDate.exe)",
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(pip uninstall:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
