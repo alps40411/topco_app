@@ -45,7 +45,10 @@
       "Bash(./DllBridgeService.exe)",
       "Bash(./DllBridgeService.exe --headless)",
       "Bash(./SimpleReportService.exe)",
-      "Bash(TestDailyDate.exe)"
+      "Bash(TestDailyDate.exe)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

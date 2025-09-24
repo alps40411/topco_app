@@ -473,7 +473,7 @@ async def get_report_detail(
         # 查詢 master 基本資訊
         master_sql = text("""
             SELECT daily_no, empno, sop_desc_c, empnamec,
-                   xdate, xtime, status
+                   xdate, xtime, status, doc_date
             FROM jps.tdr_master
             WHERE daily_no = :daily_no
         """)
@@ -610,10 +610,12 @@ async def get_report_detail(
             daily_sub_nos = detail_row[1]  # daily_sub_nos
             cocode = detail_row[32]  # cocode - 修正索引
             empno = detail_row[33]  # empno - 修正索引
-            doc_date = master_row[4]  # xdate 來自 master
+            doc_date = master_row[7]  # doc_date 來自 master (原始日報日期，不是 xdate)
             
             # 調試日誌
             logger.info(f"檔案查詢參數: daily_sub_nos={daily_sub_nos}, cocode={cocode}, empno={empno}, doc_date={doc_date}")
+            logger.info(f"Master row indices: master_row[7]={master_row[7] if len(master_row) > 7 else 'INDEX_ERROR'}")
+            logger.info(f"Detail row indices: detail_row[32]={detail_row[32] if len(detail_row) > 32 else 'INDEX_ERROR'}, detail_row[33]={detail_row[33] if len(detail_row) > 33 else 'INDEX_ERROR'}")
             
             # 計算檔案 ID 範圍，避免整數溢位
             daily_no_int = int(report_id)
@@ -643,10 +645,12 @@ async def get_report_detail(
                 "empno": empno,
                 "doc_date": doc_date
             })
-            
+
             files = []
             file_index = 1
-            for file_row in files_result.fetchall():
+            file_rows = files_result.fetchall()
+            logger.info(f"Files query result: found {len(file_rows)} files for daily_sub_nos={daily_sub_nos}")
+            for file_row in file_rows:
                 file_id = daily_no_int * 1000000 + daily_sub_nos_int * 1000 + file_index
                 # 根據檔案副檔名判斷類型
                 filename = file_row[1] or ""
@@ -697,7 +701,7 @@ async def get_report_detail(
                 "department_no": emp_row[3] if emp_row else "",  # deptno
                 "department_name": emp_row[4] if emp_row else ""  # deptnamec
             },
-            "date": master_row[4],  # xdate
+            "date": master_row[7],  # doc_date
             "status": "submitted",
             "consolidated_content": consolidated_content if consolidated_content else [{
                 "project": {

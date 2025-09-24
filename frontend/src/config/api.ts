@@ -54,9 +54,17 @@ export const buildApiUrl = (endpoint: string): string => {
     return `${API_BASE_URL}${endpoint}`;
   }
 
-  // 如果沒有設定 API_BASE_URL，自動使用當前主機:8000
-  if (typeof window !== "undefined" && import.meta.env.MODE === "production") {
+  // 如果沒有設定 API_BASE_URL，使用當前頁面的主機和端口
+  if (typeof window !== "undefined") {
     const currentHost = window.location.hostname;
+    const currentPort = window.location.port;
+
+    // 如果是開發環境或使用代理，直接返回 endpoint
+    if (import.meta.env.MODE === "development" || currentPort === "3000") {
+      return endpoint;
+    }
+
+    // 生產環境：使用當前主機的 8000 端口作為後端
     return `http://${currentHost}:8000${endpoint}`;
   }
 

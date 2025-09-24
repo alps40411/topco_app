@@ -1025,6 +1025,7 @@ async def upload_daily_report(
                     all_att_file2 += "," + draft[18]
                 else:
                     all_att_file2 = draft[18]
+
         
         # 取得執行工作描述
         main_sop_desc_c = ''
