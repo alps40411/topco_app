@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 # ========== 日報查詢相關 ==========
 
+@router.get("")
 @router.get("/")
 async def get_reports(
     date: Optional[str] = Query(None, description="查詢日期 YYYY-MM-DD"),
