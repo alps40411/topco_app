@@ -404,7 +404,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </span>
               )}
             </div>
-            <div className="text-right text-sm text-gray-500">
+            <div className="text-right text-base text-gray-500">
               <div className="font-medium">
                 {formatTime(comment.created_at)}
               </div>
@@ -415,7 +415,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
           {comment.rating && comment.rating > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded p-2 mt-auto">
-              <div className="text-sm font-medium text-amber-700">
+              <div className="text-base font-medium text-amber-700">
                 評分: {getRatingText(comment.rating)}
               </div>
             </div>
@@ -474,6 +474,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             {flattenComments(comments).map((comment) => renderComment(comment))}
           </div>
         )}
+
+        {/* 統一的瞭解!按鈕 */}
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={() => {
+              if (isReportSupervisor && !hasSubmittedReview && user.employee?.id !== reportOwnerId) {
+                // 只有主管尚未評分時才用評分功能
+                handleSubmitReview(true);
+              } else {
+                // 所有其他情況（員工回覆、主管已評分後的追加留言等）
+                handleSubmitMessage(true);
+              }
+            }}
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
+          >
+            {isSubmitting ? "送出中..." : "瞭解!"}
+          </button>
+        </div>
       </div>
       {!isReadOnly && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
@@ -487,13 +506,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       <Crown className="w-4 h-4 mr-2" />
                       主管評分與回饋
                     </h4>
-                    <button
-                      onClick={() => handleSubmitReview(true)}
-                      disabled={isSubmitting}
-                      className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {isSubmitting ? "送出中..." : "瞭解!"}
-                    </button>
                   </div>
                   <div className="mb-4">
                     <span className="text-sm font-medium text-gray-700 mr-4">
@@ -674,13 +686,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       ? "追加留言"
                       : "員工回覆"}
                   </h4>
-                  <button
-                    onClick={() => handleSubmitMessage(true)}
-                    disabled={isSubmitting}
-                    className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isSubmitting ? "送出中..." : "瞭解!"}
-                  </button>
                 </div>
                 <div className="mb-3">
                   <p className="text-xs text-slate-700 mb-2">快速回覆建議：</p>

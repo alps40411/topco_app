@@ -770,7 +770,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 日報編輯
               </h2>
               {writingStatus && (
-                <div className="flex flex-col sm:flex-row sm:items-center mt-1 text-sm text-gray-600">
+                <div className="flex flex-col sm:flex-row sm:items-center mt-1 text-base text-gray-600">
                   <span className="mr-0 sm:mr-2">
                     🕐 {writingStatus.current_time}
                   </span>
@@ -853,7 +853,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                        className={`inline-flex items-center px-3 py-1 text-base font-medium rounded-md ${
                           getProjectColors(report.project.plan_subj_c).tag
                         }`}
                       >
@@ -861,7 +861,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       </div>
                       {report.total_execution_time_minutes !== undefined &&
                         report.total_execution_time_minutes > 0 && (
-                          <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                          <span className="text-base text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
                             {formatMinutesToHours(
                               report.total_execution_time_minutes
                             )}
@@ -987,7 +987,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                     </div>
                   </div>
                   {generatingAiFor.has(`${report.daily_no}-${report.sopno}`) ? (
-                    <p className="text-sm text-gray-500 italic">
+                    <p className="text-base text-gray-500 italic">
                       AI 正在為此專案生成潤飾內容...
                     </p>
                   ) : report.ai_content ? (
@@ -999,7 +999,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       />
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400 italic">
+                    <p className="text-base text-gray-400 italic">
                       此專案無 AI 潤飾內容。點擊魔法棒按鈕開始生成。
                     </p>
                   )}

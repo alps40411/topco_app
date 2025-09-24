@@ -411,7 +411,7 @@ function App() {
               </div>
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-base font-medium text-gray-900">
                     {user?.name}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -453,7 +453,7 @@ function App() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
+                  <p className="text-base text-yellow-700">
                     {writingStatus.message}
                   </p>
                 </div>

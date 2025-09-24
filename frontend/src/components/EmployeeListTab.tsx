@@ -127,18 +127,18 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     const hasAttachments = report.attachments && report.attachments.length > 0;
 
     return (
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center justify-center gap-0.5">
         {hasMyAsk && (
-          <img src="/my_ask.png" alt="我的提問" className="w-5 h-5" />
+          <img src="/my_ask.png" alt="我的提問" className="w-4 h-4 flex-shrink-0" />
         )}
         {hasOtherAsk && (
-          <img src="/other_ask.png" alt="他人提問" className="w-5 h-5" />
+          <img src="/other_ask.png" alt="他人提問" className="w-4 h-4 flex-shrink-0" />
         )}
         {hasAttachments && (
           <img
             src="/attached.gif"
             alt="有附件"
-            className="w-5 h-5"
+            className="w-4 h-4 flex-shrink-0"
             title="此日報包含附件"
           />
         )}
@@ -218,7 +218,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                   {renderResponseStatus(report)}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-base font-medium text-gray-900">
                     {report.employee.name}
                   </div>
                 </td>
@@ -237,7 +237,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                           report.id
                         )
                       }
-                      className="text-sm text-blue-600 hover:text-blue-900 max-w-xs cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
+                      className="text-base text-blue-600 hover:text-blue-900 max-w-xs cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
                     >
                       {report.sop_desc_c || "執行項目"}
                       {report.emergency && (
@@ -247,7 +247,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                       )}
                     </div>
                   ) : (
-                    <div className="text-sm text-gray-400 max-w-xs p-2">
+                    <div className="text-base text-gray-400 max-w-xs p-2">
                       {report.sop_desc_c || "執行項目"}
                       {report.emergency && (
                         <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">

@@ -131,7 +131,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
               {reportDetail.employee.empnamec || reportDetail.employee.name}{" "}
               {formatDate(reportDetail.date)} 日報
             </h2>
-            <div className="text-sm text-gray-500">
+            <div className="text-base text-gray-500">
               {reportDetail.employee.department_name ||
                 reportDetail.employee.department_no}
             </div>
@@ -198,7 +198,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
               >
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <div
-                    className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                    className={`inline-flex items-center px-3 py-1 text-base font-medium rounded-md ${
                       getProjectColors(projectReport.project.plan_subj_c).tag
                     }`}
                   >
@@ -216,12 +216,12 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                   )}
                   {projectReport.total_execution_time_minutes !== undefined &&
                   projectReport.total_execution_time_minutes > 0 ? (
-                    <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                    <span className="text-base text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
                       執行時間: {projectReport.total_execution_time_minutes}{" "}
                       小時
                     </span>
                   ) : (
-                    <span className="text-sm text-gray-400 bg-gray-50 px-2 py-1 rounded font-medium">
+                    <span className="text-base text-gray-400 bg-gray-50 px-2 py-1 rounded font-medium">
                       執行時間: 未設定
                     </span>
                   )}

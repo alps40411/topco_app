@@ -503,7 +503,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-2 space-y-2 sm:space-y-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <div
-                        className={`inline-flex items-center px-2 py-1 text-xs sm:text-sm font-medium rounded-md ${
+                        className={`inline-flex items-center px-2 py-1 text-xs sm:text-base font-medium rounded-md ${
                           getProjectColors(report.project.plan_subj_c).tag
                         }`}
                       >
@@ -530,7 +530,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                     </div>
                   </div>
 
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                  <p className="text-base text-gray-700 whitespace-pre-wrap">
                     {report.content}
                   </p>
                   <AttachedFilesDisplay files={report.files} />
