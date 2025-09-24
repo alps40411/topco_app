@@ -14,7 +14,8 @@ from ..services.legacy_service_v2 import LegacyReportServiceV2
 router = APIRouter(tags=["Drafts"])
 logger = logging.getLogger(__name__)
 
-@router.post("/")
+@router.post("", status_code=201)
+@router.post("/", status_code=201)
 async def save_draft(
     draft_data: Dict[str, Any],
     db: Session = Depends(get_legacy_db)
