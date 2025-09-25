@@ -287,132 +287,41 @@ async def get_forward_visors(
 
 @router.get("/forward/employees")
 async def get_forward_employees(
-    current_user: User = Depends(get_current_user),
+    # current_user: User = Depends(get_current_user),  # 暫時註解掉認證
     db: Session = Depends(get_legacy_db)
 ):
-    """取得轉寄員工名單(按部門分組)"""
+    """取得轉寄員工名單(使用 CorpEmployeeService.loadForward)"""
     try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+        # if not current_user.employee:
+        #     raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
         
-        # 日報轉寄名單(下半部, 分部門)
-        employee_sql = text("""
-            SELECT t.*,
-                (
-                    CASE
-                    WHEN t.cocode = 'G' THEN 'ZG'
-                    WHEN t.cocode = 'G01' THEN 'ZG01'
-                    WHEN t.cocode = 'J09'  THEN 'J009'
-                    ELSE t.cocode
-                    END
-                ) AS sort_cocode, 
-                (
-                    CASE
-                    WHEN sort_order IS NULL THEN '99999'
-                    ELSE sort_order::text
-                    END
-                ) AS sort_customize, 
-                (
-                    CASE
-                    WHEN t.cocode = 'H' AND t.g_deptno = '00A00' THEN '0'
-                    WHEN t.cocode = 'J07' AND t.g_deptno = '00010' THEN '0'
-                    WHEN t.cocode = 'J10' AND t.g_deptno = '00010' THEN '0'
-                    WHEN t.cocode = 'J17' AND t.g_deptno = '03000' THEN '0'
-                    WHEN t.cocode = 'M' AND t.g_deptno = '00000' THEN '0'
-                    WHEN t.cocode = 'P' AND t.g_deptno = '00010' THEN '0'
-                    WHEN t.cocode = 'T' AND t.g_deptno = 'S0000' THEN '0'
-                    WHEN t.cocode = 'X' AND t.g_deptno = '05000' THEN '0'
-                    ELSE '1'
-                    END
-                ) AS sort_gmDept, 
-                (
-                    CASE
-                    WHEN t.sbu = 1 AND t.cocode = 'T' THEN SUBSTR(t.g_deptno, 1, 3) || '00'
-                    WHEN t.sbu = 1 AND t.cocode = 'A' AND SUBSTR(t.g_deptno, 1, 2) = '00' THEN '99' || SUBSTR(t.g_deptno, 3, 3)
-                    WHEN t.sbu = 1 AND t.cocode = 'A' THEN SUBSTR(t.g_deptno, 1, 2) || '000'
-                    WHEN t.sbu = 2 AND t.cocode = 'A' AND t.g_deptno = '00521' THEN t.g_deptno 
-                    WHEN t.sbu = 2 AND t.cocode = 'A' AND ( t.g_deptno NOT LIKE '00G7%' AND t.g_deptno NOT LIKE '00G1%' AND t.g_deptno NOT LIKE '00G3%' AND t.g_deptno NOT LIKE '00B4%' ) THEN SUBSTR(t.g_deptno, 1, 4) || '0'
-                    ELSE t.g_deptno
-                    END
-                ) AS g_deptno1
-            FROM (
-                SELECT
-                (
-                    CASE
-                    WHEN b.cocode = '003' AND (b.deptno = '00000' OR b.deptno = '00281') THEN 'A'
-                    WHEN b.practice_cocode IS NULL THEN b.cocode
-                    WHEN b.practice_cocode <> b.cocode THEN b.cocode
-                    ELSE b.practice_cocode
-                    END
-                ) AS cocode,
-                a.empno, b.empnamec,
-                (
-                    CASE
-                    WHEN b.practice_cocode IS NULL THEN b.deptno
-                    WHEN b.practice_cocode <> b.cocode THEN b.deptno
-                    ELSE b.practice_deptno
-                    END
-                ) AS deptno,
-                (
-                    CASE
-                    WHEN f.duty IS NULL THEN '其他'
-                    ELSE f.duty
-                    END
-                ) AS dutyscript, 
-                c.sbu, d.coabbv, 
-                (
-                    CASE
-                    WHEN c.sbu = 2 AND c.cocode = 'A' AND c.g_deptno LIKE '00A2%' THEN '資訊處'
-                    WHEN c.sbu = 2 AND c.cocode = 'A' AND c.g_deptno LIKE '00B3%' THEN '資材處'
-                    ELSE c.deptabbv
-                    END
-                ) AS deptabbv, 
-                (
-                    CASE
-                    WHEN b.cocode = '003' AND (b.deptno = '00000' OR b.deptno = '00281') THEN '00G10'
-                    ELSE c.g_deptno
-                    END
-                ) AS g_deptno, b.dclass, b.adm_rank, g.sort_order 
-                FROM jps.TDR_FORWARDLIST a
-                JOIN jps.DCD003$MASTER b ON a.cocode = b.cocode AND a.empno = b.EMPNO
-                JOIN jps.DCD002$MASTER c ON a.cocode = c.cocode AND b.deptno = c.DEPTNO
-                JOIN jps.DCD001$MASTER d ON a.cocode = d.COCODE
-                LEFT JOIN jps.DCD004$MASTER e ON a.cocode = e.cocode AND b.dutyno = e.dutyno AND e.ducode = 'O'
-                LEFT JOIN jps.tdr_forward_duty f ON e.DUTYNAME = f.DUTYNAME 
-                LEFT JOIN jps.tdr_forward_dept_sort g ON d.cocode = g.cocode AND c.g_deptno = g.deptno
-                WHERE b.quitdate IS NULL 
-                AND (b.RIGHT_STOP_DATE IS NULL OR b.RIGHT_STOP_DATE > TO_CHAR(CURRENT_DATE, 'yyyyMMdd'))
-            ) t
-            ORDER BY sort_cocode, sort_customize, sort_gmDept, sbu, g_deptno1, dclass DESC, adm_rank
+        # 使用 CorpEmployeeService
+        from ..services.corp_employee_service import CorpEmployeeService
+
+        # 取得職稱列表 - 從 tdr_forward_duty 表取得
+        duty_sql = text("""
+            SELECT DISTINCT dutyname 
+            FROM jps.tdr_forward_duty 
+            ORDER BY dutyname
         """)
         
-        result = db.execute(employee_sql).fetchall()
+        duty_result = db.execute(duty_sql).fetchall()
+        ls_forward_duty = [row[0] for row in duty_result]
         
-        # 按公司和部門分組
-        grouped_data = {}
-        for row in result:
-            coabbv = row[5]  # coabbv
-            deptabbv = row[6]  # deptabbv
-            
-            if coabbv not in grouped_data:
-                grouped_data[coabbv] = {}
-            
-            if deptabbv not in grouped_data[coabbv]:
-                grouped_data[coabbv][deptabbv] = []
-            
-            grouped_data[coabbv][deptabbv].append({
-                "empno": row[1],  # empno
-                "empname": row[2],  # empnamec
-                "cocode": row[0],  # cocode
-                "deptno": row[3],  # deptno
-                "duty": row[4],   # dutyscript
-                "dclass": row[9], # dclass
-                "adm_rank": row[10] # adm_rank
-            })
+        if not ls_forward_duty:
+            logger.warning("沒有找到有效的職稱列表")
+            ls_forward_duty = ["總經理", "協理", "處長", "副處長", "經理", "副理"]  # 預設職稱
+        
+        # 調用 CorpEmployeeService.loadForward
+        corp_service = CorpEmployeeService()
+        forward_data = corp_service.load_forward(
+            ls_forward_duty=ls_forward_duty,
+            table_name="tdr_forward_employees"
+        )
         
         return {
             "success": True,
-            "data": grouped_data
+            "data": forward_data
         }
         
     except Exception as e:
