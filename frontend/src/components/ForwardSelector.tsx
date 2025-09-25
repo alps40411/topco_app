@@ -40,7 +40,7 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
 
   const loadForwardData = async () => {
     if (forwardData) return; // 已載入過就不重複載入
-    
+
     setIsLoading(true);
     try {
       const response = await authFetch("/api/supervisor/forward/candidates");
@@ -61,9 +61,9 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
 
   const handleToggleUser = (empno: string) => {
     const newSelectedUsers = selectedForwardUsers.includes(empno)
-      ? selectedForwardUsers.filter(id => id !== empno)
+      ? selectedForwardUsers.filter((id) => id !== empno)
       : [...selectedForwardUsers, empno];
-    
+
     onForwardUsersChange(newSelectedUsers);
   };
 
@@ -72,29 +72,34 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
   };
 
   const selectedCount = selectedForwardUsers.length;
-  const selectedNames = forwardData?.candidates
-    .filter(c => selectedForwardUsers.includes(c.empno))
-    .map(c => c.empname) || [];
-  
-  const titleCandidates = forwardData?.candidates.filter(c => c.type === "title") || [];
-  const deptCandidates = forwardData?.candidates.filter(c => c.type === "department") || [];
+  const selectedNames =
+    forwardData?.candidates
+      .filter((c) => selectedForwardUsers.includes(c.empno))
+      .map((c) => c.empname) || [];
+
+  const titleCandidates =
+    forwardData?.candidates.filter((c) => c.type === "title") || [];
+  const deptCandidates =
+    forwardData?.candidates.filter((c) => c.type === "department") || [];
 
   return (
-    <div className={`border border-blue-300 rounded-lg bg-blue-25 ${className}`}>
+    <div
+      className={`border border-blue-300 rounded-lg bg-blue-25 ${className}`}
+    >
       {/* 標題區塊 */}
       <div className="p-4 border-b border-blue-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Forward className="w-5 h-5 text-blue-600" />
             <span className="text-lg font-medium text-blue-800">
-              轉寄給其他主管
+              跨群轉寄 (請勾選轉寄對象)
             </span>
           </div>
           <div className="flex items-center space-x-2">
             {selectedCount > 0 && (
               <>
                 <span className="text-sm text-blue-800">
-                  已選擇: {selectedNames.join(', ')}
+                  已選擇: {selectedNames.join(", ")}
                 </span>
                 <button
                   onClick={clearAllSelections}
@@ -111,15 +116,13 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
       {/* 內容區塊 - 始終顯示 */}
       <div className="p-4">
         {isLoading ? (
-          <div className="text-center text-blue-600 py-8">載入轉寄名單中...</div>
+          <div className="text-center text-blue-600 py-8">
+            載入轉寄名單中...
+          </div>
         ) : forwardData ? (
           <>
             {/* 職稱轉寄區塊 */}
             <div className="mb-6">
-              <h4 className="text-md font-medium text-blue-800 mb-3 flex items-center">
-                <Forward className="w-4 h-4 mr-2" />
-                職稱轉寄
-              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                 {titleCandidates.map((candidate) => (
                   <label
@@ -148,11 +151,6 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
             {/* 部門轉寄區塊 - 只有高管才顯示 */}
             {forwardData.user_adm_rank <= 5 && deptCandidates.length > 0 && (
               <div>
-                <h4 className="text-md font-medium text-blue-800 mb-3 flex items-center">
-                  <Users className="w-4 h-4 mr-2" />
-                  部門轉寄 
-                  <span className="text-sm text-blue-600 ml-2">(管理階層專用)</span>
-                </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                   {deptCandidates.map((candidate) => (
                     <label

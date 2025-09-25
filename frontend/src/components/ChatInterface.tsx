@@ -451,29 +451,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
-      <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-        <div className="flex items-center space-x-2">
-          <MessageCircle className="w-5 h-5 text-gray-600" />
-          <h3 className="font-medium text-gray-900">回應內容</h3>
-          {comments.length > 0 && (
-            <span className="text-sm text-gray-500">
-              ({comments.length} 則留言)
-            </span>
-          )}
-        </div>
-      </div>
+      {comments.length > 0 && (
+        <>
+          <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+            <div className="flex items-center space-x-2">
+              <MessageCircle className="w-5 h-5 text-gray-600" />
+              <h3 className="font-medium text-gray-900">回應內容</h3>
+              <span className="text-sm text-gray-500">
+                ({comments.length} 則留言)
+              </span>
+            </div>
+          </div>
+          <div className="p-4 bg-gray-50">
+            <div>
+              {flattenComments(comments).map((comment) => renderComment(comment))}
+            </div>
+          </div>
+        </>
+      )}
       <div className="p-4 bg-gray-50">
-        {comments.length === 0 ? (
-          <div className="text-center py-8">
-            <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500">尚無任何回應</p>
-            <p className="text-sm text-gray-400 mt-1">開始第一則留言吧！</p>
-          </div>
-        ) : (
-          <div>
-            {flattenComments(comments).map((comment) => renderComment(comment))}
-          </div>
-        )}
 
         {/* 統一的瞭解!按鈕 */}
         <div className="flex justify-end mt-4">
