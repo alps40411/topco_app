@@ -96,6 +96,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
     // 檢查是否為開發環境
     const isDevelopment =
       window.location.port === "5173" ||
+      window.location.port === "5174" ||
       window.location.port === "3000" ||
       window.location.hostname === "localhost";
 

@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem("user");
 
     // 強制重新加載頁面確保完全清除狀態
-    window.location.href = '/login';
+    window.location.href = '/MyReportAI/login';
   }, []);
 
   const isAuthenticated = isInitialized && !!token;

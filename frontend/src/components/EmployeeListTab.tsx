@@ -108,13 +108,27 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       return null;
     } else if (replyCount === replierCount) {
       // 只有自己回應 (reply_count = replier_count)
-      return <img src="/purple_heart.gif" alt="自己回應" className="w-6 h-6" />;
+      return (
+        <img
+          src="/MyReportAI/purple_heart.gif"
+          alt="自己回應"
+          className="w-6 h-6"
+        />
+      );
     } else if (replierCount === 0) {
       // 自己沒回應，只有別人回應 (replier_count = 0)
-      return <img src="/red_heart.gif" alt="有人回應" className="w-6 h-6" />;
+      return (
+        <img
+          src="/MyReportAI/red_heart.gif"
+          alt="有人回應"
+          className="w-6 h-6"
+        />
+      );
     } else if (replyCount > replierCount) {
       // 都有回應 (reply_count > replier_count)
-      return <img src="/hearts.gif" alt="雙方回應" className="w-6 h-6" />;
+      return (
+        <img src="/MyReportAI/hearts.gif" alt="雙方回應" className="w-6 h-6" />
+      );
     }
 
     return null;
@@ -129,14 +143,22 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     return (
       <div className="flex items-center justify-center gap-0.5">
         {hasMyAsk && (
-          <img src="/my_ask.png" alt="我的提問" className="w-4 h-4 flex-shrink-0" />
+          <img
+            src="/MyReportAI/my_ask.png"
+            alt="我的提問"
+            className="w-4 h-4 flex-shrink-0"
+          />
         )}
         {hasOtherAsk && (
-          <img src="/other_ask.png" alt="他人提問" className="w-4 h-4 flex-shrink-0" />
+          <img
+            src="/MyReportAI/other_ask.png"
+            alt="他人提問"
+            className="w-4 h-4 flex-shrink-0"
+          />
         )}
         {hasAttachments && (
           <img
-            src="/attached.gif"
+            src="/MyReportAI/attached.gif"
             alt="有附件"
             className="w-4 h-4 flex-shrink-0"
             title="此日報包含附件"

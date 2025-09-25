@@ -176,7 +176,7 @@ function App() {
       setSelectedEmployee(null);
       setSelectedReportId(null);
       // 為每個標籤創建瀏覽器歷史記錄
-      window.history.pushState({ tab }, "", `/?tab=${tab}`);
+      window.history.pushState({ tab }, "", `/MyReportAI/?tab=${tab}`);
     },
     []
   );
@@ -189,7 +189,7 @@ function App() {
     window.history.pushState(
       { tab: "supervisor", employee: employee.id, report: reportId },
       "",
-      `/?tab=supervisor&employee=${employee.id}&report=${reportId}`
+      `/MyReportAI/?tab=supervisor&employee=${employee.id}&report=${reportId}`
     );
   };
 
@@ -198,7 +198,7 @@ function App() {
     setSelectedReportId(null);
     setActiveTab("supervisor");
     // 返回到員工列表時創建歷史記錄
-    window.history.pushState({ tab: "supervisor" }, "", "/?tab=supervisor");
+    window.history.pushState({ tab: "supervisor" }, "", "/MyReportAI/?tab=supervisor");
   };
 
   const handleReviewCompleted = () => {
@@ -207,7 +207,7 @@ function App() {
     setSelectedReportId(null);
     setActiveTab("supervisor");
     // 返回到員工列表時創建歷史記錄
-    window.history.pushState({ tab: "supervisor" }, "", "/?tab=supervisor");
+    window.history.pushState({ tab: "supervisor" }, "", "/MyReportAI/?tab=supervisor");
     // 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
     fetchWritingStatus();
   };
@@ -355,7 +355,7 @@ function App() {
             <div className="flex items-center space-x-3">
               <div className="w-40 h-10 rounded-lg flex items-center justify-center max-w-40 min-w-40">
                 <img
-                  src="/top_logoA.jpg"
+                  src="/MyReportAI/top_logoA.jpg"
                   alt="業務日誌"
                   className="w-40 h-10 rounded-lg max-w-40 min-w-40"
                 />
