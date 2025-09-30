@@ -1028,21 +1028,32 @@ async def upload_daily_report(
 
         
         # 取得執行工作描述
-        main_sop_desc_c = ''
-        first_sopno = draft_results[0][7] if len(draft_results) > 0 and draft_results[0][7] else None
-        if first_sopno:
-            try:
-                sop_sql = text("SELECT sop_desc_c FROM jps.tpm_sop WHERE sopno = :sopno")
-                sop_result = db.execute(sop_sql, {"sopno": first_sopno}).fetchone()
-                if sop_result and sop_result[0]:
-                    main_sop_desc_c = sop_result[0]
-                    if len(main_sop_desc_c) > 50:
-                        main_sop_desc_c = main_sop_desc_c[:47] + '...'
-            except Exception as e:
-                logger.warning(f"無法取得 sopno {first_sopno} 的執行工作描述: {str(e)}")
-                main_sop_desc_c = draft_results[0][8] if draft_results[0][8] else ''
-                if len(main_sop_desc_c) > 50:
-                    main_sop_desc_c = main_sop_desc_c[:47] + '...'
+        main_sop_desc_c = []
+        all_sopno = [draft[7] for draft in draft_results]
+
+        for sopno in all_sopno:
+            sop_sql = text("SELECT sop_desc_c FROM jps.tpm_sop WHERE sopno = :sopno")
+            sop_result = db.execute(sop_sql, {"sopno": sopno}).fetchone()
+            main_sop_desc_c.append(sop_result[0])
+        main_sop_desc_c = list(set(main_sop_desc_c))
+        main_sop_desc_c = " ".join(main_sop_desc_c)
+   
+        
+        
+        # first_sopno = draft_results[0][7] if len(draft_results) > 0 and draft_results[0][7] else None
+        # if first_sopno:
+        #     try:
+        #         sop_sql = text("SELECT sop_desc_c FROM jps.tpm_sop WHERE sopno = :sopno")
+        #         sop_result = db.execute(sop_sql, {"sopno": first_sopno}).fetchone()
+        #         if sop_result and sop_result[0]:
+        #             main_sop_desc_c = sop_result[0]
+        #             if len(main_sop_desc_c) > 50:
+        #                 main_sop_desc_c = main_sop_desc_c[:47] + '...'
+        #     except Exception as e:
+        #         logger.warning(f"無法取得 sopno {first_sopno} 的執行工作描述: {str(e)}")
+        #         main_sop_desc_c = draft_results[0][8] if draft_results[0][8] else ''
+        #         if len(main_sop_desc_c) > 50:
+        #             main_sop_desc_c = main_sop_desc_c[:47] + '...'
         
         current_date = now.strftime('%Y%m%d')
         current_time = now.strftime('%H:%M:%S')
@@ -1082,6 +1093,8 @@ async def upload_daily_report(
             # 刪除現有的 detail1、detail2 和檔案記錄
             delete_detail1_sql = text("DELETE FROM jps.tdr_detail1 WHERE daily_no = :daily_no")
             delete_detail2_sql = text("DELETE FROM jps.tdr_detail2 WHERE daily_no = :daily_no")
+            delete_eai_source_sql = text("DELETE FROM jps.eai_source WHERE key = :daily_no")
+            
             # 根據 daily_no 的檔案ID模式刪除檔案（daily_no * 1000000 開頭的檔案）
             daily_no_prefix = int(daily_no) * 1000000
             delete_files_sql = text("""
@@ -1093,6 +1106,7 @@ async def upload_daily_report(
             
             detail1_deleted = db.execute(delete_detail1_sql, {"daily_no": daily_no}).rowcount
             detail2_deleted = db.execute(delete_detail2_sql, {"daily_no": daily_no}).rowcount
+            eai_source_deleted = db.execute(delete_eai_source_sql, {"daily_no": daily_no}).rowcount
             files_deleted = db.execute(delete_files_sql, {
                 "daily_no_start": daily_no_prefix,
                 "daily_no_end": daily_no_prefix + 1000000
@@ -1285,6 +1299,51 @@ async def upload_daily_report(
                 logger.info(f"planno={planno}, sopno={sopno} (daily_sub_nos={corresponding_daily_sub_nos}) 沒有檔案")
         
         logger.info(f"檔案處理完成，總共處理 {total_files_processed} 個檔案")
+
+        # 準備並插入 eai_source 以觸發簽核流程
+
+        logger.info(f"準備插入 eai_source for daily_no: {daily_no}")
+        
+        # 1. 取得 EAI 和 Key 的序列號
+        eai_seq = db.execute(text("SELECT jps.seq_eai_source.nextval FROM dual")).scalar_one()
+        key_val = daily_no
+        
+        logger.info(f"取得 eai_seq: {eai_seq}, key_val: {key_val}")
+        eai_current_date = datetime.now().strftime('%Y/%m/%d')
+        
+        
+        # 日報檢視URL (使用 key_val 作為識別)
+        subject = f'{empnamec}的日報({main_sop_desc_c})'
+        report_view_url = f"/MyReport/viewed.aspx?daily_no={daily_no}&key={key_val}"
+        
+        # 文件內容 (doc_bady)
+        doc_bady = (
+            f"Source=JpsReportDailySend^|Action=toWkf^|cocode=toWkf^|xuser={empno}^|"
+            f"doc_date={eai_current_date}^|doc_time={current_time}^|"
+            f"href={report_view_url}^|Key={key_val}^|Subject={subject}"
+        )
+
+        # 3. 執行插入
+        insert_eai_source_sql = text("""
+            INSERT INTO jps.eai_source 
+            (eai_seq, source, subject, cocode, xuser, touser, doc_date, doc_time, key, action, doc_bady, status) 
+            VALUES (:eai_seq, 'JpsReportDailySend', :subject, :cocode, :xuser, '', :doc_date, :doc_time, :key, 'toWkf', :doc_bady, 'N')
+        """)
+        
+        db.execute(insert_eai_source_sql, {
+            "eai_seq": eai_seq,
+            "subject": subject,
+            "cocode": cocode,
+            "xuser": empno,
+            "doc_date": eai_current_date,
+            "doc_time": current_time,
+            "key": key_val,
+            "doc_bady": doc_bady
+        })
+        
+        logger.info(f"成功插入 eai_source 記錄, eai_seq: {eai_seq}")
+
+
         
         # 更新所有暫存狀態為已提交
         update_draft_sql = text("""
