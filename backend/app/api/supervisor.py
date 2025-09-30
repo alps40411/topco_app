@@ -9,9 +9,11 @@ import os
 from pathlib import Path
 from datetime import datetime
 
+
 from app.core.legacy_database import get_legacy_db
 from app.core.deps import get_current_user
 from app.schemas.user import User
+from app.core.config import settings
 
 router = APIRouter(tags=["Supervisor"])
 logger = logging.getLogger(__name__)
@@ -748,7 +750,7 @@ async def download_file(
         filename = file_row[1]
         
         # 檢查檔案是否存在於檔案系統中
-        upload_dir = Path("uploads")
+        upload_dir = Path(settings.UPLOAD_DIR)
         
         # 嘗試多種可能的檔案路徑
         possible_paths = [
