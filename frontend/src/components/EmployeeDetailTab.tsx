@@ -241,6 +241,8 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
         <ChatInterface
           reportId={reportDetail.id}
           reportOwnerId={reportDetail.employee.id}
+          reportOwnerEmpno={reportDetail.employee.empno}
+          reportOwnerName={reportDetail.employee.name}
           className="min-h-[400px]"
           reportStatus={reportDetail.status}
           approvals={reportDetail.approvals || []}

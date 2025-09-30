@@ -49,6 +49,7 @@ async def submit_review(
             reviewer_cocode=current_user.employee.cocode,
             score=request.score,
             reply_memo=request.reply_memo,
+            to_users=request.to_users,
             forward_users=request.forward_users
         )
         
@@ -94,153 +95,6 @@ async def get_review_status(
         logger.error(f"取得審閱狀態失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=f"取得審閱狀態失敗: {str(e)}")
 
-@router.post("/reviews/{daily_no}/score")
-async def submit_score_only(
-    daily_no: str,
-    score: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """僅提交評分（快速評分）"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
-        if score < 1 or score > 5:
-            raise HTTPException(status_code=400, detail="評分必須在 1-5 分之間")
-        
-        result = ReviewService.submit_review(
-            db=db,
-            daily_no=daily_no,
-            reviewer_empno=current_user.employee.empno,
-            reviewer_empname=current_user.employee.empnamec,
-            reviewer_cocode=current_user.employee.cocode,
-            score=score
-        )
-        
-        return {
-            "success": True,
-            "message": "評分提交成功",
-            "score": score,
-            "daily_no": daily_no
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"提交評分失敗: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"提交評分失敗: {str(e)}")
-
-@router.post("/reviews/{daily_no}/reply")
-async def submit_reply_only(
-    daily_no: str,
-    reply_data: Dict[str, Any],
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """僅提交回應（不含評分）"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
-        reply_memo = reply_data.get("reply_memo")
-        forward_users = reply_data.get("forward_users", [])
-        
-        if not reply_memo:
-            raise HTTPException(status_code=400, detail="回應內容不能為空")
-        
-        result = ReviewService.submit_review(
-            db=db,
-            daily_no=daily_no,
-            reviewer_empno=current_user.employee.empno,
-            reviewer_empname=current_user.employee.empnamec,
-            reviewer_cocode=current_user.employee.cocode,
-            reply_memo=reply_memo,
-            forward_users=forward_users
-        )
-        
-        return {
-            "success": True,
-            "message": "回應提交成功",
-            "daily_no": daily_no,
-            "reply_nos": result.get("reply_nos")
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"提交回應失敗: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"提交回應失敗: {str(e)}")
-
-@router.get("/reviews/{daily_no}/replies")
-async def get_all_replies(
-    daily_no: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """取得指定日報的所有回應記錄"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
-        status = ReviewService.get_review_status(
-            db=db,
-            daily_no=daily_no,
-            reviewer_empno=current_user.employee.empno
-        )
-        
-        return {
-            "daily_no": daily_no,
-            "replies": status["reply_records"]
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"取得回應記錄失敗: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得回應記錄失敗: {str(e)}")
-
-@router.delete("/reviews/{daily_no}/score")
-async def delete_score(
-    daily_no: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """刪除評分（如果需要重新評分）"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
-        from sqlalchemy import text
-        
-        # 刪除評分記錄
-        delete_score_sql = text("""
-            DELETE FROM jps.tdr_score 
-            WHERE daily_no = :daily_no AND reply_empno = :reply_empno
-        """)
-        
-        result = db.execute(delete_score_sql, {
-            "daily_no": daily_no,
-            "reply_empno": current_user.employee.empno
-        })
-        
-        if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="找不到要刪除的評分記錄")
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "評分已刪除，可以重新評分",
-            "daily_no": daily_no
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"刪除評分失敗: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"刪除評分失敗: {str(e)}")
 
 @router.get("/forward/visors")
 async def get_forward_visors(
@@ -294,36 +148,37 @@ async def get_forward_employees(
     try:
         # if not current_user.employee:
         #     raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
+
         # 使用 CorpEmployeeService
         from ..services.corp_employee_service import CorpEmployeeService
 
         # 取得職稱列表 - 從 tdr_forward_duty 表取得
         duty_sql = text("""
-            SELECT DISTINCT dutyname 
-            FROM jps.tdr_forward_duty 
+            SELECT DISTINCT dutyname
+            FROM jps.tdr_forward_duty
             ORDER BY dutyname
         """)
-        
+
         duty_result = db.execute(duty_sql).fetchall()
         ls_forward_duty = [row[0] for row in duty_result]
-        
+
         if not ls_forward_duty:
             logger.warning("沒有找到有效的職稱列表")
             ls_forward_duty = ["總經理", "協理", "處長", "副處長", "經理", "副理"]  # 預設職稱
-        
+
         # 調用 CorpEmployeeService.loadForward
         corp_service = CorpEmployeeService()
         forward_data = corp_service.load_forward(
             ls_forward_duty=ls_forward_duty,
             table_name="tdr_forward_employees"
         )
-        
+
         return {
             "success": True,
             "data": forward_data
         }
-        
+
     except Exception as e:
         logger.error(f"取得轉寄員工名單失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=f"取得轉寄員工名單失敗: {str(e)}")
+

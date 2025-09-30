@@ -698,7 +698,8 @@ async def get_report_detail(
         return {
             "id": int(report_id),
             "employee": {
-                "id": int(master_row[1]),  # empno
+                "id": str(master_row[1] or "").zfill(5),  # empno 保持字串格式並補齊5位數
+                "empno": str(master_row[1] or "").zfill(5),  # 新增empno欄位
                 "name": master_row[3] or (emp_row[1] if emp_row else "未知"),  # empnamec
                 "department_no": emp_row[3] if emp_row else "",  # deptno
                 "department_name": emp_row[4] if emp_row else ""  # deptnamec
@@ -996,7 +997,8 @@ async def get_daily_homepage_reports(
             report = {
                 "id": int(row[0]),  # daily_no
                 "employee": {
-                    "id": row[2] or "",  # empno 保持字串格式
+                    "id": str(row[2] or "").zfill(5),  # empno 保持字串格式並補齊5位數
+                    "empno": str(row[2] or "").zfill(5),  # 新增empno欄位
                     "name": row[3] or "",  # empnamec
                     "department_no": row[22] or "",  # g_deptno
                     "department_name": row[23] or "",  # deptnamec
@@ -1480,7 +1482,8 @@ async def get_reports_by_date_for_supervisor(
             report = {
                 "id": int(row[0]),  # daily_no
                 "employee": {
-                    "id": int(row[2]),  # empno
+                    "id": str(row[2] or "").zfill(5),  # empno 保持字串格式並補齊5位數
+                    "empno": str(row[2] or "").zfill(5),  # 新增empno欄位
                     "name": row[3] or "",  # empnamec
                     "department_no": row[23] or "",  # g_deptno
                     "department_name": row[24] or "",  # deptnamec

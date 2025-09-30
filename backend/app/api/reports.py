@@ -321,7 +321,6 @@ async def get_report_comments(
                 "author": {
                     "id": row[1],  # empno
                     "name": row[2] or row[1],  # xuser 或 empno
-                    "email": f"{row[1]}@employee"  # 添加 email 欄位
                 },
                 "rating": row[6],  # score
                 "replies": []

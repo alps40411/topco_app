@@ -16,18 +16,23 @@ class ReviewService:
     
     @staticmethod
     def submit_review(
-        db: Session, 
+        db: Session,
         daily_no: str,
         reviewer_empno: str,
         reviewer_empname: str,
         reviewer_cocode: str,
         score: Optional[int] = None,
         reply_memo: Optional[str] = None,
+        to_users: List[str] = [],
         forward_users: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """提交主管審閱（包含評分和回復）"""
         
         try:
+            print(f"[EAI DEBUG] === 開始處理審閱 ===")
+            print(f"[EAI DEBUG] daily_no={daily_no}, reviewer_empno={reviewer_empno}")
+            print(f"[EAI DEBUG] to_users={to_users}, forward_users={forward_users}")
+
             # 取得當前日期時間
             now = datetime.now()
             current_date = now.strftime('%Y%m%d')
@@ -164,55 +169,76 @@ class ReviewService:
                 forward_users is not None and len(forward_users) > 0
             )
             
-            # 8. 工作流通知 - 建構通知用戶列表 (按照標準流程)
-            ls_total_user = [report_empno]  # 原作者
-            
-            # 加入轉寄用戶
+            # 8. 工作流通知 - 建構通知用戶列表
+            # 建立要通知的用戶列表（不包含原作者，因為原作者不需要收到自己日報的通知）
+            ls_total_user = []
+
+            # 加入回應的用戶(toUser) - 這些是要收到通知的目標用戶
+            if to_users:
+                for to_user in to_users:
+                    if to_user not in ls_total_user:
+                        ls_total_user.append(to_user)
+
+            print(f"[EAI DEBUG] 回應目標用戶: {ls_total_user}")
+
+            # 加入跨轉寄的用戶(fwUser) - 這些也是要收到通知的用戶
             if forward_users:
                 for fw_user in forward_users:
                     if fw_user not in ls_total_user:
                         ls_total_user.append(fw_user)
-            
-            # 建立訊息佇列
+
+            print(f"[EAI DEBUG] 完整通知用戶列表: {ls_total_user}")
+
+            # 建立訊息佇列 - 為每個要通知的用戶建立EAI記錄
             ls_mq = []
-            for i in range(1, len(ls_total_user)):  # 從1開始，排除原作者
+            for i in range(len(ls_total_user)):  # 從0開始，通知所有目標用戶
                 # 取得 EAI 序號
                 eai_seq_sql = text("SELECT nextval('jps.seq_eai_source')")
                 eai_seq = db.execute(eai_seq_sql).scalar()
-                
+
                 ls_mq.append({
                     "fwUser": ls_total_user[i],
                     "eai": eai_seq
                 })
+
+            print(f"[EAI DEBUG] 訊息佇列: {ls_mq}")
             
             # 建立工作流通知
             for mq_item in ls_mq:
-                subject = f"{reviewer_empname}的日報({sop_desc_c})"
-                href = f"/MyReport/viewed.aspx?cocode={reviewer_cocode}&daily_no={daily_no}&replyid={reply_nos}&status=P"
-                doc_body = f"Subject={subject}^|href={href}"
-                
-                eai_sql = text("""
-                    INSERT INTO jps.eai_source (
-                        eai_seq, source, subject, cocode, xuser, touser, doc_date, doc_time,
-                        key, action, doc_bady, status, planno
-                    ) VALUES (
-                        :eai_seq, 'JpsReportDailyReply', :subject, :cocode, :xuser, :touser, 
-                        :doc_date, :doc_time, :key, 'toWkf', :doc_bady, 'N', :planno
-                    )
-                """)
-                
-                db.execute(eai_sql, {
-                    "eai_seq": mq_item["eai"],
-                    "subject": subject,
-                    "cocode": reviewer_cocode,
-                    "xuser": reviewer_empno,
-                    "touser": mq_item["fwUser"],
-                    "doc_date": f"{current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}",
-                    "doc_time": current_time,
-                    "key": daily_no,
-                    "doc_bady": doc_body,
-                    "planno": planno
-                })
+                try:
+                    subject = f"{reviewer_empname}回應日報({sop_desc_c})"
+                    href = f"/MyReport/viewed.aspx?cocode={reviewer_cocode}&daily_no={daily_no}&replyid={reply_nos}&status=P"
+                    doc_body = f"Source=JpsReportDailyReply^|Action=toWkf^|cocode=toWkf^|xuser={reviewer_empno}^|doc_date={current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}^|doc_time={current_time}^|touser={reviewer_empno}^|href={href}^|Key={daily_no}^|Subject={subject}"
+
+                    print(f"[EAI DEBUG] 準備插入: touser={mq_item['fwUser']}, eai_seq={mq_item['eai']}")
+
+                    eai_sql = text("""
+                        INSERT INTO jps.eai_source (
+                            eai_seq, source, subject, cocode, xuser, touser, doc_date, doc_time,
+                            key, action, doc_bady, status
+                        ) VALUES (
+                            :eai_seq, 'JpsReportDailyReply', :subject, :cocode, :xuser, :touser,
+                            :doc_date, :doc_time, :key, 'toWkf', :doc_bady, 'N'
+                        )
+                    """)
+
+                    db.execute(eai_sql, {
+                        "eai_seq": mq_item["eai"],
+                        "subject": subject,
+                        "cocode": reviewer_cocode,
+                        "xuser": reviewer_empno,
+                        "touser": mq_item["fwUser"],
+                        "doc_date": f"{current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}",
+                        "doc_time": current_time,
+                        "key": daily_no,
+                        "doc_bady": doc_body
+                    })
+
+                    print(f"[EAI DEBUG] 成功插入: touser={mq_item['fwUser']}, eai_seq={mq_item['eai']}")
+
+                except Exception as eai_error:
+                    print(f"[EAI DEBUG] 插入失敗: touser={mq_item['fwUser']}, error={str(eai_error)}")
+                    # 不要因為EAI失敗而中斷整個流程，繼續處理
             
             db.commit()
             logger.info(f"成功提交審閱 daily_no={daily_no}, reply_nos={reply_nos}")

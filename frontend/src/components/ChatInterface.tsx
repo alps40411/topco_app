@@ -28,11 +28,10 @@ export interface Comment {
   id: number;
   content: string;
   created_at: string;
-  user_id: number;
+  user_id: string;
   author?: {
-    id: number;
+    id: string;
     name: string;
-    email: string;
   };
   parent_comment_id?: number;
   rating?: number; // 評分（如果是審閱留言）
@@ -45,9 +44,17 @@ interface AISuggestion {
   content: string;
 }
 
+interface ReplyTarget {
+  empno: string;
+  empname: string;
+  is_author: boolean;
+}
+
 interface ChatInterfaceProps {
   reportId: number;
   reportOwnerId?: number; // 報告擁有者的員工ID
+  reportOwnerEmpno?: string; // 報告擁有者的員工編號
+  reportOwnerName?: string; // 報告擁有者的姓名
   className?: string;
   reportStatus?: string;
   approvals: SupervisorApprovalInfo[];
@@ -61,6 +68,8 @@ interface ChatInterfaceProps {
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   reportId,
   reportOwnerId,
+  reportOwnerEmpno,
+  reportOwnerName,
   className = "",
   // reportStatus, // 暫時未使用
   approvals, // Added prop
@@ -89,6 +98,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isSupervisorRepliesExpanded, setIsSupervisorRepliesExpanded] =
     useState(false);
 
+  // 回應目標相關狀態
+  const [replyTargets, setReplyTargets] = useState<ReplyTarget[]>([]);
+  const [selectedReplyTargets, setSelectedReplyTargets] = useState<string[]>(
+    []
+  );
+
   const { authFetch, user } = useAuth();
 
   // This effect now correctly determines if the current user has reviewed
@@ -111,6 +126,110 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           (approval) => approval.supervisor_empno === user.employee.empno
         )
       : false;
+
+  // 獲取日報詳細資訊以取得作者資料
+  const fetchReportAuthor = useCallback(async () => {
+    if (!authFetch) return null;
+    try {
+      const response = await authFetch(`/api/supervisor/reports/${reportId}`);
+
+      if (response.ok) {
+        const reportData = await response.json();
+
+        // 確保 empno 保持字串格式並補齊到5位數
+        let empno = reportData.employee?.empno;
+        if (empno) {
+          empno = String(empno).padStart(5, "0");
+        }
+
+        return {
+          empno: empno,
+          empname: reportData.employee?.name,
+        };
+      }
+    } catch (error) {
+      console.error("Error fetching report author:", error);
+    }
+    return null;
+  }, [authFetch, reportId]);
+
+  // 建構回應目標列表
+  const buildReplyTargets = useCallback(
+    async (commentsData: Comment[]) => {
+      const targets: ReplyTarget[] = [];
+      const seenEmpnos = new Set<string>();
+
+      // 1. 從 API 獲取日報作者資訊
+      const authorInfo = await fetchReportAuthor();
+      const currentUserEmpno = user?.employee?.empno
+        ? String(user.employee.empno).padStart(5, "0")
+        : null;
+
+      if (authorInfo && authorInfo.empno) {
+        // 總是添加日報作者到選項中，即使是作者本人
+        // 這樣主管在追加留言時也能選擇回應給作者
+        targets.push({
+          empno: authorInfo.empno,
+          empname: authorInfo.empname,
+          is_author: true,
+        });
+        seenEmpnos.add(authorInfo.empno);
+      }
+
+      // 確保至少有當前用戶自己作為選項
+      if (
+        currentUserEmpno &&
+        user?.employee?.empnamec &&
+        !seenEmpnos.has(currentUserEmpno)
+      ) {
+        targets.push({
+          empno: currentUserEmpno,
+          empname: user.employee.empnamec,
+          is_author: false,
+        });
+        seenEmpnos.add(currentUserEmpno);
+      }
+
+      // 2. 從 comments 中提取其他已回應的用戶
+      if (Array.isArray(commentsData)) {
+        commentsData.forEach((comment) => {
+          // 嘗試多種方式來提取工號
+          let authorEmpno = comment.author?.id;
+          let authorName = comment.author?.name || `用戶 ${comment.user_id}`;
+
+          // 確保工號格式正確（補齊到5位數）
+          if (authorEmpno) {
+            authorEmpno = String(authorEmpno).padStart(5, "0");
+          }
+
+          if (authorEmpno && !seenEmpnos.has(authorEmpno)) {
+            targets.push({
+              empno: authorEmpno,
+              empname: authorName,
+              is_author: false,
+            });
+            seenEmpnos.add(authorEmpno);
+          }
+        });
+      }
+
+      console.log("建構的回應目標列表:", targets);
+      setReplyTargets(targets);
+
+      // 設定預設選擇：優先選擇日報作者，如果沒有則選第一個
+      if (targets.length > 0) {
+        const defaultTarget = targets.find((t) => t.is_author);
+        if (defaultTarget) {
+          setSelectedReplyTargets([defaultTarget.empno]);
+        } else {
+          setSelectedReplyTargets([targets[0].empno]);
+        }
+      } else {
+        setSelectedReplyTargets([]);
+      }
+    },
+    [fetchReportAuthor, user?.employee?.empno]
+  );
 
   const fetchComments = useCallback(async () => {
     if (!authFetch) return;
@@ -135,21 +254,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         // 確保 commentsData 是陣列
         if (Array.isArray(commentsData)) {
           setComments(commentsData);
+          // 建構回應目標列表（異步）
+          buildReplyTargets(commentsData);
         } else {
           console.warn("API returned non-array comments data:", commentsData);
           setComments([]);
+          buildReplyTargets([]);
         }
       } else {
         setComments([]);
+        buildReplyTargets([]);
       }
     } catch (error) {
       console.error("獲取留言失敗:", error);
       toast.error("載入留言失敗");
       setComments([]);
+      buildReplyTargets([]);
     } finally {
       setIsLoading(false);
     }
-  }, [reportId, authFetch]);
+  }, [reportId, authFetch, buildReplyTargets]);
 
   useEffect(() => {
     if (authFetch) {
@@ -162,20 +286,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!finalMessage || !authFetch) return;
     setIsSubmitting(true);
     try {
-      const response = await authFetch(`/api/reports/${reportId}/comments`, {
+      // 使用統一的 reviews/submit API，不傳評分表示一般回覆
+      const response = await authFetch("/api/reviews/submit", {
         method: "POST",
-        body: JSON.stringify({ content: finalMessage }),
+        body: JSON.stringify({
+          daily_no: reportId.toString(),
+          reply_memo: finalMessage,
+          to_users: selectedReplyTargets.filter(
+            (target) =>
+              target &&
+              target !== String(user?.employee?.empno).padStart(5, "0")
+          ), // 過濾掉空值和自己
+          forward_users: (selectedForwardUsers || []).filter((user) => user), // 過濾掉空值
+        }),
       });
       if (response.ok) {
         setNewMessage("");
-        toast.success("留言已送出");
+        toast.success("回覆已送出");
+        onForwardUsersChange?.([]); // 清空轉寄選擇
         await fetchComments();
       } else {
-        throw new Error("提交留言失敗");
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "提交回覆失敗");
       }
     } catch (error) {
-      console.error("提交留言失敗:", error);
-      toast.error("提交留言失敗");
+      console.error("提交回覆失敗:", error);
+      toast.error(error instanceof Error ? error.message : "提交回覆失敗");
     } finally {
       setIsSubmitting(false);
     }
@@ -197,8 +333,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           daily_no: reportId.toString(),
           score: selectedRating,
           reply_memo: finalComment,
-          forward_users:
-            selectedForwardUsers.length > 0 ? selectedForwardUsers : null,
+          to_users: selectedReplyTargets.filter(
+            (target) =>
+              target &&
+              target !== String(user?.employee?.empno).padStart(5, "0")
+          ), // 過濾掉空值和自己
+          forward_users: (selectedForwardUsers || []).filter((user) => user), // 過濾掉空值
         }),
       });
 
@@ -388,8 +528,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const renderComment = (comment: Comment) => {
-    const isAuthorSupervisor =
-      comment.author?.email.includes("@supervisor") || false;
+    // Note: Supervisor detection logic removed as email field is deprecated
+    const isAuthorSupervisor = false;
     return (
       <div key={comment.id} className="mb-4">
         <div className="bg-white border border-gray-300 rounded p-4 min-h-[120px] flex flex-col">
@@ -464,18 +604,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
           <div className="p-4 bg-gray-50">
             <div>
-              {flattenComments(comments).map((comment) => renderComment(comment))}
+              {flattenComments(comments).map((comment) =>
+                renderComment(comment)
+              )}
             </div>
           </div>
         </>
       )}
       <div className="p-4 bg-gray-50">
-
         {/* 統一的瞭解!按鈕 */}
         <div className="flex justify-end mt-4">
           <button
             onClick={() => {
-              if (isReportSupervisor && !hasSubmittedReview && user.employee?.id !== reportOwnerId) {
+              if (
+                isReportSupervisor &&
+                !hasSubmittedReview &&
+                user.employee?.id !== reportOwnerId
+              ) {
                 // 只有主管尚未評分時才用評分功能
                 handleSubmitReview(true);
               } else {
@@ -502,6 +647,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       <Crown className="w-4 h-4 mr-2" />
                       主管評分與回饋
                     </h4>
+                    {/* 回應目標選擇器 - 放在標題右側 */}
+                    {replyTargets.length > 0 && (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-blue-700">回應給：</span>
+                        <select
+                          value={
+                            selectedReplyTargets.length === replyTargets.length
+                              ? "all"
+                              : selectedReplyTargets[0] || ""
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "all") {
+                              setSelectedReplyTargets(
+                                replyTargets
+                                  .map((t) => t.empno)
+                                  .filter((empno) => empno)
+                              );
+                            } else if (value) {
+                              setSelectedReplyTargets([value]);
+                            }
+                          }}
+                          className="text-xs border border-blue-300 rounded px-2 py-1 bg-white text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          {replyTargets.map((target) => (
+                            <option key={target.empno} value={target.empno}>
+                              {target.empname}
+                              {/* {target.is_author ? " (作者)" : ""} */}
+                            </option>
+                          ))}
+                          {replyTargets.length > 1 && (
+                            <option value="all">全部</option>
+                          )}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   <div className="mb-4">
                     <span className="text-sm font-medium text-gray-700 mr-4">
@@ -648,6 +829,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         setSelectedRating(3); // Reset to default (普通)
                         setReviewComment("");
                         onForwardUsersChange?.([]); // 清空轉寄選擇
+                        // 重置回應目標選擇到預設值
+                        if (replyTargets.length > 0) {
+                          const defaultTarget = replyTargets.find(
+                            (t) => t.is_author
+                          );
+                          if (defaultTarget) {
+                            setSelectedReplyTargets([defaultTarget.empno]);
+                          } else {
+                            setSelectedReplyTargets([replyTargets[0].empno]);
+                          }
+                        }
                       }}
                       disabled={isSubmitting}
                       className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
@@ -682,6 +874,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       ? "追加留言"
                       : "員工回覆"}
                   </h4>
+                  {/* 回應目標選擇器 - 放在標題右側 */}
+                  {replyTargets.length > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-slate-700">回應給：</span>
+                      <select
+                        value={
+                          selectedReplyTargets.length === replyTargets.length
+                            ? "all"
+                            : selectedReplyTargets[0] || ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "all") {
+                            setSelectedReplyTargets(
+                              replyTargets
+                                .map((t) => t.empno)
+                                .filter((empno) => empno)
+                            );
+                          } else if (value) {
+                            setSelectedReplyTargets([value]);
+                          }
+                        }}
+                        className="text-xs border border-slate-300 rounded px-2 py-1 bg-white text-slate-700 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      >
+                        {replyTargets.map((target) => (
+                          <option key={target.empno} value={target.empno}>
+                            {target.empname}
+                            {/* {target.is_author ? " (作者)" : ""} */}
+                          </option>
+                        ))}
+                        {replyTargets.length > 1 && (
+                          <option value="all">全部</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div className="mb-3">
                   <p className="text-xs text-slate-700 mb-2">快速回覆建議：</p>

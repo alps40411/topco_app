@@ -8,6 +8,7 @@ class ReviewSubmitRequest(BaseModel):
     daily_no: str
     score: Optional[int] = None  # 1-5分
     reply_memo: Optional[str] = None  # 回應內容
+    to_users: List[str] = []  # 回應目標用戶的工號列表（必填，支持預設值和"全部"選項）
     forward_users: Optional[List[str]] = []  # 轉寄給其他用戶的工號列表
     
 class ReviewSubmitResponse(BaseModel):
