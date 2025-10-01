@@ -49,6 +49,11 @@ async def sso_login(request: Request):
         print(f"[SSO] Step 3: Validating user - empno={empno}, cocode={cocode}")
         logger.info(f"SSO login attempt: empno={empno}, cocode={cocode}")
 
+        # 清除該使用者的日期快取，確保獲取最新資料
+        print(f"[SSO] Step 3.5: Clearing date cache for {cocode}:{empno}")
+        from app.services.daily_date_service import clear_date_cache
+        clear_date_cache(cocode or "A", empno)
+
         # 驗證用戶和創建 token (復用現有邏輯)
         print("[SSO] Step 4: Creating user token...")
         login_response = await _create_user_token_from_empno(empno, cocode or "A")

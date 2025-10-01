@@ -14,6 +14,26 @@ logger = logging.getLogger(__name__)
 _date_cache: Dict[str, Dict[str, Any]] = {}
 _cache_timeout = 5 * 60  # 5分鐘緩存
 
+def clear_date_cache(cocode: str = None, empno: str = None):
+    """
+    清除日期快取
+
+    Args:
+        cocode: 公司別（可選，如果不提供則清除所有快取）
+        empno: 員工編號（可選，必須與 cocode 一起使用）
+    """
+    global _date_cache
+
+    if cocode and empno:
+        cache_key = f"{cocode}:{empno}"
+        if cache_key in _date_cache:
+            del _date_cache[cache_key]
+            logger.info(f"🗑️ 清除日期快取: {cache_key}")
+    else:
+        # 清除所有快取
+        _date_cache.clear()
+        logger.info("🗑️ 清除所有日期快取")
+
 class DailyDateService:
     """日期範圍服務 - 使用 C# 子程序調用 MyReport.dll"""
 
