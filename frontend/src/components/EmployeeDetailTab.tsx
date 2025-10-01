@@ -33,6 +33,10 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>([]);
   const { authFetch } = useAuth();
 
+  // 從 URL 獲取 status 參數（status=P 表示從郵件進入）
+  const urlParams = new URLSearchParams(window.location.search);
+  const status = urlParams.get('status') || undefined;
+
   const fetchReportDetails = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -250,6 +254,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           onReviewCompleted={onReviewCompleted}
           selectedForwardUsers={selectedForwardUsers}
           onForwardUsersChange={setSelectedForwardUsers}
+          urlStatus={status}
         />
       </div>
 

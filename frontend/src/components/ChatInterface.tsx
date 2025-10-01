@@ -63,6 +63,7 @@ interface ChatInterfaceProps {
   isReadOnly?: boolean; // 新增只讀模式屬性
   selectedForwardUsers?: string[]; // 選中的轉寄用戶
   onForwardUsersChange?: (users: string[]) => void; // 轉寄用戶變更回調
+  urlStatus?: string; // URL 中的 status 參數，'P' 表示顯示確認按鈕
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -78,6 +79,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   isReadOnly = false, // 預設為 false
   selectedForwardUsers = [],
   onForwardUsersChange,
+  urlStatus,
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -305,6 +307,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         toast.success("回覆已送出");
         onForwardUsersChange?.([]); // 清空轉寄選擇
         await fetchComments();
+
+        // 如果是點擊「瞭解!」按鈕，返回上一頁
+        if (useDefaultMessage) {
+          window.history.back();
+        }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交回覆失敗");
@@ -356,8 +363,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();
 
-        // 評分完成後跳轉回審閱列表
-        if (onReviewCompleted) {
+        // 如果是點擊「瞭解!」按鈕，返回上一頁
+        if (useDefaultComment) {
+          window.history.back();
+        } else if (onReviewCompleted) {
+          // 評分完成後跳轉回審閱列表
           setTimeout(() => {
             onReviewCompleted();
           }, 1500); // 延遲1.5秒讓用戶看到成功訊息
@@ -369,6 +379,33 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     } catch (error) {
       console.error("提交審閱失敗:", error);
       toast.error(error instanceof Error ? error.message : "提交審閱失敗");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 確認按鈕處理函數（status=P 時使用）
+  const handleAcknowledge = async () => {
+    if (!authFetch) return;
+    setIsSubmitting(true);
+    try {
+      const response = await authFetch("/api/reports/acknowledge", {
+        method: "POST",
+        body: JSON.stringify({
+          daily_no: reportId.toString(),
+        }),
+      });
+
+      if (response.ok) {
+        // 返回上一頁
+        window.history.back();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "確認失敗");
+      }
+    } catch (error) {
+      console.error("確認失敗:", error);
+      toast.error(error instanceof Error ? error.message : "確認失敗");
     } finally {
       setIsSubmitting(false);
     }
@@ -612,11 +649,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </>
       )}
       <div className="p-4 bg-gray-50">
-        {/* 統一的瞭解!按鈕 */}
+        {/* 統一的瞭解!/確認按鈕 */}
         <div className="flex justify-end mt-4">
           <button
             onClick={() => {
-              if (
+              // 只判斷 URL 中的 status 參數
+              if (urlStatus === 'P') {
+                // status=P -> 確認按鈕
+                handleAcknowledge();
+              } else if (
                 isReportSupervisor &&
                 !hasSubmittedReview &&
                 user.employee?.id !== reportOwnerId
@@ -631,7 +672,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             disabled={isSubmitting}
             className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
-            {isSubmitting ? "送出中..." : "瞭解!"}
+            {isSubmitting ? "送出中..." : (urlStatus === 'P' ? "確認" : "瞭解!")}
           </button>
         </div>
       </div>

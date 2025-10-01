@@ -34,3 +34,13 @@ class ReviewStatusResponse(BaseModel):
     has_replied: bool
     has_scored: bool
     reply_records: List[ReplyRecord] = []
+
+class ReportAcknowledgeRequest(BaseModel):
+    """日報確認已讀請求"""
+    daily_no: str
+
+class ReportAcknowledgeResponse(BaseModel):
+    """日報確認已讀回應"""
+    success: bool
+    message: str
+    eai_seq: Optional[int] = None

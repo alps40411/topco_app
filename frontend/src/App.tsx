@@ -321,6 +321,44 @@ function App() {
     };
   }, []);
 
+  // 處理 URL 中的 employee 和 report 參數（從郵件連結進入）
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const reportParam = urlParams.get("report");
+
+    // 如果有 report 參數，先立即設置 selectedReportId 避免閃爍
+    if (reportParam && !selectedReportId) {
+      setSelectedReportId(parseInt(reportParam));
+    }
+  }, []); // 只在初始化時執行一次
+
+  // 獲取員工詳細資訊
+  useEffect(() => {
+    if (!authFetch || !selectedReportId) return;
+
+    // 檢查是否已經有 selectedEmployee，如果有就不需要重新獲取
+    if (selectedEmployee) return;
+
+    const fetchEmployeeInfo = async () => {
+      try {
+        const response = await authFetch(`/api/supervisor/reports/${selectedReportId}`);
+        if (response.ok) {
+          const reportData = await response.json();
+          setSelectedEmployee({
+            id: reportData.employee.id,
+            empno: reportData.employee.empno,
+            name: reportData.employee.name,
+            latest_report_id: selectedReportId,
+            latest_report_date: reportData.doc_date,
+          });
+        }
+      } catch (error) {
+        console.error("無法獲取員工資訊:", error);
+      }
+    };
+    fetchEmployeeInfo();
+  }, [authFetch, selectedReportId, selectedEmployee]);
+
   // 當寫入狀態變化時，確保當前活動標籤是可用的
   useEffect(() => {
     if (writingStatus && !writingStatus.allowed) {

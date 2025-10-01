@@ -11,9 +11,11 @@ from ..core.legacy_database import get_legacy_db
 from ..models.user import User
 from ..services.review_service import ReviewService
 from ..schemas.review_schemas import (
-    ReviewSubmitRequest, 
-    ReviewSubmitResponse, 
-    ReviewStatusResponse
+    ReviewSubmitRequest,
+    ReviewSubmitResponse,
+    ReviewStatusResponse,
+    ReportAcknowledgeRequest,
+    ReportAcknowledgeResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -181,4 +183,39 @@ async def get_forward_employees(
     except Exception as e:
         logger.error(f"取得轉寄員工名單失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=f"取得轉寄員工名單失敗: {str(e)}")
+
+@router.post("/reports/acknowledge", response_model=ReportAcknowledgeResponse)
+async def acknowledge_report(
+    request: ReportAcknowledgeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """確認已讀日報並從信箱移除通知"""
+    try:
+        if not current_user.employee:
+            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+
+        logger.info(f"確認日報請求 daily_no={request.daily_no}, user={current_user.employee.empno}")
+
+        result = ReviewService.acknowledge_report(
+            db=db,
+            daily_no=request.daily_no,
+            user_empno=current_user.employee.empno,
+            user_empname=current_user.employee.empnamec,
+            user_cocode=current_user.employee.cocode
+        )
+
+        return ReportAcknowledgeResponse(
+            success=result["success"],
+            message=result["message"],
+            eai_seq=result.get("eai_seq")
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"確認日報失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"確認日報失敗: {str(e)}")
 

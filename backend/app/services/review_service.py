@@ -207,7 +207,7 @@ class ReviewService:
             for mq_item in ls_mq:
                 try:
                     subject = f"{reviewer_empname}回應日報({sop_desc_c})"
-                    href = f"/MyReport/viewed.aspx?cocode={reviewer_cocode}&daily_no={daily_no}&replyid={reply_nos}&status=P"
+                    href = f"/MyReportAI/?tab=supervisor&employee={reviewer_empno}&report={daily_no}&status=P"
                     doc_body = f"Source=JpsReportDailyReply^|Action=toWkf^|cocode=toWkf^|xuser={reviewer_empno}^|doc_date={current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}^|doc_time={current_time}^|touser={reviewer_empno}^|href={href}^|Key={daily_no}^|Subject={subject}"
 
                     print(f"[EAI DEBUG] 準備插入: touser={mq_item['fwUser']}, eai_seq={mq_item['eai']}")
@@ -356,7 +356,85 @@ class ReviewService:
                 "has_scored": has_scored,
                 "reply_records": reply_records
             }
-            
+
         except Exception as e:
             logger.error(f"取得審閱狀態失敗: {str(e)}")
+            raise
+
+    @staticmethod
+    def acknowledge_report(
+        db: Session,
+        daily_no: str,
+        user_empno: str,
+        user_empname: str,
+        user_cocode: str
+    ) -> Dict[str, Any]:
+        """確認已讀日報並從信箱移除通知"""
+
+        try:
+            print(f"[ACKNOWLEDGE DEBUG] === 處理日報確認 ===")
+            print(f"[ACKNOWLEDGE DEBUG] daily_no={daily_no}, user_empno={user_empno}")
+
+            # 取得當前日期時間
+            now = datetime.now()
+            current_date = now.strftime('%Y%m%d')
+            current_time = now.strftime('%H:%M:%S')
+
+            # 驗證日報是否存在
+            report_check_sql = text("""
+                SELECT empno, empnamec, cocode
+                FROM jps.tdr_master
+                WHERE daily_no = :daily_no
+            """)
+            report_result = db.execute(report_check_sql, {"daily_no": daily_no}).fetchone()
+
+            if not report_result:
+                raise ValueError(f"日報 {daily_no} 不存在")
+
+            # 取得 EAI 序號
+            eai_seq_sql = text("SELECT nextval('jps.seq_eai_source')")
+            eai_seq = db.execute(eai_seq_sql).scalar()
+
+            print(f"[ACKNOWLEDGE DEBUG] 獲得EAI序號: {eai_seq}")
+
+            # 建立 EAI 確認通知（從信箱移除這個通知）
+            subject = "Daily_Dele_Report"
+            doc_body = f"Source=JpsReportDailyDelete^|Action=Del_inbox^|cocode=Del_inbox^|xuser={user_empno}^|doc_date={current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}^|doc_time={current_time}^|Key={daily_no}^|Subject={subject}"
+
+            eai_sql = text("""
+                INSERT INTO jps.eai_source (
+                    eai_seq, source, subject, cocode, xuser, touser, doc_date, doc_time,
+                    key, action, doc_bady, status
+                ) VALUES (
+                    :eai_seq, 'JpsReportDailyDelete', :subject, :cocode, :xuser, '',
+                    :doc_date, :doc_time, :key, 'Del_inbox', :doc_bady, 'N'
+                )
+            """)
+
+            db.execute(eai_sql, {
+                "eai_seq": eai_seq,
+                "subject": subject,
+                "cocode": user_cocode,
+                "xuser": user_empno,
+                "doc_date": f"{current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}",
+                "doc_time": current_time,
+                "key": daily_no,
+                "doc_bady": doc_body
+            })
+
+            print(f"[ACKNOWLEDGE DEBUG] EAI確認通知已插入: eai_seq={eai_seq}")
+
+            db.commit()
+            logger.info(f"成功建立日報確認通知 daily_no={daily_no}, eai_seq={eai_seq}")
+
+            return {
+                "success": True,
+                "message": "已確認閱讀，將從信箱移除此通知",
+                "eai_seq": eai_seq,
+                "daily_no": daily_no
+            }
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"確認日報失敗: {str(e)}")
             raise
