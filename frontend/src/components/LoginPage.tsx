@@ -10,7 +10,7 @@ const LoginPage: React.FC = () => {
   const [empno, setEmpno] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSSO, setIsSSO] = useState(false);
+  const [isCheckingSSO, setIsCheckingSSO] = useState(true); // 新增：正在檢查 SSO 狀態
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
       if (wasManualLogout) {
         console.log("手動登出，跳過自動 SSO");
         sessionStorage.removeItem("manual_logout");
-        setIsSSO(false);
+        setIsCheckingSSO(false);
         return;
       }
 
@@ -36,15 +36,16 @@ const LoginPage: React.FC = () => {
           const data = await response.json();
           console.log("SSO login successful:", data);
           login(data.token.access_token, data.user);
-          navigate("/");
+          // 使用完整路徑跳轉
+          window.location.href = "/MyReportAI/?tab=supervisor";
         } else {
           // SSO 失敗，顯示傳統登入界面
-          setIsSSO(false);
+          setIsCheckingSSO(false);
         }
       } catch (error) {
         // SSO 不可用，使用傳統登入
         console.log("SSO not available, falling back to traditional login");
-        setIsSSO(false);
+        setIsCheckingSSO(false);
       }
     };
 
@@ -73,7 +74,8 @@ const LoginPage: React.FC = () => {
 
       const data = await response.json();
       login(data.token.access_token, data.user);
-      navigate("/");
+      // 使用完整路徑跳轉
+      window.location.href = "/MyReportAI/?tab=supervisor";
     } catch (err: any) {
       setError(err.message || "發生未知錯誤");
     } finally {
@@ -96,13 +98,41 @@ const LoginPage: React.FC = () => {
 
       const data = await response.json();
       login(data.token.access_token, data.user);
-      navigate("/");
+      // 使用完整路徑跳轉
+      window.location.href = "/MyReportAI/?tab=supervisor";
     } catch (err: any) {
       setError(err.message || "SSO 登入失敗");
     } finally {
       setIsLoading(false);
     }
   };
+
+  // 如果正在檢查 SSO，顯示 loading 畫面
+  if (isCheckingSSO) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="w-full max-w-md p-8 pt-10 space-y-6 bg-white rounded-2xl shadow-lg">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">TSC</span>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              登入 TSC 業務日誌
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">崇越科技</p>
+          </div>
+
+          {/* Loading 動畫 */}
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="w-12 h-12 border-4 border-green-200 border-t-green-600 rounded-full animate-spin"></div>
+            <p className="mt-4 text-gray-600">正在驗證登入...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">

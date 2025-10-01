@@ -207,7 +207,7 @@ class ReviewService:
             for mq_item in ls_mq:
                 try:
                     subject = f"{reviewer_empname}回應日報({sop_desc_c})"
-                    href = f"/MyReportAI/?tab=supervisor&employee={reviewer_empno}&report={daily_no}&status=P"
+                    href = f"/MyReportAI/viewed.aspx?web_type=EIP&cocode={report_cocode}&daily_no={daily_no}&status=P"
                     doc_body = f"Source=JpsReportDailyReply^|Action=toWkf^|cocode=toWkf^|xuser={reviewer_empno}^|doc_date={current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}^|doc_time={current_time}^|touser={reviewer_empno}^|href={href}^|Key={daily_no}^|Subject={subject}"
 
                     print(f"[EAI DEBUG] 準備插入: touser={mq_item['fwUser']}, eai_seq={mq_item['eai']}")

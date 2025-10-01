@@ -74,6 +74,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
 
+    // 設置手動登出標記，避免自動 SSO
+    sessionStorage.setItem("manual_logout", "true");
+
     // 強制重新加載頁面確保完全清除狀態
     window.location.href = '/MyReportAI/login';
   }, []);

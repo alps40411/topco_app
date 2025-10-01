@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 
@@ -85,6 +86,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   // 審閱相關狀態
   const [selectedRating, setSelectedRating] = useState<number>(3); // 預設評分為「普通」(5分制)
@@ -310,7 +312,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         // 如果是點擊「瞭解!」按鈕，返回上一頁
         if (useDefaultMessage) {
-          window.history.back();
+          navigate(-1);
         }
       } else {
         const errorData = await response.json();
@@ -365,7 +367,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         // 如果是點擊「瞭解!」按鈕，返回上一頁
         if (useDefaultComment) {
-          window.history.back();
+          navigate(-1);
         } else if (onReviewCompleted) {
           // 評分完成後跳轉回審閱列表
           setTimeout(() => {
@@ -398,7 +400,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       if (response.ok) {
         // 返回上一頁
-        window.history.back();
+        navigate(-1);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "確認失敗");

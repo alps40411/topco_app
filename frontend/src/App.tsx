@@ -1,6 +1,7 @@
 // frontend/src/App.tsx
 
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { toast } from "react-hot-toast";
 import DataInputTab from "./components/DataInputTab";
@@ -153,6 +154,9 @@ export interface User {
 function App() {
   const { user, logout, authFetch } = useAuth();
   const { hasSubordinates } = useHasSubordinates();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
   const [activeTab, setActiveTab] = useState<
     "input" | "daily" | "supervisor" | "ai" | "comprehensive"
   >("supervisor"); // 預設為日報首頁
@@ -175,30 +179,26 @@ function App() {
       setActiveTab(tab);
       setSelectedEmployee(null);
       setSelectedReportId(null);
-      // 為每個標籤創建瀏覽器歷史記錄
-      window.history.pushState({ tab }, "", `/MyReportAI/?tab=${tab}`);
+      // 使用 navigate 更新 URL
+      navigate(`./?tab=${tab}`, { replace: false });
     },
-    []
+    [navigate]
   );
 
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
     setSelectedEmployee(employee);
     setSelectedReportId(reportId);
     setActiveTab("supervisor"); // 切換到審閱模式
-    // 為員工詳情創建歷史記錄
-    window.history.pushState(
-      { tab: "supervisor", employee: employee.id, report: reportId },
-      "",
-      `/MyReportAI/?tab=supervisor&employee=${employee.id}&report=${reportId}`
-    );
+    // 使用 navigate 更新 URL
+    navigate(`./?tab=supervisor&employee=${employee.id}&report=${reportId}`, { replace: false });
   };
 
   const handleBackFromDetail = () => {
     setSelectedEmployee(null);
     setSelectedReportId(null);
     setActiveTab("supervisor");
-    // 返回到員工列表時創建歷史記錄
-    window.history.pushState({ tab: "supervisor" }, "", "/MyReportAI/?tab=supervisor");
+    // 使用 navigate 返回列表頁
+    navigate("./?tab=supervisor", { replace: false });
   };
 
   const handleReviewCompleted = () => {
@@ -206,8 +206,8 @@ function App() {
     setSelectedEmployee(null);
     setSelectedReportId(null);
     setActiveTab("supervisor");
-    // 返回到員工列表時創建歷史記錄
-    window.history.pushState({ tab: "supervisor" }, "", "/MyReportAI/?tab=supervisor");
+    // 使用 navigate 返回列表頁
+    navigate("./?tab=supervisor", { replace: false });
     // 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
     fetchWritingStatus();
   };
@@ -220,18 +220,14 @@ function App() {
     setActiveTab("daily");
     // 設定顯示上傳的那天日報
     setGlobalSelectedDate(uploadedDate);
-    // 更新URL
-    window.history.pushState(
-      { tab: "daily", date: uploadedDate },
-      "",
-      `/?tab=daily&date=${uploadedDate}`
-    );
+    // 使用 navigate 更新 URL
+    navigate(`./?tab=daily&date=${uploadedDate}`, { replace: false });
 
     // 延遲顯示成功訊息，確保跳轉完成
     setTimeout(() => {
       toast.success("已跳轉到日報首頁查看上傳的日報");
     }, 100);
-  }, []);
+  }, [navigate]);
 
   const fetchWritingStatus = useCallback(
     async (docDate?: string) => {
@@ -260,77 +256,51 @@ function App() {
     }
   }, [authFetch, user?.employee, fetchWritingStatus, globalSelectedDate]);
 
-  // 監聽瀏覽器歷史變化並恢復狀態
+  // 監聽 URL 參數變化並同步狀態
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      const state = event.state;
-      if (state) {
-        setActiveTab(state.tab || "supervisor");
-        if (state.employee && state.report) {
-          // 這裡需要重新獲取員工信息，暫時先重置
-          setSelectedEmployee(null);
-          setSelectedReportId(null);
-        } else {
-          setSelectedEmployee(null);
-          setSelectedReportId(null);
-        }
-      } else {
-        // 沒有狀態信息時，檢查URL參數
-        const urlParams = new URLSearchParams(window.location.search);
-        const tabParam =
-          (urlParams.get("tab") as
-            | "input"
-            | "daily"
-            | "supervisor"
-            | "ai"
-            | "comprehensive") || "supervisor";
-        setActiveTab(tabParam);
-        setSelectedEmployee(null);
-        setSelectedReportId(null);
-      }
-    };
-
-    // 初始化時檢查URL參數
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get("tab") as
+    const tab = searchParams.get("tab") as
       | "input"
       | "daily"
       | "supervisor"
       | "ai"
-      | "comprehensive";
-    const dateParam = urlParams.get("date");
+      | "comprehensive"
+      | null;
+    const dateParam = searchParams.get("date");
+    const reportParam = searchParams.get("report");
 
-    if (tabParam) {
-      setActiveTab(tabParam);
+    // 同步 tab
+    if (tab) {
+      if (tab !== activeTab) {
+        setActiveTab(tab);
+      }
     } else {
-      // 如果沒有URL參數，創建初始歷史記錄
-      window.history.replaceState(
-        { tab: "supervisor" },
-        "",
-        "/?tab=supervisor"
-      );
+      // 如果沒有 tab 參數，設置預設值並更新 URL
+      if (activeTab !== "supervisor") {
+        setActiveTab("supervisor");
+      }
+      // 只在沒有任何參數時設置預設 URL
+      if (!searchParams.toString()) {
+        navigate("./?tab=supervisor", { replace: true });
+      }
     }
 
-    if (dateParam) {
+    // 同步日期
+    if (dateParam && dateParam !== globalSelectedDate) {
       setGlobalSelectedDate(dateParam);
     }
 
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, []);
-
-  // 處理 URL 中的 employee 和 report 參數（從郵件連結進入）
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const reportParam = urlParams.get("report");
-
-    // 如果有 report 參數，先立即設置 selectedReportId 避免閃爍
-    if (reportParam && !selectedReportId) {
-      setSelectedReportId(parseInt(reportParam));
+    // 同步 report
+    if (reportParam) {
+      const reportId = parseInt(reportParam);
+      if (reportId !== selectedReportId) {
+        setSelectedReportId(reportId);
+      }
+    } else if (selectedReportId) {
+      // 如果 URL 沒有 report 但 state 有，則清空
+      setSelectedReportId(null);
+      setSelectedEmployee(null);
     }
-  }, []); // 只在初始化時執行一次
+  }, [searchParams, activeTab, globalSelectedDate, selectedReportId, navigate])
 
   // 獲取員工詳細資訊
   useEffect(() => {

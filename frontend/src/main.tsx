@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import App from "./App.tsx";
 import LoginPage from "./components/LoginPage.tsx";
+import RedirectHandler from "./components/RedirectHandler.tsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.tsx";
 import "./index.css";
 
@@ -58,6 +59,18 @@ const AppWithAuth = () => {
       <Router basename="/MyReportAI">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+
+          {/* 新格式 URL（郵件連結） */}
+          <Route
+            path="/viewed.aspx"
+            element={
+              <ProtectedRoute>
+                <RedirectHandler />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 主應用路由 */}
           <Route
             path="/*"
             element={
