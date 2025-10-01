@@ -104,8 +104,6 @@ class LegacyReportServiceV2:
             att_file2 = ','.join(att_file2_list) if att_file2_list else ""
             files_json = json.dumps(files_json_list, ensure_ascii=False) if files_json_list else "[]"
             
-            logger.info(f"DRAFT 多檔案處理: att_file1={att_file1}, att_file2={att_file2}")
-            
             # 處理 daily_no 邏輯
             if daily_no:
                 # 使用前端提供的 daily_no
@@ -234,7 +232,7 @@ class LegacyReportServiceV2:
                     WHERE RECORD_ID = :record_id
                 """)
                 
-                db.execute(update_sql, {
+                update_params = {
                     "plan_subj_c": plan_subj_c,
                     "sop_desc_c": sop_desc_c,
                     "work_item_seq": merged_work_items,
@@ -251,8 +249,10 @@ class LegacyReportServiceV2:
                     "updated_date": current_date,
                     "updated_time": current_time,
                     "record_id": existing_exact_match[0]
-                })
-                
+                }
+
+                db.execute(update_sql, update_params)
+
                 db.commit()
                 logger.info(f"合併更新完成，record_id: {existing_exact_match[0]}，總執行時間: {total_time} 分鐘")
                 return daily_no
@@ -301,21 +301,62 @@ class LegacyReportServiceV2:
                     # 更新第一個匹配的記錄，合併工作項目序列
                     first_match_id = existing_partial_matches[0][0]
                     
+                    # 合併檔案資訊
+                    existing_record_sql = text("""
+                        SELECT ATT_FILE1, ATT_FILE2, FILES
+                        FROM jps.tdr_draft
+                        WHERE RECORD_ID = :record_id
+                    """)
+                    existing_record = db.execute(existing_record_sql, {"record_id": first_match_id}).fetchone()
+
+                    existing_att_file1 = existing_record[0] or "" if existing_record else ""
+                    existing_att_file2 = existing_record[1] or "" if existing_record else ""
+                    existing_files = existing_record[2] or "[]" if existing_record else "[]"
+
+                    # 合併檔案
+                    merged_att_file1 = existing_att_file1
+                    merged_att_file2 = existing_att_file2
+
+                    if att_file1:
+                        merged_att_file1 = f"{merged_att_file1},{att_file1}" if merged_att_file1 else att_file1
+                    if att_file2:
+                        merged_att_file2 = f"{merged_att_file2},{att_file2}" if merged_att_file2 else att_file2
+
+                    # 合併 files JSON
+                    if files_json and files_json != "[]":
+                        try:
+                            existing_files_list = json.loads(existing_files) if existing_files != "[]" else []
+                            new_files_list = json.loads(files_json)
+                            merged_files_list = existing_files_list + new_files_list
+                            merged_files = json.dumps(merged_files_list, ensure_ascii=False)
+                        except:
+                            merged_files = files_json
+                    else:
+                        merged_files = existing_files
+
                     update_partial_sql = text("""
-                        UPDATE jps.tdr_draft 
+                        UPDATE jps.tdr_draft
                         SET WORK_ITEM_SEQ = :work_item_seq,
                             CONTENT = COALESCE(CONTENT, '') || CASE WHEN COALESCE(CONTENT, '') = '' THEN '' ELSE '\n' END || :new_content,
                             EXECUTION_TIME_MINUTES = COALESCE(EXECUTION_TIME_MINUTES, 0) + :additional_time,
                             WORD_COUNT = CHAR_LENGTH(COALESCE(CONTENT, '') || CASE WHEN COALESCE(CONTENT, '') = '' THEN '' ELSE '\n' END || :new_content),
+                            ATT_FILE1 = :att_file1,
+                            ATT_FILE2 = :att_file2,
+                            FILES = :files,
                             UPDATED_DATE = :updated_date,
                             UPDATED_TIME = :updated_time
                         WHERE RECORD_ID = :record_id
                     """)
-                    
+
+
+
                     db.execute(update_partial_sql, {
                         "work_item_seq": final_work_item_seq,
                         "new_content": content,
                         "additional_time": draft_content.get('execution_time_minutes', 0),
+                        "att_file1": merged_att_file1,
+                        "att_file2": merged_att_file2,
+                        "files": merged_files,
                         "updated_date": current_date,
                         "updated_time": current_time,
                         "record_id": first_match_id
@@ -346,7 +387,7 @@ class LegacyReportServiceV2:
                     )
                 """)
                 
-                db.execute(insert_sql, {
+                insert_params = {
                     "daily_no": daily_no,
                     "empno": empno,
                     "cocode": cocode,
@@ -371,8 +412,11 @@ class LegacyReportServiceV2:
                     "created_time": current_time,
                     "updated_date": current_date,
                     "updated_time": current_time
-                })
-                
+                }
+
+
+                db.execute(insert_sql, insert_params)
+
                 db.commit()
                 logger.info(f"新增記錄完成，daily_no: {daily_no}")
                 return daily_no
