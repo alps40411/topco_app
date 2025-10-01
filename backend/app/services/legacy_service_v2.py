@@ -189,7 +189,7 @@ class LegacyReportServiceV2:
                         existing_files_list = json.loads(existing_files) if existing_files != "[]" else []
                         new_files_list = json.loads(files_json)
                         merged_files_list = existing_files_list + new_files_list
-                        merged_files = json.dumps(merged_files_list)
+                        merged_files = json.dumps(merged_files_list, ensure_ascii=False)
                     except:
                         merged_files = files_json
                 else:

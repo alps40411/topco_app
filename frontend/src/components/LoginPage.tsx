@@ -27,6 +27,11 @@ const LoginPage: React.FC = () => {
       }
 
       try {
+        // 清除舊的認證資訊，確保 SSO 登入會獲取最新的使用者資料
+        console.log("🔄 清除舊的認證資訊，準備 SSO 登入");
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+
         // 嘗試調用 SSO 登入端點看是否有有效的 SSO headers
         const response = await fetch(buildApiUrl("/api/auth/sso"), {
           method: "POST",
@@ -88,6 +93,11 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // 清除舊的認證資訊，確保 SSO 登入會獲取最新的使用者資料
+      console.log("🔄 手動 SSO - 清除舊的認證資訊");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+
       const response = await fetch(buildApiUrl("/api/auth/sso"), {
         method: "POST",
       });
