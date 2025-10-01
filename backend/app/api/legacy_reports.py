@@ -808,9 +808,15 @@ async def upload_file(
         upload_dir = Path(settings.UPLOAD_DIR)
         upload_dir.mkdir(exist_ok=True)
         
-        # 生成唯一檔案名
-        file_id = str(uuid.uuid4())
-        safe_filename = f"{file_id}_{file.filename}"
+        # 生成唯一檔案名（時間戳記 + 短 hash）
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        short_hash = uuid.uuid4().hex[:8]
+        file_ext = Path(file.filename or "").suffix
+        # 限制原檔名長度，避免過長
+        original_name = Path(file.filename or "file").stem
+        if len(original_name) > 50:
+            original_name = original_name[:50]
+        safe_filename = f"{timestamp}_{short_hash}_{original_name}{file_ext}"
         file_path = upload_dir / safe_filename
         
         # 保存檔案
@@ -820,7 +826,7 @@ async def upload_file(
         
         # 返回檔案資訊（模擬前端期待的格式）
         return {
-            "id": file_id,
+            "id": f"{timestamp}_{short_hash}",
             "name": file.filename,
             "type": file.content_type or "application/octet-stream",
             "size": len(content),
