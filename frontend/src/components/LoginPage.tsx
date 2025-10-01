@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import { buildApiUrl } from "../config/api";
+import { clearDateCache } from "./DateSelector";
 
 const LoginPage: React.FC = () => {
   const [empno, setEmpno] = useState("");
@@ -27,6 +28,9 @@ const LoginPage: React.FC = () => {
       }
 
       try {
+        // 清除日期快取，確保獲取新使用者的日期資料
+        clearDateCache();
+
         // 嘗試調用 SSO 登入端點看是否有有效的 SSO headers
         const response = await fetch(buildApiUrl("/api/auth/sso"), {
           method: "POST",
@@ -88,6 +92,9 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // 清除日期快取，確保獲取新使用者的日期資料
+      clearDateCache();
+
       const response = await fetch(buildApiUrl("/api/auth/sso"), {
         method: "POST",
       });

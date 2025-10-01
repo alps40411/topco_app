@@ -35,6 +35,12 @@ let globalDateCache: {
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5分鐘緩存
 
+// Export 清除快取函數，供登入頁面使用
+export const clearDateCache = () => {
+  console.log("🗑️ 清除日期快取");
+  globalDateCache = null;
+};
+
 const DateSelector: React.FC<DateSelectorProps> = ({
   selectedDate,
   onDateChange,
