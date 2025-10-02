@@ -169,7 +169,21 @@ class ReviewService:
                 forward_users is not None and len(forward_users) > 0
             )
             
-            # 8. 工作流通知 - 建構通知用戶列表
+            # 8. 更新 wfinbox 狀態
+            update_wfinbox_sql = text("""
+                UPDATE jps.wfinbox
+                SET xstatus = '3', xtime = CURRENT_TIMESTAMP
+                WHERE source = '003'
+                AND doc_type = '999'
+                AND empno = :empno
+                AND serino = :serino
+            """)
+            db.execute(update_wfinbox_sql, {
+                "empno": reviewer_empno,
+                "serino": daily_no
+            })
+
+            # 9. 工作流通知 - 建構通知用戶列表
             # 建立要通知的用戶列表（不包含原作者，因為原作者不需要收到自己日報的通知）
             ls_total_user = []
 
@@ -202,7 +216,7 @@ class ReviewService:
                 })
 
             print(f"[EAI DEBUG] 訊息佇列: {ls_mq}")
-            
+
             # 建立工作流通知
             for mq_item in ls_mq:
                 try:
@@ -239,7 +253,7 @@ class ReviewService:
                 except Exception as eai_error:
                     print(f"[EAI DEBUG] 插入失敗: touser={mq_item['fwUser']}, error={str(eai_error)}")
                     # 不要因為EAI失敗而中斷整個流程，繼續處理
-            
+
             db.commit()
             logger.info(f"成功提交審閱 daily_no={daily_no}, reply_nos={reply_nos}")
             
@@ -369,16 +383,11 @@ class ReviewService:
         user_empname: str,
         user_cocode: str
     ) -> Dict[str, Any]:
-        """確認已讀日報並從信箱移除通知"""
+        """確認已讀日報並更新信箱狀態"""
 
         try:
             print(f"[ACKNOWLEDGE DEBUG] === 處理日報確認 ===")
             print(f"[ACKNOWLEDGE DEBUG] daily_no={daily_no}, user_empno={user_empno}")
-
-            # 取得當前日期時間
-            now = datetime.now()
-            current_date = now.strftime('%Y%m%d')
-            current_time = now.strftime('%H:%M:%S')
 
             # 驗證日報是否存在
             report_check_sql = text("""
@@ -391,46 +400,28 @@ class ReviewService:
             if not report_result:
                 raise ValueError(f"日報 {daily_no} 不存在")
 
-            # 取得 EAI 序號
-            eai_seq_sql = text("SELECT nextval('jps.seq_eai_source')")
-            eai_seq = db.execute(eai_seq_sql).scalar()
-
-            print(f"[ACKNOWLEDGE DEBUG] 獲得EAI序號: {eai_seq}")
-
-            # 建立 EAI 確認通知（從信箱移除這個通知）
-            subject = "Daily_Dele_Report"
-            doc_body = f"Source=JpsReportDailyDelete^|Action=Del_inbox^|cocode=Del_inbox^|xuser={user_empno}^|doc_date={current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}^|doc_time={current_time}^|Key={daily_no}^|Subject={subject}"
-
-            eai_sql = text("""
-                INSERT INTO jps.eai_source (
-                    eai_seq, source, subject, cocode, xuser, touser, doc_date, doc_time,
-                    key, action, doc_bady, status
-                ) VALUES (
-                    :eai_seq, 'JpsReportDailyDelete', :subject, :cocode, :xuser, '',
-                    :doc_date, :doc_time, :key, 'Del_inbox', :doc_bady, 'N'
-                )
+            # 更新 wfinbox 狀態
+            update_wfinbox_sql = text("""
+                UPDATE jps.wfinbox
+                SET xstatus = '3', xtime = CURRENT_TIMESTAMP
+                WHERE source = '003'
+                AND doc_type = '999'
+                AND empno = :empno
+                AND serino = :serino
             """)
-
-            db.execute(eai_sql, {
-                "eai_seq": eai_seq,
-                "subject": subject,
-                "cocode": user_cocode,
-                "xuser": user_empno,
-                "doc_date": f"{current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}",
-                "doc_time": current_time,
-                "key": daily_no,
-                "doc_bady": doc_body
+            db.execute(update_wfinbox_sql, {
+                "empno": user_empno,
+                "serino": daily_no
             })
 
-            print(f"[ACKNOWLEDGE DEBUG] EAI確認通知已插入: eai_seq={eai_seq}")
+            print(f"[ACKNOWLEDGE DEBUG] wfinbox 已更新")
 
             db.commit()
-            logger.info(f"成功建立日報確認通知 daily_no={daily_no}, eai_seq={eai_seq}")
+            logger.info(f"成功確認日報 daily_no={daily_no}, user_empno={user_empno}")
 
             return {
                 "success": True,
-                "message": "已確認閱讀，將從信箱移除此通知",
-                "eai_seq": eai_seq,
+                "message": "已確認閱讀",
                 "daily_no": daily_no
             }
 
