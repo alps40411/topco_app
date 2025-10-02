@@ -8,6 +8,7 @@ from sqlalchemy import text
 import json
 
 from ..schemas.review_schemas import ReviewSubmitRequest
+from .wfinbox_service import WfinboxService
 
 logger = logging.getLogger(__name__)
 
@@ -169,19 +170,15 @@ class ReviewService:
                 forward_users is not None and len(forward_users) > 0
             )
             
-            # 8. 更新 wfinbox 狀態
-            update_wfinbox_sql = text("""
-                UPDATE jps.wfinbox
-                SET xstatus = '3', xtime = CURRENT_TIMESTAMP
-                WHERE source = '003'
-                AND doc_type = '999'
-                AND empno = :empno
-                AND serino = :serino
-            """)
-            db.execute(update_wfinbox_sql, {
-                "empno": reviewer_empno,
-                "serino": daily_no
-            })
+            # 8. 更新 wfinbox 狀態（透過 C# 調用 MyReport.dll）
+            try:
+                WfinboxService.update_status_to_read(
+                    empno=reviewer_empno,
+                    serino=daily_no
+                )
+            except Exception as e:
+                # wfinbox 更新失敗不影響主流程
+                logger.warning(f"Wfinbox 更新失敗（不影響主流程）: {str(e)}")
 
             # 9. 工作流通知 - 建構通知用戶列表
             # 建立要通知的用戶列表（不包含原作者，因為原作者不需要收到自己日報的通知）
@@ -400,21 +397,19 @@ class ReviewService:
             if not report_result:
                 raise ValueError(f"日報 {daily_no} 不存在")
 
-            # 更新 wfinbox 狀態
-            update_wfinbox_sql = text("""
-                UPDATE jps.wfinbox
-                SET xstatus = '3', xtime = CURRENT_TIMESTAMP
-                WHERE source = '003'
-                AND doc_type = '999'
-                AND empno = :empno
-                AND serino = :serino
-            """)
-            db.execute(update_wfinbox_sql, {
-                "empno": user_empno,
-                "serino": daily_no
-            })
-
-            print(f"[ACKNOWLEDGE DEBUG] wfinbox 已更新")
+            # 更新 wfinbox 狀態（透過 C# 調用 MyReport.dll）
+            try:
+                success = WfinboxService.update_status_to_read(
+                    empno=user_empno,
+                    serino=daily_no
+                )
+                if success:
+                    print(f"[ACKNOWLEDGE DEBUG] wfinbox 已更新")
+                else:
+                    print(f"[ACKNOWLEDGE DEBUG] wfinbox 更新失敗")
+            except Exception as e:
+                logger.warning(f"Wfinbox 更新失敗（不影響主流程）: {str(e)}")
+                print(f"[ACKNOWLEDGE DEBUG] wfinbox 更新異常: {str(e)}")
 
             db.commit()
             logger.info(f"成功確認日報 daily_no={daily_no}, user_empno={user_empno}")
