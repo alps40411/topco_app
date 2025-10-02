@@ -5,12 +5,24 @@ import {
   Routes,
   Route,
   Navigate,
+  useSearchParams,
 } from "react-router-dom";
 import App from "./App.tsx";
 import LoginPage from "./components/LoginPage.tsx";
 import RedirectHandler from "./components/RedirectHandler.tsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.tsx";
 import "./index.css";
+
+// This component checks for 'daily_no' and decides whether to redirect or render the app.
+const RootHandler = () => {
+  const [searchParams] = useSearchParams();
+  // If daily_no exists in the URL, it's a link from an email that needs redirection.
+  if (searchParams.has("daily_no")) {
+    return <RedirectHandler />;
+  }
+  // Otherwise, render the main application.
+  return <App />;
+};
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated, token, user } = useAuth();
@@ -60,22 +72,12 @@ const AppWithAuth = () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
-          {/* 新格式 URL（郵件連結） */}
-          <Route
-            path="/viewed.aspx"
-            element={
-              <ProtectedRoute>
-                <RedirectHandler />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 主應用路由 */}
+          {/* Main application route now uses RootHandler */}
           <Route
             path="/*"
             element={
               <ProtectedRoute>
-                <App />
+                <RootHandler />
               </ProtectedRoute>
             }
           />

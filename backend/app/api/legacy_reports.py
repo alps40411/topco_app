@@ -1320,7 +1320,7 @@ async def upload_daily_report(
         
         # 日報檢視URL (使用 key_val 作為識別)
         subject = f'{empnamec}的日報({main_sop_desc_c})'
-        report_view_url = f"/MyReportAI/viewed.aspx?web_type=EIP&cocode={cocode}&daily_no={daily_no}"
+        report_view_url = f"%2fMyReportAI%2f%3fcocode%3d{cocode}%26daily_no%3d{daily_no}"
         
         # 文件內容 (doc_bady)
         doc_bady = (
