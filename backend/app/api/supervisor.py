@@ -862,7 +862,7 @@ async def get_daily_homepage_reports(
                     "department_name": row[23] or "",  # deptnamec
                     "company_code": row[1] or "",  # cocode
                 },
-                "date": row[17],  # doc_date
+                "date": row[18],  # doc_date
                 "status": "pending" if row[15] != 'Y' else "reviewed",  # reply_status
                 "emergency": row[4] or "",  # emergency
                 "classify": row[5] or "",  # classify

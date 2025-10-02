@@ -179,8 +179,8 @@ function App() {
       setActiveTab(tab);
       setSelectedEmployee(null);
       setSelectedReportId(null);
-      // 使用 navigate 更新 URL
-      navigate(`./?tab=${tab}`, { replace: false });
+      // 使用 navigate 更新 URL (相對於 basename)
+      navigate(`?tab=${tab}`, { replace: false });
     },
     [navigate]
   );
@@ -189,16 +189,16 @@ function App() {
     setSelectedEmployee(employee);
     setSelectedReportId(reportId);
     setActiveTab("supervisor"); // 切換到審閱模式
-    // 使用 navigate 更新 URL
-    navigate(`./?tab=supervisor&employee=${employee.id}&report=${reportId}`, { replace: false });
+    // 使用 navigate 更新 URL (相對於 basename)
+    navigate(`?tab=supervisor&employee=${employee.id}&report=${reportId}`, { replace: false });
   };
 
   const handleBackFromDetail = () => {
     setSelectedEmployee(null);
     setSelectedReportId(null);
     setActiveTab("supervisor");
-    // 使用 navigate 返回列表頁
-    navigate("./?tab=supervisor", { replace: false });
+    // 使用 navigate 返回列表頁 (相對於 basename)
+    navigate("?tab=supervisor", { replace: false });
   };
 
   const handleReviewCompleted = () => {
@@ -206,8 +206,8 @@ function App() {
     setSelectedEmployee(null);
     setSelectedReportId(null);
     setActiveTab("supervisor");
-    // 使用 navigate 返回列表頁
-    navigate("./?tab=supervisor", { replace: false });
+    // 使用 navigate 返回列表頁 (相對於 basename)
+    navigate("?tab=supervisor", { replace: false });
     // 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
     fetchWritingStatus();
   };
@@ -220,8 +220,8 @@ function App() {
     setActiveTab("daily");
     // 設定顯示上傳的那天日報
     setGlobalSelectedDate(uploadedDate);
-    // 使用 navigate 更新 URL
-    navigate(`./?tab=daily&date=${uploadedDate}`, { replace: false });
+    // 使用 navigate 更新 URL (相對於 basename)
+    navigate(`?tab=daily&date=${uploadedDate}`, { replace: false });
 
     // 延遲顯示成功訊息，確保跳轉完成
     setTimeout(() => {
@@ -252,7 +252,8 @@ function App() {
   useEffect(() => {
     if (authFetch && user?.employee) {
       // 使用全局選中的日期，如果沒有則不傳入doc_date讓後端使用預設邏輯
-      fetchWritingStatus(globalSelectedDate || undefined);
+      const docDate = globalSelectedDate ? globalSelectedDate.replace(/-/g, "") : undefined;
+      fetchWritingStatus(docDate);
     }
   }, [authFetch, user?.employee, fetchWritingStatus, globalSelectedDate]);
 
@@ -280,7 +281,7 @@ function App() {
       }
       // 只在沒有任何參數時設置預設 URL
       if (!searchParams.toString()) {
-        navigate("./?tab=supervisor", { replace: true });
+        navigate("?tab=supervisor", { replace: true });
       }
     }
 

@@ -62,19 +62,19 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     "🔒 ProtectedRoute - 認證結果:",
     isAuthenticated ? "已認證" : "未認證"
   );
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  return isAuthenticated ? children : <Navigate to="login" replace />;
 };
 
 const AppWithAuth = () => {
   return (
     <AuthProvider>
-      <Router basename="/MyReportAI">
+      <Router basename="/MyReportAI/">
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="login" element={<LoginPage />} />
 
           {/* Main application route now uses RootHandler */}
           <Route
-            path="/*"
+            path="*"
             element={
               <ProtectedRoute>
                 <RootHandler />

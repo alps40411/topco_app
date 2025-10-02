@@ -750,13 +750,13 @@ async def get_writing_status(
                 status = "reviewed"
         elif submitted_count > 0:
             status = "submitted"
-            message = "日報已提交，等待主管審閱"
+            message = ""
         elif draft_count > 0:
             status = "draft"
-            message = "有草稿，可以繼續編輯"
+            message = ""
         else:
             status = "empty"
-            message = "尚未開始填寫日報"
+            message = ""
         
         return {
             "allowed": allowed,

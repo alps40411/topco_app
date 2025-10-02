@@ -6,6 +6,8 @@ import type { DailyReport, EmployeeInList } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
 import SupervisorDateBar from "./SupervisorDateBar";
+import { toast } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 // 新的日報首頁數據結構
 interface HomepageReport {
@@ -43,6 +45,10 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   const [reports, setReports] = useState<HomepageReport[]>([]);
   const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [editableStatus, setEditableStatus] = useState<Record<string, boolean>>(
+    {}
+  );
+  const navigate = useNavigate();
   // 日報首頁預設顯示前一天的日報，因為當天的日報通常隔天才審閱
   // const getDefaultDate = () => {
   //   const yesterday = new Date();
@@ -62,6 +68,23 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     }
   }, [user]);
 
+  // 檢查特定日期是否可編輯
+  const checkDateEditable = async (docDate: string) => {
+    try {
+      const response = await authFetch(
+        `/api/records/writing-status?doc_date=${docDate}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        return data.allowed === true;
+      }
+      return false;
+    } catch (error) {
+      console.error("檢查可編輯狀態失敗:", error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (!selectedDate) return; // Don't fetch if date is null
 
@@ -78,10 +101,32 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         const response = await authFetch(
           `/api/supervisor/daily-homepage?date=${dateString}`
         );
+        console.log("API response status:", response.status);
         if (response.ok) {
           const homepageReports = await response.json();
+          console.log("Fetched reports count:", homepageReports.length);
+          console.log("Reports data:", homepageReports);
           setReports(homepageReports);
+
+          // 檢查當天所有唯一日期的可編輯狀態
+          const uniqueDates = [
+            ...new Set(homepageReports.map((r: HomepageReport) => r.date).filter(d => d != null)),
+          ];
+          const statusPromises = uniqueDates.map(async (date) => {
+            if (!date) return [null, false];
+            const isEditable = await checkDateEditable(date);
+            return [date, isEditable];
+          });
+
+          const statusResults = await Promise.all(statusPromises);
+          const statusMap: Record<string, boolean> = {};
+          statusResults.forEach(([date, isEditable]) => {
+            statusMap[date as string] = isEditable as boolean;
+          });
+          console.log("Editable status map:", statusMap);
+          setEditableStatus(statusMap);
         } else {
+          console.error("API response not ok:", response.status, await response.text());
           setReports([]);
         }
       } catch (error) {
@@ -96,6 +141,57 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
+  };
+
+  // 處理刪除日報
+  const handleDeleteReport = async (reportId: number, reportDate: string) => {
+    if (!window.confirm("確定要刪除這份日報嗎？")) {
+      return;
+    }
+
+    try {
+      const response = await authFetch(`/api/reports/${reportId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast.success("日報刪除成功");
+        // 重新載入當前日期的日報列表
+        if (selectedDate) {
+          const year = selectedDate.getFullYear();
+          const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+          const day = String(selectedDate.getDate()).padStart(2, "0");
+          const dateString = `${year}-${month}-${day}`;
+          const refreshResponse = await authFetch(
+            `/api/supervisor/daily-homepage?date=${dateString}`
+          );
+          if (refreshResponse.ok) {
+            const homepageReports = await refreshResponse.json();
+            setReports(homepageReports);
+          }
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || "刪除日報失敗");
+      }
+    } catch (error) {
+      console.error("刪除日報失敗:", error);
+      toast.error("刪除日報失敗");
+    }
+  };
+
+  // 處理編輯日報
+  const handleEditReport = (reportDate: string) => {
+    // 將 YYYYMMDD 格式轉換為 YYYY-MM-DD 格式
+    const formattedDate =
+      reportDate.length === 8
+        ? `${reportDate.substring(0, 4)}-${reportDate.substring(
+            4,
+            6
+          )}-${reportDate.substring(6, 8)}`
+        : reportDate;
+    // 導航到日報編輯頁面，使用該日報的日期
+    navigate(`?tab=daily&date=${formattedDate}`);
   };
 
   // 渲染回應狀態圖片 - 基於 reply_count 和 replier_count 判斷
@@ -219,7 +315,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                 狀態
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -230,6 +326,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
               </th>
               <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                 內容
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                編輯
               </th>
             </tr>
           </thead>
@@ -281,6 +380,55 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 </td>
                 <td className="px-4 py-3 text-center">
                   {renderContentStatus(report)}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {(() => {
+                    const isOwnReport = currentUserEmpno === String(report.employee.id);
+                    const hasNoReply = report.reply_count === 0;
+                    const hasDate = !!report.date;
+                    const isEditable = report.date && editableStatus[report.date] === true;
+
+                    console.log(`Report ${report.id} check:`, {
+                      currentUserEmpno,
+                      employeeId: report.employee.id,
+                      isOwnReport,
+                      hasNoReply,
+                      replyCount: report.reply_count,
+                      hasDate,
+                      date: report.date,
+                      isEditable,
+                      editableStatusValue: report.date ? editableStatus[report.date] : undefined
+                    });
+
+                    return isOwnReport && hasNoReply && hasDate && isEditable && (
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleEditReport(report.date)}
+                          className="hover:opacity-75 transition-opacity"
+                          title="編輯日報"
+                        >
+                          <img
+                            src="/MyReportAI/edit.png"
+                            alt="編輯"
+                            className="w-5 h-5"
+                          />
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteReport(report.id, report.date)
+                          }
+                          className="hover:opacity-75 transition-opacity"
+                          title="刪除日報"
+                        >
+                          <img
+                            src="/MyReportAI/delete.png"
+                            alt="刪除"
+                            className="w-5 h-5"
+                          />
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </td>
               </tr>
             ))}

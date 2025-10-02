@@ -202,8 +202,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   // 當日期變更時載入報告和寫作狀態
   useEffect(() => {
     if (authFetch && selectedDate !== null) {
-      fetchReports(selectedDate || undefined);
-      fetchWritingStatus(selectedDate || undefined);
+      const docDate = selectedDate.replace(/-/g, "");
+      fetchReports(docDate);
+      fetchWritingStatus(docDate);
     }
   }, [authFetch, selectedDate]);
 
@@ -410,7 +411,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       if (!response.ok) throw new Error("更新報告失敗");
 
       // 重新獲取最新內容
-      await fetchReports(selectedDate || undefined);
+      const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
+      await fetchReports(docDate);
       toast.success("報告草稿更新成功！");
       cancelEdit();
     } catch (error) {
@@ -686,7 +688,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       }
 
       // 重新獲取最新內容
-      await fetchReports(selectedDate || undefined);
+      const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
+      await fetchReports(docDate);
 
       setNewRecord({
         content: "",

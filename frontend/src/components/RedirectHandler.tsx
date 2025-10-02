@@ -32,11 +32,11 @@ const RedirectHandler: React.FC = () => {
         params.set("replyid", replyid);
       }
 
-      // 重定向到新格式（從 /viewed.aspx 跳轉到根路徑）
-      navigate(`/?${params.toString()}`, { replace: true });
+      // 重定向到新格式（從 /viewed.aspx 跳轉到根路徑，相對於 basename）
+      navigate(`?${params.toString()}`, { replace: true });
     } else {
       // 如果沒有 daily_no，導向首頁
-      navigate("/?tab=supervisor", { replace: true });
+      navigate("?tab=supervisor", { replace: true });
     }
   }, [searchParams, navigate]);
 

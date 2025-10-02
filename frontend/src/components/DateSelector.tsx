@@ -148,7 +148,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
         setIsLoading(false);
       }
     },
-    [authFetch] // 移除 selectedDate 和 onDateChange 依賴，避免不必要的重新創建
+    [authFetch, selectedDate, onDateChange]
   );
 
   // 提供刷新函數給父組件
@@ -160,7 +160,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
 
   useEffect(() => {
     fetchAvailableDates();
-  }, [authFetch]); // 只依賴 authFetch，避免因為 fetchAvailableDates 變化導致重複調用
+  }, [fetchAvailableDates]);
 
   const handleDateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newDate = event.target.value;

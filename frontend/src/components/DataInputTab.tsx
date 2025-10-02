@@ -109,8 +109,9 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
   // 當日期變更時載入指定日期的資料
   useEffect(() => {
     if (authFetch && selectedDate !== null) {
-      fetchConsolidatedRecords(selectedDate || undefined);
-      fetchWritingStatus(selectedDate || undefined);
+      const docDate = selectedDate.replace(/-/g, "");
+      fetchConsolidatedRecords(docDate);
+      fetchWritingStatus(docDate);
     }
   }, [authFetch, selectedDate, fetchConsolidatedRecords, fetchWritingStatus]);
 
@@ -237,9 +238,10 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
       }
 
       // 使用批次同步重新獲取最新資料，確保顯示正確的整合狀態
+      const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
       await batchSync([
-        () => fetchConsolidatedRecords(selectedDate || undefined),
-        () => fetchWritingStatus(selectedDate || undefined),
+        () => fetchConsolidatedRecords(docDate),
+        () => fetchWritingStatus(docDate),
       ]);
 
       setCurrentRecord({
