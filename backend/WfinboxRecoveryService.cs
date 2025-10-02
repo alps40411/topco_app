@@ -1,5 +1,5 @@
 using System;
-using System.Data.OracleClient;
+using System.Reflection;
 using Newtonsoft.Json;
 
 namespace WfinboxRecoveryService
@@ -23,49 +23,52 @@ namespace WfinboxRecoveryService
                 string empno = args[0];
                 string serino = args[1];
 
-                // 連線字串
-                string connString = "Data Source=sohya;User Id=topco;Password=erp;";
+                // 調用 MyReport.dll 中的 DailyReportService.WfinboxRecovery
+                var myReportAssembly = Assembly.LoadFrom("MyReport.dll");
+                var dailyReportServiceType = myReportAssembly.GetType("MyReport.Services.DailyReportService");
 
-                using (OracleConnection conn = new OracleConnection(connString))
+                if (dailyReportServiceType == null)
                 {
-                    conn.Open();
-
-                    // 執行更新
-                    string updateSql = @"
-                        UPDATE wfinbox
-                        SET xstatus = '3', xtime = sysdate
-                        WHERE source = '003'
-                        AND doc_type = '999'
-                        AND empno = :empno
-                        AND serino = :serino";
-
-                    using (OracleCommand updateCmd = new OracleCommand(updateSql, conn))
-                    {
-                        updateCmd.Parameters.Add(new OracleParameter("empno", empno));
-                        updateCmd.Parameters.Add(new OracleParameter("serino", serino));
-
-                        int rowsAffected = updateCmd.ExecuteNonQuery();
-
-                        if (rowsAffected > 0)
-                        {
-                            var successResult = new
-                            {
-                                success = true,
-                                rowsAffected = rowsAffected,
-                                empno = empno,
-                                serino = serino,
-                                message = "Wfinbox status updated to '3'"
-                            };
-
-                            string jsonOutput = JsonConvert.SerializeObject(successResult, Formatting.Indented);
-                            Console.WriteLine(jsonOutput);
-                        }
-                        else
-                        {
-                            OutputError(string.Format("找不到符合條件的資料 (source='003', doc_type='999', empno='{0}', serino='{1}')", empno, serino));
-                        }
-                    }
+                    OutputError("找不到 MyReport.Services.DailyReportService 類別");
+                    return;
                 }
+
+                // 尋找 WfinboxRecovery 方法
+                var wfinboxRecoveryMethod = dailyReportServiceType.GetMethod("WfinboxRecovery");
+
+                if (wfinboxRecoveryMethod == null)
+                {
+                    OutputError("找不到 WfinboxRecovery 方法");
+                    return;
+                }
+
+                // WfinboxRecovery 方法簽名: void WfinboxRecovery(Decimal serino, String empNo)
+                // 注意：參數順序是 serino 在前，empNo 在後
+                decimal serinoDecimal = decimal.Parse(serino);
+                object[] methodArgs = new object[] { serinoDecimal, empno };
+
+                // 創建 DailyReportService 實例並調用方法
+                var instance = Activator.CreateInstance(dailyReportServiceType);
+                object result = wfinboxRecoveryMethod.Invoke(instance, methodArgs);
+
+                // 輸出成功結果
+                var successResult = new
+                {
+                    success = true,
+                    empno = empno,
+                    serino = serino,
+                    message = "Wfinbox status updated successfully via MyReport.dll",
+                    result = result
+                };
+
+                string jsonOutput = JsonConvert.SerializeObject(successResult, Formatting.Indented);
+                Console.WriteLine(jsonOutput);
+            }
+            catch (TargetInvocationException tie)
+            {
+                // 展開內部異常
+                var innerEx = tie.InnerException ?? tie;
+                OutputError("調用 MyReport.dll 失敗: " + innerEx.Message + "\n詳細錯誤: " + innerEx.ToString());
             }
             catch (Exception ex)
             {
