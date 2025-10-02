@@ -176,6 +176,7 @@ class ReviewService:
                     empno=reviewer_empno,
                     serino=daily_no
                 )
+                print(f"[EAI DEBUG] wfinbox 已更新，empno = {reviewer_empno、daily_no = {daily_no}}")
             except Exception as e:
                 # wfinbox 更新失敗不影響主流程
                 logger.warning(f"Wfinbox 更新失敗（不影響主流程）: {str(e)}")
