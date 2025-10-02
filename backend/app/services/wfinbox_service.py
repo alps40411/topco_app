@@ -46,6 +46,8 @@ class WfinboxService:
             logger.info(f"[WFINBOX] 調用 WfinboxRecovery: empno={empno}, serino={serino}")
 
             # 執行 C# 程式
+            # 注意：WfinboxRecoveryService.exe 接收參數順序為 empno, serino
+            # 但內部會調用 MyReport.dll 的 WfinboxRecovery(serino, empno)
             result = subprocess.run(
                 [str(exe_path), empno, serino],
                 capture_output=True,
