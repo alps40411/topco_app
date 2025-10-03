@@ -191,26 +191,57 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     }
   };
 
-  // 初始化時載入專案、寫入狀態和今日報告
+  // ✅ 修復: 合併兩個 useEffect，避免重複 API 呼叫
   useEffect(() => {
-    if (authFetch) {
-      fetchProjects();
-      fetchWritingStatus();
-      // 如果還沒有選擇日期，先載入今日資料
-      if (selectedDate === null) {
-        fetchReports(undefined);
-      }
-    }
-  }, [authFetch]);
+    if (!authFetch) return;
 
-  // 當日期變更時載入報告和寫作狀態
-  useEffect(() => {
-    if (authFetch && selectedDate !== null) {
-      const docDate = selectedDate.replace(/-/g, "");
-      fetchReports(docDate);
-      fetchWritingStatus(docDate);
-    }
-  }, [authFetch, selectedDate]);
+    // 只在初始化時載入專案列表
+    fetchProjects();
+
+    const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
+
+    // 載入報告
+    const loadReports = async () => {
+      setIsLoading(true);
+      try {
+        const url = docDate
+          ? `/api/records/consolidated/today?doc_date=${docDate}`
+          : "/api/records/consolidated/today";
+        const response = await authFetch(url);
+        if (response.ok) {
+          const data: ConsolidatedReport[] = await response.json();
+          setReports(data);
+          if (data.some((report) => report.ai_content)) {
+            setIsAiViewActive(true);
+          }
+        }
+      } catch (error) {
+        console.error("無法取得彙整報告:", error);
+        toast.error("無法取得彙整報告");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // 載入 writing status
+    const loadWritingStatus = async () => {
+      try {
+        const url = docDate
+          ? `/api/records/writing-status?doc_date=${docDate}`
+          : "/api/records/writing-status";
+        const response = await authFetch(url);
+        if (response.ok) {
+          const status: WritingStatus = await response.json();
+          setWritingStatus(status);
+        }
+      } catch (error) {
+        console.error("無法獲取填寫狀態:", error);
+      }
+    };
+
+    loadReports();
+    loadWritingStatus();
+  }, [authFetch, selectedDate]); // ✅ 只依賴真正需要的變數
 
   // 處理日期變更
   const handleDateChange = (newDate: string) => {

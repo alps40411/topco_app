@@ -101,21 +101,51 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     [authFetch]
   );
 
-  // 初始化時載入今日資料
+  // ✅ 修復: 合併兩個 useEffect,移除函數依賴，避免重複 API 呼叫
   useEffect(() => {
-    if (authFetch && selectedDate === null) {
-      fetchConsolidatedRecords(undefined);
-    }
-  }, [authFetch, fetchConsolidatedRecords]);
+    if (!authFetch) return;
 
-  // 當日期變更時載入指定日期的資料
-  useEffect(() => {
-    if (authFetch && selectedDate !== null) {
-      const docDate = selectedDate.replace(/-/g, "");
-      fetchConsolidatedRecords(docDate);
-      fetchWritingStatus(docDate);
+    const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
+
+    // 直接內聯邏輯,避免依賴外部函數
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const url = docDate
+          ? `/api/records/consolidated/today?doc_date=${docDate}`
+          : "/api/records/consolidated/today";
+        const response = await authFetch(url);
+        if (response.ok) {
+          setConsolidatedRecords(await response.json());
+        }
+      } catch (error) {
+        console.error("取得彙整筆記失敗:", error);
+        toast.error("取得彙整筆記失敗");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // 載入 writing status
+    const loadWritingStatus = async () => {
+      if (!docDate) return;
+      try {
+        const url = `/api/records/writing-status?doc_date=${docDate}`;
+        const response = await authFetch(url);
+        if (response.ok) {
+          const status = await response.json();
+          setWritingStatus(status);
+        }
+      } catch (error) {
+        console.error("無法獲取填寫狀態:", error);
+      }
+    };
+
+    loadData();
+    if (docDate) {
+      loadWritingStatus();
     }
-  }, [authFetch, selectedDate, fetchConsolidatedRecords, fetchWritingStatus]);
+  }, [authFetch, selectedDate]); // ✅ 只依賴真正需要的變數
 
   // 處理日期變更
   const handleDateChange = (newDate: string) => {

@@ -56,6 +56,7 @@ interface ChatInterfaceProps {
   reportOwnerId?: number; // 報告擁有者的員工ID
   reportOwnerEmpno?: string; // 報告擁有者的員工編號
   reportOwnerName?: string; // 報告擁有者的姓名
+  reportAuthor?: {empno: string, empname: string} | null; // ✅ 新增: 已獲取的作者資訊
   className?: string;
   reportStatus?: string;
   approvals: SupervisorApprovalInfo[];
@@ -72,6 +73,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   reportOwnerId,
   reportOwnerEmpno,
   reportOwnerName,
+  reportAuthor, // ✅ 接收作者資訊
   className = "",
   // reportStatus, // 暫時未使用
   approvals, // Added prop
@@ -131,31 +133,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )
       : false;
 
-  // 獲取日報詳細資訊以取得作者資料
-  const fetchReportAuthor = useCallback(async () => {
-    if (!authFetch) return null;
-    try {
-      const response = await authFetch(`/api/supervisor/reports/${reportId}`);
-
-      if (response.ok) {
-        const reportData = await response.json();
-
-        // 確保 empno 保持字串格式並補齊到5位數
-        let empno = reportData.employee?.empno;
-        if (empno) {
-          empno = String(empno).padStart(5, "0");
-        }
-
-        return {
-          empno: empno,
-          empname: reportData.employee?.name,
-        };
-      }
-    } catch (error) {
-      console.error("Error fetching report author:", error);
-    }
-    return null;
-  }, [authFetch, reportId]);
+  // ✅ 移除 fetchReportAuthor 函數，直接使用傳入的 reportAuthor
 
   // 建構回應目標列表
   const buildReplyTargets = useCallback(
@@ -163,8 +141,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const targets: ReplyTarget[] = [];
       const seenEmpnos = new Set<string>();
 
-      // 1. 從 API 獲取日報作者資訊
-      const authorInfo = await fetchReportAuthor();
+      // ✅ 使用傳入的作者資訊,無需 API 呼叫
+      const authorInfo = reportAuthor;
       const currentUserEmpno = user?.employee?.empno
         ? String(user.employee.empno).padStart(5, "0")
         : null;
@@ -231,7 +209,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         setSelectedReplyTargets([]);
       }
     },
-    [fetchReportAuthor, user?.employee?.empno]
+    [reportAuthor, user?.employee?.empno] // ✅ 依賴 reportAuthor 而非 fetchReportAuthor
   );
 
   const fetchComments = useCallback(async () => {

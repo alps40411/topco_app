@@ -32,6 +32,8 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   );
   const [isLoading, setIsLoading] = useState(true);
   const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>([]);
+  // ✅ 新增: 提取作者資訊並傳遞給 ChatInterface
+  const [reportAuthor, setReportAuthor] = useState<{empno: string, empname: string} | null>(null);
   const { authFetch } = useAuth();
 
   // 從 URL 獲取 status 參數（status=P 表示從郵件進入）
@@ -45,6 +47,15 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       const response = await authFetch(`/api/supervisor/reports/${reportId}`);
       if (response.ok) {
         const specificReport: DailyReport = await response.json();
+
+        // ✅ 提取作者資訊,避免 ChatInterface 重複查詢
+        if (specificReport.employee) {
+          const empno = String(specificReport.employee.empno).padStart(5, "0");
+          setReportAuthor({
+            empno: empno,
+            empname: specificReport.employee.name
+          });
+        }
 
         // Fetch the detailed approval status for this specific report
         const approvalResponse = await authFetch(
@@ -249,6 +260,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           reportOwnerId={reportDetail.employee.id}
           reportOwnerEmpno={reportDetail.employee.empno}
           reportOwnerName={reportDetail.employee.name}
+          reportAuthor={reportAuthor} // ✅ 傳遞已獲取的作者資訊
           className="min-h-[400px]"
           reportStatus={reportDetail.status}
           approvals={reportDetail.approvals || []}

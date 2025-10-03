@@ -1,6 +1,6 @@
 // frontend/src/App.tsx
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -252,6 +252,7 @@ function App() {
     [authFetch, user?.employee]
   );
 
+  // ✅ 修復: 移除 fetchWritingStatus 依賴,避免無限循環
   useEffect(() => {
     if (authFetch && user?.employee) {
       // 使用全局選中的日期，如果沒有則不傳入doc_date讓後端使用預設邏輯
@@ -260,7 +261,7 @@ function App() {
         : undefined;
       fetchWritingStatus(docDate);
     }
-  }, [authFetch, user?.employee, fetchWritingStatus, globalSelectedDate]);
+  }, [authFetch, user?.employee, globalSelectedDate]); // 移除 fetchWritingStatus 依賴
 
   // 監聽 URL 參數變化並同步狀態
   useEffect(() => {
@@ -308,12 +309,18 @@ function App() {
     }
   }, [searchParams, activeTab, globalSelectedDate, selectedReportId, navigate]);
 
+  // ✅ 修復: 使用 ref 追蹤已載入的 report ID，避免重複查詢
+  const loadedReportRef = useRef<number | null>(null);
+
   // 獲取員工詳細資訊
   useEffect(() => {
     if (!authFetch || !selectedReportId) return;
 
-    // 檢查是否已經有 selectedEmployee，如果有就不需要重新獲取
-    if (selectedEmployee) return;
+    // ✅ 如果已經載入過這個 report，就跳過
+    if (loadedReportRef.current === selectedReportId) return;
+
+    // ✅ 如果已經有正確的 employee 資料，也跳過
+    if (selectedEmployee?.latest_report_id === selectedReportId) return;
 
     const fetchEmployeeInfo = async () => {
       try {
@@ -329,13 +336,14 @@ function App() {
             latest_report_id: selectedReportId,
             latest_report_date: reportData.doc_date,
           });
+          loadedReportRef.current = selectedReportId;
         }
       } catch (error) {
         console.error("無法獲取員工資訊:", error);
       }
     };
     fetchEmployeeInfo();
-  }, [authFetch, selectedReportId, selectedEmployee]);
+  }, [authFetch, selectedReportId]); // ✅ 移除 selectedEmployee 依賴
 
   // 當寫入狀態變化時，確保當前活動標籤是可用的
   useEffect(() => {

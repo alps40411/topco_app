@@ -11,6 +11,7 @@ import App from "./App.tsx";
 import LoginPage from "./components/LoginPage.tsx";
 import RedirectHandler from "./components/RedirectHandler.tsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.tsx";
+import { WorkDataProvider } from "./contexts/WorkDataContext.tsx";
 import "./index.css";
 
 // This component checks for 'daily_no' and decides whether to redirect or render the app.
@@ -55,21 +56,23 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 const AppWithAuth = () => {
   return (
     <AuthProvider>
-      <Router basename="/MyReportAI/">
-        <Routes>
-          <Route path="login" element={<LoginPage />} />
+      <WorkDataProvider>
+        <Router basename="/MyReportAI/">
+          <Routes>
+            <Route path="login" element={<LoginPage />} />
 
-          {/* Main application route now uses RootHandler */}
-          <Route
-            path="*"
-            element={
-              <ProtectedRoute>
-                <RootHandler />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Router>
+            {/* Main application route now uses RootHandler */}
+            <Route
+              path="*"
+              element={
+                <ProtectedRoute>
+                  <RootHandler />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </WorkDataProvider>
     </AuthProvider>
   );
 };
