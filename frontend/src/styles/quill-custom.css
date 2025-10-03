@@ -1,0 +1,62 @@
+/* Custom Quill Editor Styles */
+
+/* 確保編輯器有足夠的高度 */
+.quill {
+  background: white;
+}
+
+.ql-container {
+  min-height: 200px;
+  font-size: 14px;
+}
+
+.ql-editor {
+  min-height: 200px;
+  padding: 12px;
+}
+
+/* 工具列樣式 */
+.ql-toolbar {
+  background: #f8f9fa;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+.ql-container {
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+
+/* paperclip 按鈕樣式（使用 Quill 內建樣式） */
+.ql-toolbar button.ql-paperclip {
+  width: 28px !important;
+}
+
+/* placeholder 樣式 */
+.ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+}
+
+/* 限制編輯器內和預覽區的圖片寬度 */
+.ql-editor img,
+.prose img,
+div[dangerouslySetInnerHTML] img,
+[class*="prose"] img {
+  max-width: 60%;
+  height: auto;
+  display: block;
+  margin: 1rem 0;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* 移動設備上圖片佔據更多空間 */
+@media (max-width: 768px) {
+  .ql-editor img,
+  .prose img,
+  div[dangerouslySetInnerHTML] img,
+  [class*="prose"] img {
+    max-width: 90%;
+  }
+}

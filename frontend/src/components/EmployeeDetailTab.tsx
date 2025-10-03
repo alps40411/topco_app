@@ -230,9 +230,10 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                     </span>
                   )}
                 </div>
-                <p className="text-gray-700 whitespace-pre-wrap">
-                  {projectReport.content}
-                </p>
+                <div
+                  className="text-gray-700 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: projectReport.content }}
+                />
                 <AttachedFilesDisplay files={projectReport.files} />
               </div>
             )

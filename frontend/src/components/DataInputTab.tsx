@@ -1,6 +1,10 @@
 // frontend/src/components/DataInputTab.tsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { Save, FileText } from "lucide-react";
 import type {
   ConsolidatedReport,
@@ -15,6 +19,7 @@ import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import ServiceSelector from "./ServiceSelector";
 import DateSelector from "./DateSelector";
+import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 import { useDataSync } from "../hooks/useDataSync";
@@ -268,38 +273,13 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     }
   };
 
-  const handleFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setIsUploading(true);
-    const uploadPromises = Array.from(files).map(async (file) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      try {
-        const response = await authFetch("/api/records/upload", {
-          method: "POST",
-          body: formData,
-        });
-        if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
-        const uploadedFile = await response.json();
-        const newFile: FileForUpload = {
-          name: uploadedFile.name,
-          type: uploadedFile.type,
-          size: uploadedFile.size,
-          url: uploadedFile.url,
-          is_selected_for_ai: false,
-        };
-        setCurrentRecord((prev) => ({
-          ...prev,
-          files: [...(prev.files || []), newFile],
-        }));
-      } catch (error: any) {
-        console.error(error);
-        toast.error(error.message);
-      }
-    });
-    await Promise.all(uploadPromises);
-    setIsUploading(false);
-  };
+  // 處理來自 RichTextEditor 的檔案上傳回調
+  const handleEditorFileUpload = useCallback((file: FileForUpload) => {
+    setCurrentRecord((prev) => ({
+      ...prev,
+      files: [...(prev.files || []), file],
+    }));
+  }, []);
 
   const handleAiSelectionChange = (fileUrl: string, isSelected: boolean) => {
     setCurrentRecord((prev) => ({
@@ -431,23 +411,6 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
               serviceTargets={serviceTargets}
               required={false}
             />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                內容
-              </label>
-              <textarea
-                rows={4}
-                placeholder="記錄您的想法..."
-                value={currentRecord.content || ""}
-                onChange={(e) => {
-                  setCurrentRecord((prev) => ({
-                    ...prev,
-                    content: e.target.value,
-                  }));
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
 
             <ExecutionTimeSelector
               totalMinutes={currentRecord.execution_time_minutes || 0}
@@ -459,13 +422,29 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
               }}
               required
             />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                內容
+              </label>
+              <RichTextEditor
+                value={currentRecord.content || ""}
+                onChange={(content) => {
+                  setCurrentRecord((prev) => ({
+                    ...prev,
+                    content,
+                  }));
+                }}
+                onFileUpload={handleEditorFileUpload}
+                placeholder="記錄您的想法... (可直接貼上圖片)"
+              />
+            </div>
 
             <AttachedFilesManager
               files={currentRecord.files || []}
-              onFileUpload={handleFileUpload}
               onRemoveFile={removeFile}
               onAiSelectionChange={handleAiSelectionChange}
               isUploading={isUploading}
+              showUploadButton={false}
             />
 
             <button
@@ -532,9 +511,10 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                     </div>
                   </div>
 
-                  <p className="text-base text-gray-700 whitespace-pre-wrap">
-                    {report.content}
-                  </p>
+                  <div
+                    className="text-base text-gray-700 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: report.content }}
+                  />
                   <AttachedFilesDisplay files={report.files} />
                 </div>
               ))

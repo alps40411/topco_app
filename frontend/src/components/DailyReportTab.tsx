@@ -26,6 +26,7 @@ import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import ServiceSelector from "./ServiceSelector";
 import DateSelector from "./DateSelector";
+import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 
@@ -519,6 +520,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setEditFiles((prev) => prev.filter((file) => file.url !== fileUrl));
   };
 
+  // 處理來自編輯用 RichTextEditor 的檔案上傳回調
+  const handleEditEditorFileUpload = useCallback((file: FileForUpload) => {
+    setEditFiles((prev) => [...prev, file]);
+  }, []);
+
   const handleNewRecordUpload = async (filesToUpload: FileList) => {
     if (!filesToUpload || filesToUpload.length === 0 || !authFetch) return;
     setIsUploadingNewFile(true);
@@ -569,6 +575,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       files: (prev.files || []).filter((file) => file.url !== fileUrl),
     }));
   };
+
+  // 處理來自新增用 RichTextEditor 的檔案上傳回調
+  const handleNewRecordEditorFileUpload = useCallback((file: FileForUpload) => {
+    setNewRecord((prev) => ({
+      ...prev,
+      files: [...(prev.files || []), file],
+    }));
+  }, []);
 
   const handleSaveNewRecord = async () => {
     if (!authFetch) return;
@@ -928,17 +942,18 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <div className="flex-grow">
                   {editingSopno === report.sopno ? (
                     <div className="space-y-4">
-                      <textarea
+                      <RichTextEditor
                         value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full min-h-[200px] p-4 border rounded-lg"
+                        onChange={setEditContent}
+                        onFileUpload={handleEditEditorFileUpload}
+                        placeholder="編輯記錄內容... (可直接貼上圖片)"
                       />
                       <AttachedFilesManager
                         files={editFiles}
-                        onFileUpload={handleEditFileUpload}
                         onRemoveFile={removeEditFile}
                         onAiSelectionChange={handleEditAiSelectionChange}
                         isUploading={false}
+                        showUploadButton={false}
                       />
                       <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                         <button
@@ -962,9 +977,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       {/* 報告內容 */}
                       <div>
                         <div className="flex items-start space-x-2">
-                          <p className="prose max-w-none text-gray-700 whitespace-pre-wrap flex-1">
-                            {report.content}
-                          </p>
+                          <div
+                            className="prose prose-sm max-w-none text-gray-700 flex-1"
+                            dangerouslySetInnerHTML={{ __html: report.content }}
+                          />
                           {/* {report.files && report.files.length > 0 && (
                             <img
                               src="/attached.gif"
@@ -1094,14 +1110,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     內容
                   </label>
-                  <textarea
-                    rows={5}
-                    placeholder="記錄您的想法..."
+                  <RichTextEditor
                     value={newRecord.content || ""}
-                    onChange={(e) =>
-                      setNewRecord({ ...newRecord, content: e.target.value })
+                    onChange={(content) =>
+                      setNewRecord({ ...newRecord, content })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    onFileUpload={handleNewRecordEditorFileUpload}
+                    placeholder="記錄您的想法... (可直接貼上圖片)"
                   />
                 </div>
 
@@ -1118,10 +1133,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
                 <AttachedFilesManager
                   files={newRecord.files || []}
-                  onFileUpload={handleNewRecordUpload}
                   onRemoveFile={removeNewRecordFile}
                   onAiSelectionChange={handleNewRecordAiSelectionChange}
                   isUploading={isUploadingNewFile}
+                  showUploadButton={false}
                 />
 
                 <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">

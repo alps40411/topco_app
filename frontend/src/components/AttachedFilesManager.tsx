@@ -14,10 +14,11 @@ import type { FileForUpload } from "../App";
 
 interface AttachedFilesManagerProps {
   files: FileForUpload[];
-  onFileUpload: (files: FileList) => void;
+  onFileUpload?: (files: FileList) => void; // 可選，用於向後兼容
   onRemoveFile: (fileUrl: string) => void;
   onAiSelectionChange: (fileUrl: string, isSelected: boolean) => void;
   isUploading: boolean;
+  showUploadButton?: boolean; // 控制是否顯示上傳按鈕
 }
 
 const getFileIcon = (type: string) => {
@@ -40,6 +41,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
   onRemoveFile,
   onAiSelectionChange,
   isUploading,
+  showUploadButton = true, // 默認顯示上傳按鈕（向後兼容）
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -47,7 +49,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
   const dragCounter = useRef(0);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) {
+    if (event.target.files && onFileUpload) {
       onFileUpload(event.target.files);
     }
   };
@@ -77,7 +79,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
     handleDrag(e);
     setIsDragging(false);
     dragCounter.current = 0;
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && onFileUpload) {
       onFileUpload(e.dataTransfer.files);
       e.dataTransfer.clearData();
     }
@@ -117,40 +119,44 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
         <label className="block text-sm font-medium text-gray-700 mb-2">
           附加檔案
         </label>
-        <div
-          onDragEnter={handleDragIn}
-          onDragLeave={handleDragOut}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors duration-200 ${
-            isDragging
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-300 hover:border-gray-400"
-          }`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-          <p className="text-sm text-gray-600 mb-2">點擊上傳或拖曳檔案到此處</p>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
-          >
-            <Plus className="w-4 h-4 mr-2" /> 選擇檔案
-          </button>
-        </div>
+        {showUploadButton && (
+          <>
+            <div
+              onDragEnter={handleDragIn}
+              onDragLeave={handleDragOut}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors duration-200 ${
+                isDragging
+                  ? "border-blue-500 bg-blue-50"
+                  : "border-gray-300 hover:border-gray-400"
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p className="text-sm text-gray-600 mb-2">點擊上傳或拖曳檔案到此處</p>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
+              >
+                <Plus className="w-4 h-4 mr-2" /> 選擇檔案
+              </button>
+            </div>
 
-        {isUploading && (
-          <div className="flex items-center text-sm text-blue-600 mt-2">
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            <span>檔案上傳中...</span>
-          </div>
+            {isUploading && (
+              <div className="flex items-center text-sm text-blue-600 mt-2">
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <span>檔案上傳中...</span>
+              </div>
+            )}
+          </>
         )}
 
         {files && files.length > 0 && (

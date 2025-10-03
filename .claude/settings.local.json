@@ -49,7 +49,8 @@
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
       "Bash(netstat:*)",
-      "Bash(pip uninstall:*)"
+      "Bash(pip uninstall:*)",
+      "Bash(npm install:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
