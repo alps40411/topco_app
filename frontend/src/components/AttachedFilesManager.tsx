@@ -1,232 +1,116 @@
 // frontend/src/components/AttachedFilesManager.tsx
 
-import React, { useRef, useState } from "react";
-import {
-  Upload,
-  Plus,
-  X,
-  Image,
-  File,
-  BrainCircuit,
-  Loader2,
-} from "lucide-react";
+import React from "react";
+import { FileText, Trash2, CheckSquare, Square } from "lucide-react";
 import type { FileForUpload } from "../App";
 
 interface AttachedFilesManagerProps {
   files: FileForUpload[];
-  onFileUpload?: (files: FileList) => void; // 可選，用於向後兼容
   onRemoveFile: (fileUrl: string) => void;
   onAiSelectionChange: (fileUrl: string, isSelected: boolean) => void;
   isUploading: boolean;
-  showUploadButton?: boolean; // 控制是否顯示上傳按鈕
 }
-
-const getFileIcon = (type: string) => {
-  if (type?.startsWith("image/"))
-    return <Image className="w-4 h-4 text-gray-500" />;
-  return <File className="w-4 h-4 text-gray-500" />;
-};
-
-const formatFileSize = (bytes: number) => {
-  if (!bytes || bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-};
 
 const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
   files,
-  onFileUpload,
   onRemoveFile,
   onAiSelectionChange,
   isUploading,
-  showUploadButton = true, // 默認顯示上傳按鈕（向後兼容）
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const dragCounter = useRef(0);
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && onFileUpload) {
-      onFileUpload(event.target.files);
-    }
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDragIn = (e: React.DragEvent) => {
-    handleDrag(e);
-    dragCounter.current++;
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      setIsDragging(true);
-    }
-  };
-
-  const handleDragOut = (e: React.DragEvent) => {
-    handleDrag(e);
-    dragCounter.current--;
-    if (dragCounter.current === 0) {
-      setIsDragging(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    handleDrag(e);
-    setIsDragging(false);
-    dragCounter.current = 0;
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && onFileUpload) {
-      onFileUpload(e.dataTransfer.files);
-      e.dataTransfer.clearData();
-    }
-  };
-
-  const getFullUrl = (url: string) => {
-    if (!url) {
-      console.error("❌ AttachedFilesManager - 空的URL");
-      return "";
-    }
-
-    if (url.startsWith("http")) {
-      return url;
-    }
-
-    // 檢查是否為開發環境
-    const isDevelopment =
-      window.location.port === "5173" ||
-      window.location.port === "5174" ||
-      window.location.port === "3000" ||
-      window.location.hostname === "localhost";
-
-    const backendUrl = isDevelopment
-      ? `http://${window.location.hostname}:8000`
-      : "";
-
-    const fullUrl = url.startsWith("/")
-      ? `${backendUrl}${url}`
-      : `${backendUrl}/${url}`;
-
-    return fullUrl;
-  };
+  // 如果沒有檔案且不在上傳中，則不顯示任何東西
+  if (files.length === 0 && !isUploading) {
+    return null;
+  }
 
   return (
-    <>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          附加檔案
-        </label>
-        {showUploadButton && (
-          <>
-            <div
-              onDragEnter={handleDragIn}
-              onDragLeave={handleDragOut}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors duration-200 ${
-                isDragging
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-gray-400"
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileSelect}
-                className="hidden"
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        附加檔案
+      </label>
+      <div className="space-y-2">
+        {files.map((file) => (
+          <div
+            key={file.url}
+            className={`flex items-center justify-between p-2 rounded-lg border transition-colors duration-200 ${
+              file.is_selected_for_ai
+                ? "bg-green-50 border-green-200"
+                : "bg-gray-50 border-gray-200"
+            }`}
+          >
+            {/* 左側：圖示和檔名 */}
+            <div className="flex items-center min-w-0">
+              <FileText
+                className={`w-5 h-5 flex-shrink-0 ${
+                  file.is_selected_for_ai ? "text-green-600" : "text-gray-500"
+                }`}
               />
-              <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <p className="text-sm text-gray-600 mb-2">點擊上傳或拖曳檔案到此處</p>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
+              <a
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-2 text-sm font-medium text-gray-800 truncate hover:underline"
+                title={file.name}
               >
-                <Plus className="w-4 h-4 mr-2" /> 選擇檔案
+                {file.name}
+              </a>
+            </div>
+
+            {/* 右側：勾選和刪除按鈕 */}
+            <div className="flex items-center flex-shrink-0 ml-4">
+              <button
+                onClick={() =>
+                  onAiSelectionChange(file.url, !file.is_selected_for_ai)
+                }
+                className="p-1 text-gray-500 hover:text-gray-800"
+                title={
+                  file.is_selected_for_ai ? "取消 AI 使用" : "勾選給 AI 使用"
+                }
+              >
+                {file.is_selected_for_ai ? (
+                  <CheckSquare className="w-5 h-5 text-green-600" />
+                ) : (
+                  <Square className="w-5 h-5" />
+                )}
+              </button>
+              <button
+                onClick={() => onRemoveFile(file.url)}
+                className="p-1 text-gray-500 hover:text-red-600"
+                title="移除檔案"
+              >
+                <Trash2 className="w-5 h-5" />
               </button>
             </div>
+          </div>
+        ))}
 
-            {isUploading && (
-              <div className="flex items-center text-sm text-blue-600 mt-2">
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                <span>檔案上傳中...</span>
-              </div>
-            )}
-          </>
-        )}
-
-        {files && files.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center p-2 bg-green-50 border border-green-200 text-green-800 text-xs font-medium rounded-lg">
-              <BrainCircuit className="w-4 h-4 mr-2" />
-              <span>勾選檔案，即可在「AI 日報編輯」中作為參考資料使用。</span>
-            </div>
-            {files.map((file) => (
-              <div
-                key={file.url}
-                className="flex items-center justify-between bg-gray-50 p-2 rounded-lg"
-              >
-                <div className="flex items-center space-x-3 flex-grow overflow-hidden">
-                  <input
-                    type="checkbox"
-                    checked={!!file.is_selected_for_ai}
-                    onChange={(e) =>
-                      onAiSelectionChange(file.url, e.target.checked)
-                    }
-                    className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer flex-shrink-0"
-                  />
-                  {file.type.startsWith("image/") ? (
-                    <img
-                      src={getFullUrl(file.url)}
-                      alt={file.name}
-                      onClick={() => setPreviewImageUrl(getFullUrl(file.url))}
-                      className="w-12 h-12 object-cover rounded-md cursor-pointer flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 flex items-center justify-center bg-gray-200 rounded-md flex-shrink-0">
-                      {getFileIcon(file.type)}
-                    </div>
-                  )}
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(file.size)}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onRemoveFile(file.url)}
-                  className="p-1 text-red-400 hover:text-red-600 flex-shrink-0 ml-2"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+        {/* 如果正在上傳，顯示一個提示 */}
+        {isUploading && (
+          <div className="flex items-center p-2 text-sm text-gray-500">
+            <svg
+              className="animate-spin -ml-1 mr-2 h-4 w-4"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            檔案處理中...
           </div>
         )}
       </div>
-
-      {/* Image Preview Modal */}
-      {previewImageUrl && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100] animate-fade-in"
-          onClick={() => setPreviewImageUrl(null)}
-        >
-          <img
-            src={previewImageUrl}
-            alt="Preview"
-            className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-xl"
-            onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking on image
-          />
-        </div>
-      )}
-    </>
+    </div>
   );
 };
 
