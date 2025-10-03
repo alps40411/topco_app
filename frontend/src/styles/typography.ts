@@ -40,6 +40,12 @@ export const TypographyStandards = {
     h3: 'text-lg',               // 18px - 小標題
     cardTitle: 'text-lg',        // 18px - 卡片標題
     sectionTitle: 'text-lg',     // 18px - 區塊標題
+  },
+
+  // 富文本編輯器區域
+  richText: {
+    editor: 'text-base',         // 16px - 編輯器內容
+    display: 'text-base',        // 16px - 顯示內容
   }
 } as const;
 
@@ -77,6 +83,9 @@ export const TypographyClasses = {
   // 導航
   navItem: `${TypographyStandards.secondary.navigation} font-medium`,
   navItemActive: `${TypographyStandards.secondary.navigation} font-semibold`,
+
+  // 富文本
+  richTextDisplay: `${TypographyStandards.richText.display} text-gray-700 leading-relaxed prose prose-sm max-w-none`,
 } as const;
 
 /**

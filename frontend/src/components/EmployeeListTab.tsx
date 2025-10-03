@@ -95,22 +95,25 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
       const day = String(selectedDate.getDate()).padStart(2, "0");
       const dateString = `${year}-${month}-${day}`;
-      console.log("Fetching homepage reports for date:", dateString); // 除錯用
+
       try {
         // 使用新的日報首頁API
         const response = await authFetch(
           `/api/supervisor/daily-homepage?date=${dateString}`
         );
-        console.log("API response status:", response.status);
+
         if (response.ok) {
           const homepageReports = await response.json();
-          console.log("Fetched reports count:", homepageReports.length);
-          console.log("Reports data:", homepageReports);
+
           setReports(homepageReports);
 
           // 檢查當天所有唯一日期的可編輯狀態
           const uniqueDates = [
-            ...new Set(homepageReports.map((r: HomepageReport) => r.date).filter(d => d != null)),
+            ...new Set(
+              homepageReports
+                .map((r: HomepageReport) => r.date)
+                .filter((d) => d != null)
+            ),
           ];
           const statusPromises = uniqueDates.map(async (date) => {
             if (!date) return [null, false];
@@ -123,10 +126,14 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
           statusResults.forEach(([date, isEditable]) => {
             statusMap[date as string] = isEditable as boolean;
           });
-          console.log("Editable status map:", statusMap);
+
           setEditableStatus(statusMap);
         } else {
-          console.error("API response not ok:", response.status, await response.text());
+          console.error(
+            "API response not ok:",
+            response.status,
+            await response.text()
+          );
           setReports([]);
         }
       } catch (error) {
@@ -383,10 +390,12 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 </td>
                 <td className="px-4 py-3 text-center">
                   {(() => {
-                    const isOwnReport = currentUserEmpno === String(report.employee.id);
+                    const isOwnReport =
+                      currentUserEmpno === String(report.employee.id);
                     const hasNoReply = report.reply_count === 0;
                     const hasDate = !!report.date;
-                    const isEditable = report.date && editableStatus[report.date] === true;
+                    const isEditable =
+                      report.date && editableStatus[report.date] === true;
 
                     console.log(`Report ${report.id} check:`, {
                       currentUserEmpno,
@@ -397,36 +406,43 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                       hasDate,
                       date: report.date,
                       isEditable,
-                      editableStatusValue: report.date ? editableStatus[report.date] : undefined
+                      editableStatusValue: report.date
+                        ? editableStatus[report.date]
+                        : undefined,
                     });
 
-                    return isOwnReport && hasNoReply && hasDate && isEditable && (
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditReport(report.date)}
-                          className="hover:opacity-75 transition-opacity"
-                          title="編輯日報"
-                        >
-                          <img
-                            src="/MyReportAI/edit.png"
-                            alt="編輯"
-                            className="w-5 h-5"
-                          />
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleDeleteReport(report.id, report.date)
-                          }
-                          className="hover:opacity-75 transition-opacity"
-                          title="刪除日報"
-                        >
-                          <img
-                            src="/MyReportAI/delete.png"
-                            alt="刪除"
-                            className="w-5 h-5"
-                          />
-                        </button>
-                      </div>
+                    return (
+                      isOwnReport &&
+                      hasNoReply &&
+                      hasDate &&
+                      isEditable && (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEditReport(report.date)}
+                            className="hover:opacity-75 transition-opacity"
+                            title="編輯日報"
+                          >
+                            <img
+                              src="/MyReportAI/edit.png"
+                              alt="編輯"
+                              className="w-5 h-5"
+                            />
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDeleteReport(report.id, report.date)
+                            }
+                            className="hover:opacity-75 transition-opacity"
+                            title="刪除日報"
+                          >
+                            <img
+                              src="/MyReportAI/delete.png"
+                              alt="刪除"
+                              className="w-5 h-5"
+                            />
+                          </button>
+                        </div>
+                      )
                     );
                   })()}
                 </td>

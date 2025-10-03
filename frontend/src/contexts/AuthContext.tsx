@@ -29,34 +29,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // 在組件掛載時從 localStorage 讀取認證資訊
   useEffect(() => {
-    console.log("🚀 AuthContext - useEffect 開始執行");
-
     const storedToken = localStorage.getItem("authToken");
     const storedUser = localStorage.getItem("user");
 
-    console.log("🔍 AuthContext - localStorage 檢查:", {
-      hasStoredToken: !!storedToken,
-      hasStoredUser: !!storedUser,
-      tokenLength: storedToken?.length || 0,
-    });
-
     if (storedToken) {
       setToken(storedToken);
-      console.log("✅ AuthContext - Token 已設置");
     }
 
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        console.log("✅ AuthContext - User 已設置:", parsedUser);
       } catch (e) {
         console.error("❌ AuthContext - 解析 user 失敗:", e);
         localStorage.removeItem("user");
       }
     }
 
-    console.log("🏁 AuthContext - 初始化完成");
     setIsInitialized(true);
   }, []);
 
@@ -68,7 +57,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = useCallback(() => {
-    console.log("🚪 AuthContext - 執行登出");
     setToken(null);
     setUser(null);
     localStorage.removeItem("authToken");
@@ -78,18 +66,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.setItem("manual_logout", "true");
 
     // 強制重新加載頁面確保完全清除狀態
-    window.location.href = '/MyReportAI/login';
+    window.location.href = "/MyReportAI/login";
   }, []);
 
   const isAuthenticated = isInitialized && !!token;
 
   // 添加調試信息
-  console.log("🔐 AuthContext Debug:", {
-    isInitialized,
-    hasToken: !!token,
-    isAuthenticated,
-    tokenLength: token?.length || 0,
-  });
 
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}) => {
@@ -107,7 +89,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (response.status === 401) {
-        console.log("🔒 AuthContext - 收到401回應，清理認證狀態");
         logout();
         throw new Error("Session expired");
       }
@@ -119,7 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // 在初始化完成前顯示載入畫面
   if (!isInitialized) {
-    console.log("🔄 AuthContext - 等待初始化完成...");
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">

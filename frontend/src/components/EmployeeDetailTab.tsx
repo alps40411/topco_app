@@ -10,6 +10,7 @@ import ChatInterface from "./ChatInterface";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
 import { formatMinutesToHours } from "../utils/timeUtils";
 import ForwardSelector from "./ForwardSelector";
+import { TypographyClasses } from "../styles/typography";
 
 interface ReportWithApprovals extends DailyReport {
   approvals?: SupervisorApprovalInfo[];
@@ -231,7 +232,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                   )}
                 </div>
                 <div
-                  className="text-gray-700 prose prose-sm max-w-none"
+                  className={TypographyClasses.richTextDisplay}
                   dangerouslySetInnerHTML={{ __html: projectReport.content }}
                 />
                 <AttachedFilesDisplay files={projectReport.files} />

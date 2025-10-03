@@ -190,7 +190,9 @@ function App() {
     setSelectedReportId(reportId);
     setActiveTab("supervisor"); // 切換到審閱模式
     // 使用 navigate 更新 URL (相對於 basename)
-    navigate(`?tab=supervisor&employee=${employee.id}&report=${reportId}`, { replace: false });
+    navigate(`?tab=supervisor&employee=${employee.id}&report=${reportId}`, {
+      replace: false,
+    });
   };
 
   const handleBackFromDetail = () => {
@@ -213,21 +215,22 @@ function App() {
   };
 
   // 處理上傳完成後的跳轉
-  const handleUploadComplete = useCallback((uploadedDate: string) => {
-    console.log("handleUploadComplete called with:", uploadedDate);
+  const handleUploadComplete = useCallback(
+    (uploadedDate: string) => {
+      // 立即跳轉到日報首頁（daily tab）
+      setActiveTab("daily");
+      // 設定顯示上傳的那天日報
+      setGlobalSelectedDate(uploadedDate);
+      // 使用 navigate 更新 URL (相對於 basename)
+      navigate(`?tab=daily&date=${uploadedDate}`, { replace: false });
 
-    // 立即跳轉到日報首頁（daily tab）
-    setActiveTab("daily");
-    // 設定顯示上傳的那天日報
-    setGlobalSelectedDate(uploadedDate);
-    // 使用 navigate 更新 URL (相對於 basename)
-    navigate(`?tab=daily&date=${uploadedDate}`, { replace: false });
-
-    // 延遲顯示成功訊息，確保跳轉完成
-    setTimeout(() => {
-      toast.success("已跳轉到日報首頁查看上傳的日報");
-    }, 100);
-  }, [navigate]);
+      // 延遲顯示成功訊息，確保跳轉完成
+      setTimeout(() => {
+        toast.success("已跳轉到日報首頁查看上傳的日報");
+      }, 100);
+    },
+    [navigate]
+  );
 
   const fetchWritingStatus = useCallback(
     async (docDate?: string) => {
@@ -252,7 +255,9 @@ function App() {
   useEffect(() => {
     if (authFetch && user?.employee) {
       // 使用全局選中的日期，如果沒有則不傳入doc_date讓後端使用預設邏輯
-      const docDate = globalSelectedDate ? globalSelectedDate.replace(/-/g, "") : undefined;
+      const docDate = globalSelectedDate
+        ? globalSelectedDate.replace(/-/g, "")
+        : undefined;
       fetchWritingStatus(docDate);
     }
   }, [authFetch, user?.employee, fetchWritingStatus, globalSelectedDate]);
@@ -301,7 +306,7 @@ function App() {
       setSelectedReportId(null);
       setSelectedEmployee(null);
     }
-  }, [searchParams, activeTab, globalSelectedDate, selectedReportId, navigate])
+  }, [searchParams, activeTab, globalSelectedDate, selectedReportId, navigate]);
 
   // 獲取員工詳細資訊
   useEffect(() => {
@@ -312,7 +317,9 @@ function App() {
 
     const fetchEmployeeInfo = async () => {
       try {
-        const response = await authFetch(`/api/supervisor/reports/${selectedReportId}`);
+        const response = await authFetch(
+          `/api/supervisor/reports/${selectedReportId}`
+        );
         if (response.ok) {
           const reportData = await response.json();
           setSelectedEmployee({

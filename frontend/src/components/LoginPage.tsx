@@ -21,7 +21,6 @@ const LoginPage: React.FC = () => {
       // 檢查是否是手動登出（避免自動重新登入）
       const wasManualLogout = sessionStorage.getItem("manual_logout");
       if (wasManualLogout) {
-        console.log("手動登出，跳過自動 SSO");
         sessionStorage.removeItem("manual_logout");
         setIsCheckingSSO(false);
         return;
@@ -38,7 +37,7 @@ const LoginPage: React.FC = () => {
 
         if (response.ok) {
           const data = await response.json();
-          console.log("SSO login successful:", data);
+
           login(data.token.access_token, data.user);
           // 使用完整路徑跳轉
           window.location.href = "/MyReportAI/?tab=supervisor";
@@ -48,7 +47,7 @@ const LoginPage: React.FC = () => {
         }
       } catch (error) {
         // SSO 不可用，使用傳統登入
-        console.log("SSO not available, falling back to traditional login");
+
         setIsCheckingSSO(false);
       }
     };

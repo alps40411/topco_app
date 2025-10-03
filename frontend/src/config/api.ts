@@ -4,10 +4,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 // 除錯資訊
-console.log("🔧 API 配置除錯:");
-console.log("   VITE_API_BASE_URL:", import.meta.env.VITE_API_BASE_URL);
-console.log("   API_BASE_URL:", API_BASE_URL);
-console.log("   MODE:", import.meta.env.MODE);
 
 // 自動偵測模式：
 // 開發模式：使用代理

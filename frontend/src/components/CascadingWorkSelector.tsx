@@ -89,7 +89,6 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
       setIsLoading(true);
       try {
         const workData = await LegacyApi.getAllWorkData(user.employee.empno);
-        // console.log("=== API 已呼叫並返回資料 (只會執行一次) ===", workData);
 
         // 1. 設定從 API 獲取的原始資料
         setWorkPlans(workData.work_plans || []);

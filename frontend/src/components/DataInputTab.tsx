@@ -1,10 +1,6 @@
 // frontend/src/components/DataInputTab.tsx
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Save, FileText } from "lucide-react";
 import type {
   ConsolidatedReport,
@@ -23,6 +19,7 @@ import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 import { useDataSync } from "../hooks/useDataSync";
+import { TypographyClasses } from "../styles/typography";
 
 interface DataInputTabProps {
   selectedDate: string | null;
@@ -188,7 +185,6 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
           if (existingDrafts.length > 0) {
             // 使用現有記錄的daily_no
             daily_no = existingDrafts[0].daily_no;
-            console.log("✅ 使用現有的 daily_no:", daily_no);
           }
         }
       } catch (error) {
@@ -200,7 +196,6 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         const dailyNoResponse = await authFetch("/api/legacy/next-daily-no");
         const { daily_no: newDailyNo } = await dailyNoResponse.json();
         daily_no = newDailyNo;
-        console.log("✅ 取得新的 daily_no:", daily_no);
       }
 
       // 準備暫存數據
@@ -290,12 +285,76 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     }));
   };
 
-  const removeFile = (fileUrl: string) => {
-    setCurrentRecord((prev) => ({
-      ...prev,
-      files: (prev.files || []).filter((file) => file.url !== fileUrl),
-    }));
-  };
+  // 統一的檔案刪除處理函式（處理所有刪除操作）
+  const handleRemoveFile = useCallback(
+    async (fileUrl: string) => {
+      try {
+        // 從 URL 提取檔案名稱
+        // fileUrl 格式: /uploads/filename.jpg 或 http://localhost:8000/uploads/filename.jpg
+        let filename = fileUrl;
+        if (fileUrl.startsWith("http")) {
+          const url = new URL(fileUrl);
+          filename = url.pathname;
+        }
+        // 移除 /uploads/ 前綴
+        filename = filename.replace("/uploads/", "");
+
+        // 1. 從後端伺服器刪除實體檔案
+        const response = await authFetch(
+          `/api/records/delete/${encodeURIComponent(filename)}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!response.ok) {
+          console.warn("Failed to delete file from server:", fileUrl);
+          // 即使伺服器刪除失敗，仍繼續刪除前端狀態
+        }
+
+        // 2. 從狀態中移除檔案
+        setCurrentRecord((prev) => ({
+          ...prev,
+          files: (prev.files || []).filter((file) => file.url !== fileUrl),
+        }));
+
+        // 3. 從富文本編輯器內容中移除對應的圖片標籤
+        setCurrentRecord((prev) => {
+          const content = prev.content || "";
+          // 構建可能的圖片 URL 格式
+          const possibleUrls = [
+            fileUrl,
+            fileUrl.startsWith("/")
+              ? `http://localhost:8000${fileUrl}`
+              : fileUrl,
+            fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
+          ];
+
+          let updatedContent = content;
+          // 移除所有可能格式的圖片標籤
+          possibleUrls.forEach((url) => {
+            const imgRegex = new RegExp(
+              `<img[^>]*src="${url.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+              )}"[^>]*>`,
+              "g"
+            );
+            updatedContent = updatedContent.replace(imgRegex, "");
+          });
+
+          return {
+            ...prev,
+            content: updatedContent,
+          };
+        });
+      } catch (error) {
+        console.error("Error removing file:", error);
+        toast.error("檔案刪除失敗");
+      }
+    },
+    [authFetch]
+  );
 
   // 只有在完全沒有其他可填寫日期時才顯示禁用提示
   if (
@@ -435,13 +494,15 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                   }));
                 }}
                 onFileUpload={handleEditorFileUpload}
-                placeholder="記錄您的想法... (可直接貼上圖片)"
+                onFileRemove={handleRemoveFile}
+                files={currentRecord.files || []}
+                placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
               />
             </div>
 
             <AttachedFilesManager
               files={currentRecord.files || []}
-              onRemoveFile={removeFile}
+              onRemoveFile={handleRemoveFile}
               onAiSelectionChange={handleAiSelectionChange}
               isUploading={isUploading}
               showUploadButton={false}
@@ -512,7 +573,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                   </div>
 
                   <div
-                    className="text-base text-gray-700 prose prose-sm max-w-none"
+                    className={TypographyClasses.richTextDisplay}
                     dangerouslySetInnerHTML={{ __html: report.content }}
                   />
                   <AttachedFilesDisplay files={report.files} />

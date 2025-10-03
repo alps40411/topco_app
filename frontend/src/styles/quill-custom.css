@@ -1,18 +1,18 @@
 /* Custom Quill Editor Styles */
+/* 使用 TypographyStandards.richText.editor (text-base) 作為統一字體大小 */
+/* 字體大小由 Tailwind config 控制，目前為 19px */
 
 /* 確保編輯器有足夠的高度 */
 .quill {
-  background: white;
+  @apply bg-white;
 }
 
 .ql-container {
-  min-height: 200px;
-  font-size: 14px;
+  @apply min-h-[200px] text-base;
 }
 
 .ql-editor {
-  min-height: 200px;
-  padding: 12px;
+  @apply min-h-[200px] p-3 text-base leading-relaxed;
 }
 
 /* 工具列樣式 */
@@ -43,7 +43,7 @@
 .prose img,
 div[dangerouslySetInnerHTML] img,
 [class*="prose"] img {
-  max-width: 60%;
+  max-width: 80%;
   height: auto;
   display: block;
   margin: 1rem 0;

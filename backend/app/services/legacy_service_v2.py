@@ -178,38 +178,13 @@ class LegacyReportServiceV2:
                 # 計算新的字數
                 merged_word_count = len(merged_content) if merged_content else 0
                 
-                # 合併檔案和更新 att_file1、att_file2
-                existing_files = existing_exact_match[8] or "[]"
-                existing_att_file1 = existing_exact_match[6] or ""  # 現有的檔案名稱
-                existing_att_file2 = existing_exact_match[7] or ""  # 現有的檔案路徑
-                
-                # 合併檔案 JSON
-                if files_json and files_json != "[]":
-                    try:
-                        existing_files_list = json.loads(existing_files) if existing_files != "[]" else []
-                        new_files_list = json.loads(files_json)
-                        merged_files_list = existing_files_list + new_files_list
-                        merged_files = json.dumps(merged_files_list, ensure_ascii=False)
-                    except:
-                        merged_files = files_json
-                else:
-                    merged_files = existing_files
-                
-                # 合併 att_file1 (檔案名稱) 和 att_file2 (檔案路徑)
-                merged_att_file1 = existing_att_file1 or ""
-                merged_att_file2 = existing_att_file2 or ""
-                
-                if att_file1:  # 有新的檔案名稱
-                    if merged_att_file1:
-                        merged_att_file1 += "," + att_file1
-                    else:
-                        merged_att_file1 = att_file1
-                        
-                if att_file2:  # 有新的檔案路徑
-                    if merged_att_file2:
-                        merged_att_file2 += "," + att_file2
-                    else:
-                        merged_att_file2 = att_file2
+                # 檔案處理：使用前端傳來的完整檔案列表（已處理刪除）
+                # 直接替換，而非合併，以支援檔案刪除同步
+                merged_files = files_json  # 使用前端傳來的檔案列表（已反映刪除操作）
+                merged_att_file1 = att_file1  # 使用前端傳來的檔案名稱列表
+                merged_att_file2 = att_file2  # 使用前端傳來的檔案路徑列表
+
+                logger.info(f"檔案列表更新（替換模式）: {len(files)} 個檔案")
                 
                 # 更新現有記錄
                 update_sql = text("""

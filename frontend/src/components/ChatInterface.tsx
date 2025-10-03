@@ -217,7 +217,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         });
       }
 
-      console.log("建構的回應目標列表:", targets);
       setReplyTargets(targets);
 
       // 設定預設選擇：優先選擇日報作者，如果沒有則選第一個
@@ -656,7 +655,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <button
             onClick={() => {
               // 只判斷 URL 中的 status 參數
-              if (urlStatus === 'P') {
+              if (urlStatus === "P") {
                 // status=P -> 確認按鈕
                 handleAcknowledge();
               } else if (
@@ -674,7 +673,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             disabled={isSubmitting}
             className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
-            {isSubmitting ? "送出中..." : (urlStatus === 'P' ? "確認" : "瞭解!")}
+            {isSubmitting ? "送出中..." : urlStatus === "P" ? "確認" : "瞭解!"}
           </button>
         </div>
       </div>

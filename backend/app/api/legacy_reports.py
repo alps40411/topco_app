@@ -841,6 +841,41 @@ async def upload_file(
         logger.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"檔案上傳失敗: {str(e)}")
 
+@records_router.delete("/delete/{filename}")
+async def delete_upload(
+    filename: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """
+    從伺服器上刪除一個已上傳的檔案。
+    """
+    try:
+        if not current_user.employee:
+            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+
+        # 組合檔案的完整路徑
+        upload_dir = Path(settings.UPLOAD_DIR)
+        file_path = upload_dir / filename
+
+        # 安全性檢查：確保檔案路徑是在我們預期的 UPLOAD_DIR 底下
+        if not file_path.is_file() or not str(file_path.resolve()).startswith(str(upload_dir.resolve())):
+            raise HTTPException(status_code=404, detail="檔案不存在或路徑無效")
+
+        # 執行刪除
+        os.remove(file_path)
+        logger.info(f"File deleted successfully: {file_path}")
+
+        return {"message": "檔案刪除成功", "filename": filename}
+
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="檔案不存在")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"刪除檔案時發生錯誤: {e}")
+        raise HTTPException(status_code=500, detail=f"刪除檔案時發生內部錯誤: {str(e)}")
+
 @records_router.post("/upload-record")
 async def upload_record(
     record_data: Dict[str, Any],

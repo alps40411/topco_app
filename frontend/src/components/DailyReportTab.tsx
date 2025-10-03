@@ -28,6 +28,7 @@ import ServiceSelector from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
+import { TypographyClasses } from "../styles/typography";
 import { formatMinutesToHours } from "../utils/timeUtils";
 
 interface DailyRecordCreate
@@ -89,6 +90,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   });
   const [isSavingNewRecord, setIsSavingNewRecord] = useState(false);
   const [isUploadingNewFile, setIsUploadingNewFile] = useState(false);
+  // 追蹤新增筆記中臨時上傳的檔案（用於取消時清理）
+  const newRecordTempFilesRef = useRef<string[]>([]);
   const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
   const [serviceTargets, setServiceTargets] = useState<any[]>([]);
 
@@ -460,7 +463,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
       // 立即跳轉到日報首頁
       if (onSwitchToDaily) {
-        console.log("Switching to daily homepage");
         onSwitchToDaily();
       }
 
@@ -516,9 +518,65 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       )
     );
   };
-  const removeEditFile = (fileUrl: string) => {
-    setEditFiles((prev) => prev.filter((file) => file.url !== fileUrl));
-  };
+  // 統一的編輯區檔案刪除處理函式
+  const handleRemoveEditFile = useCallback(
+    async (fileUrl: string) => {
+      try {
+        // 從 URL 提取檔案名稱
+        let filename = fileUrl;
+        if (fileUrl.startsWith("http")) {
+          const url = new URL(fileUrl);
+          filename = url.pathname;
+        }
+        filename = filename.replace("/uploads/", "");
+
+        // 1. 從後端伺服器刪除實體檔案
+        const response = await authFetch(
+          `/api/records/delete/${encodeURIComponent(filename)}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!response.ok) {
+          console.warn("Failed to delete file from server:", fileUrl);
+        }
+
+        // 2. 從狀態中移除檔案
+        setEditFiles((prev) => prev.filter((file) => file.url !== fileUrl));
+
+        // 3. 從富文本編輯器內容中移除對應的圖片標籤
+        setEditContent((prev) => {
+          const content = prev || "";
+          const possibleUrls = [
+            fileUrl,
+            fileUrl.startsWith("/")
+              ? `http://localhost:8000${fileUrl}`
+              : fileUrl,
+            fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
+          ];
+
+          let updatedContent = content;
+          possibleUrls.forEach((url) => {
+            const imgRegex = new RegExp(
+              `<img[^>]*src="${url.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+              )}"[^>]*>`,
+              "g"
+            );
+            updatedContent = updatedContent.replace(imgRegex, "");
+          });
+
+          return updatedContent;
+        });
+      } catch (error) {
+        console.error("Error removing edit file:", error);
+        toast.error("檔案刪除失敗");
+      }
+    },
+    [authFetch]
+  );
 
   // 處理來自編輯用 RichTextEditor 的檔案上傳回調
   const handleEditEditorFileUpload = useCallback((file: FileForUpload) => {
@@ -569,19 +627,142 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       ),
     }));
   };
-  const removeNewRecordFile = (fileUrl: string) => {
-    setNewRecord((prev) => ({
-      ...prev,
-      files: (prev.files || []).filter((file) => file.url !== fileUrl),
-    }));
-  };
+  // 統一的新增記錄檔案刪除處理函式
+  const handleRemoveNewRecordFile = useCallback(
+    async (fileUrl: string) => {
+      try {
+        // 從 URL 提取檔案名稱
+        let filename = fileUrl;
+        if (fileUrl.startsWith("http")) {
+          const url = new URL(fileUrl);
+          filename = url.pathname;
+        }
+        filename = filename.replace("/uploads/", "");
+
+        // 1. 從後端伺服器刪除實體檔案
+        const response = await authFetch(
+          `/api/records/delete/${encodeURIComponent(filename)}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!response.ok) {
+          console.warn("Failed to delete file from server:", fileUrl);
+        }
+
+        // 2. 從狀態中移除檔案
+        setNewRecord((prev) => ({
+          ...prev,
+          files: (prev.files || []).filter((file) => file.url !== fileUrl),
+        }));
+
+        // 3. 從富文本編輯器內容中移除對應的圖片標籤
+        setNewRecord((prev) => {
+          const content = prev.content || "";
+          const possibleUrls = [
+            fileUrl,
+            fileUrl.startsWith("/")
+              ? `http://localhost:8000${fileUrl}`
+              : fileUrl,
+            fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
+          ];
+
+          let updatedContent = content;
+          possibleUrls.forEach((url) => {
+            const imgRegex = new RegExp(
+              `<img[^>]*src="${url.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+              )}"[^>]*>`,
+              "g"
+            );
+            updatedContent = updatedContent.replace(imgRegex, "");
+          });
+
+          return {
+            ...prev,
+            content: updatedContent,
+          };
+        });
+      } catch (error) {
+        console.error("Error removing new record file:", error);
+        toast.error("檔案刪除失敗");
+      }
+    },
+    [authFetch]
+  );
+
+  // 清理新增筆記中的臨時檔案
+  const cleanupNewRecordTempFiles = useCallback(async () => {
+    if (!authFetch || newRecordTempFilesRef.current.length === 0) return;
+
+    // 刪除所有臨時檔案
+    for (const fileUrl of newRecordTempFilesRef.current) {
+      try {
+        let filename = fileUrl;
+        if (fileUrl.startsWith("http")) {
+          const url = new URL(fileUrl);
+          filename = url.pathname;
+        }
+        filename = filename.replace("/uploads/", "");
+
+        await authFetch(`/api/records/delete/${encodeURIComponent(filename)}`, {
+          method: "DELETE",
+        });
+      } catch (error) {
+        console.error("Failed to delete temp file:", fileUrl, error);
+      }
+    }
+
+    // 清空追蹤列表
+    newRecordTempFilesRef.current = [];
+  }, [authFetch]);
+
+  // 組件卸載時清理臨時檔案
+  useEffect(() => {
+    return () => {
+      // 在卸載時觸發清理，但不等待完成（避免 DOM 操作錯誤）
+      if (newRecordTempFilesRef.current.length > 0) {
+        // 使用 void 表示故意不等待 Promise
+        void cleanupNewRecordTempFiles();
+      }
+    };
+  }, [cleanupNewRecordTempFiles]);
+
+  // 處理關閉新增筆記 Modal（清理臨時檔案並重置狀態）
+  const handleCloseNewRecordModal = useCallback(async () => {
+    // 清理臨時上傳的檔案
+    await cleanupNewRecordTempFiles();
+
+    // 重置表單狀態
+    setNewRecord({
+      content: "",
+      project_id: undefined,
+      execution_work_id: undefined,
+      work_item_id: undefined,
+      service_cocode: undefined,
+      service_empno: undefined,
+      files: [],
+      execution_time_minutes: 0,
+    });
+
+    // 關閉 Modal
+    setIsAddNoteModalOpen(false);
+  }, [cleanupNewRecordTempFiles]);
 
   // 處理來自新增用 RichTextEditor 的檔案上傳回調
   const handleNewRecordEditorFileUpload = useCallback((file: FileForUpload) => {
-    setNewRecord((prev) => ({
-      ...prev,
-      files: [...(prev.files || []), file],
-    }));
+    // 記錄臨時檔案 URL（用於取消時刪除）
+    newRecordTempFilesRef.current.push(file.url);
+
+    setNewRecord((prev) => {
+      const updatedFiles = [...(prev.files || []), file];
+      return {
+        ...prev,
+        files: updatedFiles,
+      };
+    });
   }, []);
 
   const handleSaveNewRecord = async () => {
@@ -645,7 +826,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           if (existingDrafts.length > 0) {
             // 使用現有記錄的daily_no
             daily_no = existingDrafts[0].daily_no;
-            console.log("✅ 使用現有的 daily_no:", daily_no);
           }
         }
       } catch (error) {
@@ -657,7 +837,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         const dailyNoResponse = await authFetch("/api/legacy/next-daily-no");
         const { daily_no: newDailyNo } = await dailyNoResponse.json();
         daily_no = newDailyNo;
-        console.log("✅ 取得新的 daily_no:", daily_no);
       }
 
       // 準備暫存數據
@@ -715,6 +894,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         files: [],
         execution_time_minutes: 0,
       });
+      // 保存成功後清空臨時檔案追蹤（這些檔案已經被記錄引用）
+      newRecordTempFilesRef.current = [];
       setIsAddNoteModalOpen(false);
       toast.success("記錄儲存成功！");
     } catch (error) {
@@ -726,10 +907,36 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   };
 
   const handleApplyAiSuggestion = (aiContent: string) => {
-    // Convert HTML line breaks to plain text newlines for the textarea
-    const plainTextContent = aiContent.replace(/<br \/>/g, "\n");
-    setEditContent(plainTextContent);
-    toast.success("AI 建議已套用至編輯框！");
+    console.log("=== 套用 AI 建議 ===");
+    console.log("當前 editFiles:", editFiles);
+    console.log("當前 editContent 長度:", editContent.length);
+
+    // 提取當前編輯內容中的所有圖片標籤
+    const imgRegex = /<img[^>]*>/gi;
+    const images = editContent.match(imgRegex) || [];
+    console.log("找到的圖片數量:", images.length);
+
+    // 將純文字的換行符轉換為 HTML 的 <br> 標籤
+    // 保持原始的換行格式（單換行和雙換行都保留）
+    const htmlContent = aiContent.replace(/\n/g, '<br>');
+
+    // 如果沒有圖片，直接套用轉換後的 AI 建議
+    if (images.length === 0) {
+      setEditContent(htmlContent);
+      toast.success("AI 建議已套用！");
+      console.log("套用後 editFiles 應該不變");
+      return;
+    }
+
+    // 將圖片包裹在段落標籤中，保持編輯器格式一致性
+    const imageBlocks = images.map(img => `<p>${img}</p>`).join('');
+
+    // 組合新內容：AI 建議文字 + 保留的圖片
+    const newContent = `${htmlContent}${imageBlocks}`;
+
+    setEditContent(newContent);
+    toast.success(`AI 建議已套用，並保留了 ${images.length} 張圖片！`);
+    console.log("套用完成，editFiles 應該保持不變");
   };
 
   if (isLoading) {
@@ -946,11 +1153,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                         value={editContent}
                         onChange={setEditContent}
                         onFileUpload={handleEditEditorFileUpload}
+                        onFileRemove={handleRemoveEditFile}
+                        files={editFiles}
                         placeholder="編輯記錄內容... (可直接貼上圖片)"
                       />
                       <AttachedFilesManager
                         files={editFiles}
-                        onRemoveFile={removeEditFile}
+                        onRemoveFile={handleRemoveEditFile}
                         onAiSelectionChange={handleEditAiSelectionChange}
                         isUploading={false}
                         showUploadButton={false}
@@ -978,7 +1187,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       <div>
                         <div className="flex items-start space-x-2">
                           <div
-                            className="prose prose-sm max-w-none text-gray-700 flex-1"
+                            className={`${TypographyClasses.richTextDisplay} flex-1`}
                             dangerouslySetInnerHTML={{ __html: report.content }}
                           />
                           {/* {report.files && report.files.length > 0 && (
@@ -1010,7 +1219,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       AI 正在為此專案生成潤飾內容...
                     </p>
                   ) : report.ai_content ? (
-                    <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">
+                    <div
+                      className={`${TypographyClasses.richTextDisplay} whitespace-pre-wrap`}
+                    >
                       <div
                         dangerouslySetInnerHTML={{
                           __html: report.ai_content.replace(/\n/g, "<br />"),
@@ -1063,7 +1274,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   新增筆記到今日報告
                 </h3>
                 <button
-                  onClick={() => setIsAddNoteModalOpen(false)}
+                  onClick={handleCloseNewRecordModal}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-6 h-6" />
@@ -1091,16 +1302,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   selectedCompanyId={newRecord.service_cocode}
                   selectedTargetId={newRecord.service_empno}
                   onCompanyChange={(cocode) =>
-                    setNewRecord({
-                      ...newRecord,
+                    setNewRecord((prev) => ({
+                      ...prev,
                       service_cocode: cocode,
-                    })
+                    }))
                   }
                   onTargetChange={(empno) =>
-                    setNewRecord({
-                      ...newRecord,
+                    setNewRecord((prev) => ({
+                      ...prev,
                       service_empno: empno,
-                    })
+                    }))
                   }
                   serviceCompanies={serviceCompanies}
                   serviceTargets={serviceTargets}
@@ -1113,27 +1324,29 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   <RichTextEditor
                     value={newRecord.content || ""}
                     onChange={(content) =>
-                      setNewRecord({ ...newRecord, content })
+                      setNewRecord((prev) => ({ ...prev, content }))
                     }
                     onFileUpload={handleNewRecordEditorFileUpload}
-                    placeholder="記錄您的想法... (可直接貼上圖片)"
+                    onFileRemove={handleRemoveNewRecordFile}
+                    files={newRecord.files || []}
+                    placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
                   />
                 </div>
 
                 <ExecutionTimeSelector
                   totalMinutes={newRecord.execution_time_minutes || 0}
                   onChange={(minutes) =>
-                    setNewRecord({
-                      ...newRecord,
+                    setNewRecord((prev) => ({
+                      ...prev,
                       execution_time_minutes: minutes,
-                    })
+                    }))
                   }
                   required
                 />
 
                 <AttachedFilesManager
                   files={newRecord.files || []}
-                  onRemoveFile={removeNewRecordFile}
+                  onRemoveFile={handleRemoveNewRecordFile}
                   onAiSelectionChange={handleNewRecordAiSelectionChange}
                   isUploading={isUploadingNewFile}
                   showUploadButton={false}
@@ -1141,7 +1354,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
                 <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
                   <button
-                    onClick={() => setIsAddNoteModalOpen(false)}
+                    onClick={handleCloseNewRecordModal}
                     className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 order-2 sm:order-1"
                   >
                     取消

@@ -37,7 +37,6 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5分鐘緩存
 
 // Export 清除快取函數，供登入頁面使用
 export const clearDateCache = () => {
-  console.log("🗑️ 清除日期快取");
   globalDateCache = null;
 };
 
@@ -65,7 +64,6 @@ const DateSelector: React.FC<DateSelectorProps> = ({
         globalDateCache &&
         now - globalDateCache.timestamp < CACHE_DURATION
       ) {
-        console.log("使用緩存的日期數據");
         setAvailableDates(globalDateCache.data);
         setCurrentReportDate(globalDateCache.currentReportDate);
 
@@ -79,7 +77,6 @@ const DateSelector: React.FC<DateSelectorProps> = ({
 
       // 防止多個實例同時發起請求 - 檢查是否已有請求正在進行
       if (!forceRefresh && globalDateCache?.isLoading) {
-        console.log("等待其他實例的請求完成");
         // 等待一小段時間後重新檢查快取
         setTimeout(() => {
           if (globalDateCache && !globalDateCache.isLoading) {
@@ -178,7 +175,6 @@ const DateSelector: React.FC<DateSelectorProps> = ({
       }
     }
   };
-
 
   if (isLoading) {
     return (

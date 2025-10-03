@@ -11,13 +11,17 @@ import type { FileForUpload } from "../App";
 // 在模組載入時註冊 paperclip 圖示（只執行一次）
 const icons = ReactQuill.Quill.import("ui/icons");
 if (!icons["paperclip"]) {
-  icons["paperclip"] = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.59a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`;
+  icons[
+    "paperclip"
+  ] = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.59a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`;
 }
 
 interface RichTextEditorProps {
   value: string;
   onChange: (content: string) => void;
   onFileUpload?: (file: FileForUpload) => void;
+  onFileRemove?: (fileUrl: string) => void;
+  files?: FileForUpload[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -27,12 +31,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
   onChange,
   onFileUpload,
-  placeholder = "記錄您的想法... (可直接貼上圖片)",
+  onFileRemove,
+  files = [],
+  placeholder = "記錄您的想法... (可直接貼上圖片或者附上檔案)",
   disabled = false,
   className = "",
 }) => {
   const quillRef = useRef<ReactQuill>(null);
   const { authFetch } = useAuth();
+  const previousContentRef = useRef<string>(value);
 
   // 處理圖片上傳並插入編輯器
   const handleImageUpload = useCallback(() => {
@@ -128,6 +135,78 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       }
     };
   }, [authFetch, onFileUpload]);
+
+  // 偵測編輯器內圖片被刪除（透過退格鍵或其他方式）
+  useEffect(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill || !authFetch || !onFileRemove) return;
+
+    let isProcessing = false;
+
+    const handleTextChange = (delta: any, oldContents: any, source: string) => {
+      // 只處理用戶操作，忽略 API 或程式碼觸發的變更
+      if (source !== "user") return;
+      if (isProcessing) return;
+
+      // 使用 setTimeout 確保 DOM 已更新
+      setTimeout(() => {
+        const currentContent = quill.root.innerHTML;
+        const previousContent = previousContentRef.current;
+
+        // 提取當前內容中的所有圖片 URL
+        const currentImages = new Set<string>();
+        const imgRegex = /<img[^>]+src="([^">]+)"/g;
+        let match;
+        while ((match = imgRegex.exec(currentContent)) !== null) {
+          currentImages.add(match[1]);
+        }
+
+        // 提取之前內容中的所有圖片 URL
+        const previousImages = new Set<string>();
+        const imgRegex2 = /<img[^>]+src="([^">]+)"/g;
+        while ((match = imgRegex2.exec(previousContent)) !== null) {
+          previousImages.add(match[1]);
+        }
+
+        // 只有在圖片數量減少時才檢查刪除（拖移不會改變數量）
+        if (currentImages.size < previousImages.size) {
+          isProcessing = true;
+          // 找出被刪除的圖片
+          for (const imageUrl of previousImages) {
+            if (!currentImages.has(imageUrl)) {
+              // 圖片從編輯器中被移除了
+              // 從完整 URL 中提取相對路徑
+              let fileUrl = imageUrl;
+              if (imageUrl.startsWith("http")) {
+                const url = new URL(imageUrl);
+                fileUrl = url.pathname;
+              }
+
+              // 通知父元件並刪除檔案
+              onFileRemove(fileUrl);
+            }
+          }
+          setTimeout(() => {
+            isProcessing = false;
+          }, 100);
+        }
+
+        // 更新 ref
+        previousContentRef.current = currentContent;
+      }, 0);
+    };
+
+    quill.on("text-change", handleTextChange);
+
+    return () => {
+      quill.off("text-change", handleTextChange);
+    };
+  }, [authFetch, onFileRemove]);
+
+  // 同步 value 變化到 previousContentRef
+  useEffect(() => {
+    previousContentRef.current = value;
+  }, [value]);
 
   // 處理剪貼簿圖片貼上
   useEffect(() => {
