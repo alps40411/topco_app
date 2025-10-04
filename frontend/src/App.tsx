@@ -12,7 +12,6 @@ import DailyReportTab from "./components/DailyReportTab";
 import EmployeeListTab from "./components/EmployeeListTab";
 import EmployeeDetailTab from "./components/EmployeeDetailTab";
 import { useAuth } from "./contexts/AuthContext";
-import { useHasSubordinates } from "./hooks/useHasSubordinates";
 import { Toaster } from "react-hot-toast";
 
 interface WritingStatus {
@@ -152,8 +151,7 @@ export interface User {
   employee?: EmployeeForUser;
 }
 function App() {
-  const { user, logout, authFetch } = useAuth();
-  const { hasSubordinates } = useHasSubordinates();
+  const { user, logout, authFetch, hasSubordinates } = useAuth(); // ✅ 從 AuthContext 獲取
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 

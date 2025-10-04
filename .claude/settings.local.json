@@ -50,7 +50,8 @@
       "Bash(findstr:*)",
       "Bash(netstat:*)",
       "Bash(pip uninstall:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git log:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

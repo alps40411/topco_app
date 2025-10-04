@@ -7,6 +7,7 @@ import React, {
   ReactNode,
   useCallback,
   useEffect,
+  useMemo,
 } from "react";
 import type { User } from "../App"; // 我們將從 App.tsx 引入統一的 User 型別
 import { buildApiUrl } from "../config/api";
@@ -18,6 +19,8 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
+  hasSubordinates: boolean; // ✅ 新增
+  isCheckingSubordinates: boolean; // ✅ 新增
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +29,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [hasSubordinates, setHasSubordinates] = useState(false); // ✅ 新增
+  const [isCheckingSubordinates, setIsCheckingSubordinates] = useState(true); // ✅ 新增
 
   // 在組件掛載時從 localStorage 讀取認證資訊
   useEffect(() => {
@@ -48,6 +53,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setIsInitialized(true);
   }, []);
+
+  // ✅ 只在登入後檢查一次下屬關係
+  useEffect(() => {
+    if (token && user) {
+      checkSubordinates();
+    } else {
+      setHasSubordinates(false);
+      setIsCheckingSubordinates(false);
+    }
+  }, [token, user]);
+
+  const checkSubordinates = async () => {
+    if (!token) return;
+
+    setIsCheckingSubordinates(true);
+    try {
+      const response = await fetch(buildApiUrl("/api/supervisor/has-subordinates"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setHasSubordinates(data.has_subordinates);
+        console.log("[AuthContext] 下屬檢查完成:", data.has_subordinates);
+      }
+    } catch (error) {
+      console.error("[AuthContext] 檢查下屬關係失敗:", error);
+      setHasSubordinates(false);
+    } finally {
+      setIsCheckingSubordinates(false);
+    }
+  };
 
   const login = (newToken: string, newUser: User) => {
     setToken(newToken);
@@ -98,6 +135,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [token, logout]
   );
 
+  // ✅ 使用 useMemo 記憶化 Context 值,避免不必要的重渲染
+  const contextValue = useMemo(
+    () => ({
+      token,
+      user,
+      login,
+      logout,
+      isAuthenticated,
+      authFetch,
+      hasSubordinates,
+      isCheckingSubordinates,
+    }),
+    [token, user, login, logout, isAuthenticated, authFetch, hasSubordinates, isCheckingSubordinates]
+  );
+
   // 在初始化完成前顯示載入畫面
   if (!isInitialized) {
     return (
@@ -111,9 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <AuthContext.Provider
-      value={{ token, user, login, logout, isAuthenticated, authFetch }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

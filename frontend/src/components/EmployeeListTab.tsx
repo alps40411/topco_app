@@ -1,6 +1,6 @@
 // frontend/src/components/EmployeeListTab.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Clock, UserCheck, User } from "lucide-react";
 import type { DailyReport, EmployeeInList } from "../App";
 import { useAuth } from "../contexts/AuthContext";
@@ -25,6 +25,7 @@ interface HomepageReport {
   classify: string;
   sop_desc_c: string;
   reply_count: number;
+  replier_count: number;
   my_ask: boolean;
   other_ask: boolean;
   is_forwarded: boolean;
@@ -62,21 +63,34 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   );
   const { authFetch, user } = useAuth();
 
+  // ✅ 使用 useRef 建立編輯狀態快取
+  const editableStatusCache = useRef<Record<string, boolean>>({});
+
   useEffect(() => {
     if (user?.employee?.empno) {
       setCurrentUserEmpno(user.employee.empno);
     }
   }, [user]);
 
-  // 檢查特定日期是否可編輯
+  // 檢查特定日期是否可編輯 (帶快取)
   const checkDateEditable = async (docDate: string) => {
+    // ✅ 檢查快取
+    if (editableStatusCache.current[docDate] !== undefined) {
+      console.log(`[EmployeeListTab] 使用快取: ${docDate} = ${editableStatusCache.current[docDate]}`);
+      return editableStatusCache.current[docDate];
+    }
+
     try {
       const response = await authFetch(
         `/api/records/writing-status?doc_date=${docDate}`
       );
       if (response.ok) {
         const data = await response.json();
-        return data.allowed === true;
+        const isEditable = data.allowed === true;
+        // ✅ 存入快取
+        editableStatusCache.current[docDate] = isEditable;
+        console.log(`[EmployeeListTab] API 查詢: ${docDate} = ${isEditable}`);
+        return isEditable;
       }
       return false;
     } catch (error) {

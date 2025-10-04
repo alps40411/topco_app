@@ -42,6 +42,15 @@ interface ForwardSelectorProps {
   className?: string;
 }
 
+// ✅ 全局快取 (模組層級)
+let globalForwardDataCache: {
+  forwardData: ForwardData | null;
+  departmentData: ForwardEmployeeData | null;
+  timestamp: number;
+} | null = null;
+
+const CACHE_DURATION = 10 * 60 * 1000; // 10 分鐘
+
 const ForwardSelector: React.FC<ForwardSelectorProps> = ({
   selectedForwardUsers,
   onForwardUsersChange,
@@ -60,8 +69,19 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
   }, []);
 
   const loadForwardData = async () => {
-    if (forwardData) return; // 已載入過就不重複載入
+    // ✅ 檢查全局快取
+    const now = Date.now();
+    if (
+      globalForwardDataCache &&
+      now - globalForwardDataCache.timestamp < CACHE_DURATION
+    ) {
+      console.log("[ForwardSelector] 使用快取資料");
+      setForwardData(globalForwardDataCache.forwardData);
+      setDepartmentData(globalForwardDataCache.departmentData);
+      return;
+    }
 
+    console.log("[ForwardSelector] 載入新資料");
     setIsLoading(true);
     try {
       const response = await authFetch("/api/supervisor/forward/candidates");
@@ -73,10 +93,18 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
       const data = await response.json();
       setForwardData(data);
 
+      let deptData = null;
       // 如果是高管，同時載入部門轉寄資料
       if (data.user_adm_rank <= 5) {
-        loadDepartmentData();
+        deptData = await loadDepartmentData();
       }
+
+      // ✅ 更新全局快取
+      globalForwardDataCache = {
+        forwardData: data,
+        departmentData: deptData,
+        timestamp: now,
+      };
     } catch (error) {
       console.error("載入轉寄名單失敗:", error);
       toast.error("載入轉寄名單失敗");
@@ -85,9 +113,7 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
     }
   };
 
-  const loadDepartmentData = async () => {
-    if (departmentData) return;
-
+  const loadDepartmentData = async (): Promise<ForwardEmployeeData | null> => {
     setIsDeptLoading(true);
     try {
       const response = await authFetch("/api/forward/employees");
@@ -98,9 +124,11 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
 
       const data = await response.json();
       setDepartmentData(data);
+      return data;
     } catch (error) {
       console.error("載入部門轉寄名單失敗:", error);
       toast.error("載入部門轉寄名單失敗");
+      return null;
     } finally {
       setIsDeptLoading(false);
     }
