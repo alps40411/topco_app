@@ -51,7 +51,7 @@ const InlineMultiSelect: React.FC<InlineMultiSelectProps> = ({
 
       {/* 可選項目列表 - 緊湊網格佈局 */}
       {options.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+        <div className="grid grid-cols-2 gap-2 border border-gray-200 rounded-lg p-3">
           {options.map((option) => {
             const isSelected = selectedValues.includes(option.id);
             return (
