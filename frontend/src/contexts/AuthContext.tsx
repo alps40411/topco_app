@@ -27,30 +27,41 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [hasSubordinates, setHasSubordinates] = useState(false); // ✅ 新增
-  const [isCheckingSubordinates, setIsCheckingSubordinates] = useState(true); // ✅ 新增
+  const [isLoading, setIsLoading] = useState(true); //  замість isInitialized
 
-  // 在組件掛載時從 localStorage 讀取認證資訊
+  // 在應用程式啟動時驗證 token
   useEffect(() => {
-    const storedToken = localStorage.getItem("authToken");
-    const storedUser = localStorage.getItem("user");
+    const verifyAuth = async () => {
+      const storedToken = localStorage.getItem("authToken");
 
-    if (storedToken) {
-      setToken(storedToken);
-    }
-
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-      } catch (e) {
-        console.error("❌ AuthContext - 解析 user 失敗:", e);
-        localStorage.removeItem("user");
+      if (!storedToken) {
+        setIsLoading(false);
+        return;
       }
-    }
 
-    setIsInitialized(true);
+      try {
+        const response = await fetch(buildApiUrl("/api/users/profile"), {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          // 使用從後端獲取的最新數據
+          login(storedToken, userData.data);
+        } else {
+          // Token 無效或過期
+          logout();
+        }
+      } catch (error) {
+        console.error("驗證失敗:", error);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    verifyAuth();
+    // Eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkSubordinates = useCallback(async () => {
@@ -105,7 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = "/MyReportAI/login";
   }, []);
 
-  const isAuthenticated = isInitialized && !!token;
+  const isAuthenticated = !isLoading && !!token;
 
   // 添加調試信息
 
@@ -135,7 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   // 在初始化完成前顯示載入畫面
-  if (!isInitialized) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
