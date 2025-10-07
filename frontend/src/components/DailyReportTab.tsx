@@ -69,6 +69,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [editingSopno, setEditingSopno] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
+  const [editOriginalContent, setEditOriginalContent] = useState<string>("");
+  const [editOriginalFiles, setEditOriginalFiles] = useState<FileForUpload[]>([]);
+  const [editPendingDeleteFiles, setEditPendingDeleteFiles] = useState<string[]>([]);
+  const [editPendingUploadFiles, setEditPendingUploadFiles] = useState<string[]>([]);
   const { authFetch, user } = useAuth();
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
@@ -399,20 +403,51 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       return;
     }
     setEditingSopno(report.sopno);
-    setEditContent(report.content);
-    setEditFiles(
-      report.files.map((f) => ({
-        ...f,
-        id: f.id || f.url,
-        is_selected_for_ai: !!f.is_selected_for_ai,
-      }))
-    );
+    const content = report.content;
+    const files = report.files.map((f) => ({
+      ...f,
+      id: f.id || f.url,
+      is_selected_for_ai: !!f.is_selected_for_ai,
+    }));
+
+    // 保存原始內容和檔案列表(用於取消時恢復)
+    setEditOriginalContent(content);
+    setEditOriginalFiles(files);
+    setEditContent(content);
+    setEditFiles(files);
+
+    // 清空 pending 列表
+    setEditPendingDeleteFiles([]);
+    setEditPendingUploadFiles([]);
   };
 
-  const cancelEdit = () => {
-    setEditingSopno(null);
-    setEditContent("");
-    setEditFiles([]);
+  const cancelEdit = async () => {
+    try {
+      // 刪除編輯期間新上傳的檔案
+      for (const filename of editPendingUploadFiles) {
+        try {
+          await authFetch(`/api/records/delete/${filename}`, {
+            method: "DELETE",
+          });
+        } catch (error) {
+          console.error(`清理檔案 ${filename} 失敗:`, error);
+        }
+      }
+
+      // 清空狀態
+      setEditingSopno(null);
+      setEditContent("");
+      setEditFiles([]);
+      setEditOriginalContent("");
+      setEditOriginalFiles([]);
+      setEditPendingDeleteFiles([]);
+      setEditPendingUploadFiles([]);
+
+      toast.success("已取消編輯");
+    } catch (error) {
+      console.error("取消編輯時發生錯誤:", error);
+      toast.error("取消編輯失敗");
+    }
   };
 
   const saveEdit = async () => {
@@ -446,11 +481,30 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
       if (!response.ok) throw new Error("更新報告失敗");
 
+      // 儲存成功後，實際刪除標記為待刪除的檔案
+      for (const filename of editPendingDeleteFiles) {
+        try {
+          await authFetch(`/api/records/delete/${filename}`, {
+            method: "DELETE",
+          });
+        } catch (error) {
+          console.error(`刪除檔案 ${filename} 失敗:`, error);
+        }
+      }
+
       // 重新獲取最新內容
       const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
       await fetchReports(docDate);
       toast.success("報告草稿更新成功！");
-      cancelEdit();
+
+      // 清空所有編輯狀態
+      setEditingSopno(null);
+      setEditContent("");
+      setEditFiles([]);
+      setEditOriginalContent("");
+      setEditOriginalFiles([]);
+      setEditPendingDeleteFiles([]);
+      setEditPendingUploadFiles([]);
     } catch (error) {
       console.error(error);
       toast.error("更新失敗，請稍後再試。");
@@ -531,6 +585,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           url: uploadedFile.url,
           is_selected_for_ai: false,
         };
+
+        // 追蹤新上傳的檔案
+        const filename = uploadedFile.url.split("/").pop();
+        if (filename) {
+          setEditPendingUploadFiles((prev) => [...prev, filename]);
+        }
+
         setEditFiles((prev) => [...prev, newFile]);
       } catch (error: any) {
         console.error(error);
@@ -571,9 +632,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           throw new Error("無法從路徑中解析檔案名稱");
         }
 
-        await authFetch(`/api/records/delete/${filename}`, {
-          method: "DELETE",
-        });
+        // 不立即刪除實體檔案,而是標記為待刪除
+        setEditPendingDeleteFiles((prev) => [...prev, filename]);
 
         setEditFiles((prev) =>
           prev.filter((file) => file.url !== relativePath)
@@ -590,11 +650,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         toast.error("檔案刪除失敗");
       }
     },
-    [authFetch]
+    []
   );
 
   // 處理來自編輯用 RichTextEditor 的檔案上傳回調
   const handleEditEditorFileUpload = useCallback((file: FileForUpload) => {
+    // 標記為新上傳的檔案
+    const filename = file.url.split("/").pop();
+    if (filename) {
+      setEditPendingUploadFiles((prev) => [...prev, filename]);
+    }
+
     setEditFiles((prev) => [...prev, file]);
   }, []);
 

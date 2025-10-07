@@ -54,7 +54,8 @@
       "Bash(git log:*)",
       "Bash(cat:*)",
       "Bash(npm show:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(git checkout:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
