@@ -10,7 +10,8 @@ import {
 import App from "./App.tsx";
 import LoginPage from "./components/LoginPage.tsx";
 import RedirectHandler from "./components/RedirectHandler.tsx";
-import { AuthProvider, useAuth } from "./contexts/AuthContext.tsx";
+import { AuthProvider } from "./contexts/AuthContext.tsx";
+import { useAuth } from "./hooks/useAuth";
 import { WorkDataProvider } from "./contexts/WorkDataContext.tsx";
 import "./index.css";
 

@@ -5,6 +5,30 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>工作日誌分頁式應用</title>
+
+    <!-- 預先連線到後端 API，減少首次請求延遲 -->
+    <script>
+      // 動態設置 API 預連線
+      (function() {
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const apiUrl = isDev ? 'http://localhost:8000' : `${protocol}//${hostname}:8000`;
+
+        // Preconnect
+        const preconnect = document.createElement('link');
+        preconnect.rel = 'preconnect';
+        preconnect.href = apiUrl;
+        preconnect.crossOrigin = 'anonymous';
+        document.head.appendChild(preconnect);
+
+        // DNS Prefetch
+        const dnsPrefetch = document.createElement('link');
+        dnsPrefetch.rel = 'dns-prefetch';
+        dnsPrefetch.href = apiUrl;
+        document.head.appendChild(dnsPrefetch);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

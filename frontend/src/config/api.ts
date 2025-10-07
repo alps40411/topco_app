@@ -54,14 +54,15 @@ export const buildApiUrl = (endpoint: string): string => {
   if (typeof window !== "undefined") {
     const currentHost = window.location.hostname;
     const currentPort = window.location.port;
+    const currentProtocol = window.location.protocol; // http: 或 https:
 
     // 如果是開發環境或使用代理，直接返回 endpoint
     if (import.meta.env.MODE === "development" || currentPort === "3000") {
       return endpoint;
     }
 
-    // 生產環境：使用當前主機的 8000 端口作為後端
-    return `http://${currentHost}:8000${endpoint}`;
+    // 生產環境：使用當前頁面的協議和主機的 8000 端口作為後端
+    return `${currentProtocol}//${currentHost}:8000${endpoint}`;
   }
 
   return endpoint; // 開發環境使用代理

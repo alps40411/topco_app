@@ -1,7 +1,7 @@
 // frontend/src/contexts/WorkDataContext.tsx
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
+import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { LegacyApi } from '../services/legacyApi';
 import { toast } from 'react-hot-toast';
 
@@ -51,14 +51,14 @@ interface WorkDataContextType {
   refetch: () => Promise<void>;
 }
 
-const WorkDataContext = createContext<WorkDataContextType | undefined>(undefined);
+export const WorkDataContext = createContext<WorkDataContextType | undefined>(undefined);
 
 export const WorkDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [workData, setWorkData] = useState<WorkData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { user, authFetch } = useAuth();
 
-  const fetchWorkData = async () => {
+  const fetchWorkData = useCallback(async () => {
     if (!user?.employee?.empno) return;
 
     setIsLoading(true);
@@ -79,29 +79,21 @@ export const WorkDataProvider: React.FC<{ children: ReactNode }> = ({ children }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.employee?.empno]);
 
   useEffect(() => {
     if (user?.employee?.empno) {
       fetchWorkData();
     }
-  }, [user?.employee?.empno]);
+  }, [user?.employee?.empno, fetchWorkData]);
 
-  const refetch = async () => {
+  const refetch = useCallback(async () => {
     await fetchWorkData();
-  };
+  }, [fetchWorkData]);
 
   return (
     <WorkDataContext.Provider value={{ workData, isLoading, refetch }}>
       {children}
     </WorkDataContext.Provider>
   );
-};
-
-export const useWorkData = () => {
-  const context = useContext(WorkDataContext);
-  if (context === undefined) {
-    throw new Error('useWorkData 必須在 WorkDataProvider 內使用');
-  }
-  return context;
 };

@@ -4,9 +4,10 @@ import React, { useRef, useCallback, useMemo, useEffect } from "react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import "../styles/quill-custom.css";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { toast } from "react-hot-toast";
 import type { FileForUpload } from "../App";
+import { getFullFileUrl } from "../utils/urlUtils";
 
 // 在模組載入時註冊 paperclip 圖示（只執行一次）
 const icons = ReactQuill.Quill.import("ui/icons");
@@ -59,6 +60,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       formData.append("file", file);
 
       try {
+        toast.loading('上傳中...', { id: 'image-upload' });
+
         const response = await authFetch("/api/records/upload", {
           method: "POST",
           body: formData,
@@ -80,15 +83,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         }
 
         // 插入圖片到編輯器
-        const range = quill.getSelection(true);
-        const imageUrl = uploadedFile.url.startsWith("http")
-          ? uploadedFile.url
-          : `http://localhost:8000${uploadedFile.url}`;
+        const range = quill.getSelection(true) || { index: quill.getLength() - 1, length: 0 };
+        const imageUrl = getFullFileUrl(uploadedFile.url);
+
         quill.insertEmbed(range.index, "image", imageUrl);
         quill.setSelection(range.index + 1, 0);
+
+        toast.success('圖片上傳成功', { id: 'image-upload' });
       } catch (error: any) {
         console.error(error);
-        toast.error(error.message);
+        toast.error(error.message, { id: 'image-upload' });
       }
     };
   }, [authFetch, onFileUpload]);
@@ -109,6 +113,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         formData.append("file", file);
 
         try {
+          toast.loading(`上傳 ${file.name}...`, { id: `file-upload-${file.name}` });
+
           const response = await authFetch("/api/records/upload", {
             method: "POST",
             body: formData,
@@ -128,9 +134,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               is_selected_for_ai: false,
             });
           }
+
+          toast.success(`${file.name} 上傳成功`, { id: `file-upload-${file.name}` });
         } catch (error: any) {
           console.error(error);
-          toast.error(error.message);
+          toast.error(error.message, { id: `file-upload-${file.name}` });
         }
       }
     };
@@ -138,20 +146,38 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   // 偵測編輯器內圖片被刪除（透過退格鍵或其他方式）
   useEffect(() => {
+    console.log('[RichTextEditor] Setting up text-change listener');
     const quill = quillRef.current?.getEditor();
-    if (!quill || !authFetch || !onFileRemove) return;
+    if (!quill || !authFetch || !onFileRemove) {
+      console.log('[RichTextEditor] Skip setup - missing:', {
+        quill: !!quill,
+        authFetch: !!authFetch,
+        onFileRemove: !!onFileRemove
+      });
+      return;
+    }
 
     let isProcessing = false;
 
     const handleTextChange = (delta: any, oldContents: any, source: string) => {
+      console.log('[RichTextEditor] text-change event:', { source, isProcessing });
+
       // 只處理用戶操作，忽略 API 或程式碼觸發的變更
       if (source !== "user") return;
       if (isProcessing) return;
 
+      // ⚠️ 關鍵：用 oldContents 來重建之前的 HTML，而不是依賴 ref
+      // 因為 ref 可能已經被其他 useEffect 更新了
+      const tempDiv = document.createElement('div');
+      const tempQuill = new (quill.constructor as any)(tempDiv);
+      tempQuill.setContents(oldContents);
+      const previousContent = tempDiv.querySelector('.ql-editor')?.innerHTML || previousContentRef.current;
+
+      console.log('[RichTextEditor] Previous content from oldContents:', previousContent);
+
       // 使用 setTimeout 確保 DOM 已更新
       setTimeout(() => {
         const currentContent = quill.root.innerHTML;
-        const previousContent = previousContentRef.current;
 
         // 提取當前內容中的所有圖片 URL
         const currentImages = new Set<string>();
@@ -168,6 +194,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           previousImages.add(match[1]);
         }
 
+        console.log('[RichTextEditor] Image count:', {
+          current: currentImages.size,
+          previous: previousImages.size,
+          currentUrls: Array.from(currentImages),
+          previousUrls: Array.from(previousImages)
+        });
+
         // 只有在圖片數量減少時才檢查刪除（拖移不會改變數量）
         if (currentImages.size < previousImages.size) {
           isProcessing = true;
@@ -182,6 +215,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 fileUrl = url.pathname;
               }
 
+              console.log('[RichTextEditor] 偵測到圖片被刪除，呼叫 onFileRemove:', fileUrl);
               // 通知父元件並刪除檔案
               onFileRemove(fileUrl);
             }
@@ -197,13 +231,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
 
     quill.on("text-change", handleTextChange);
+    console.log('[RichTextEditor] text-change listener added');
 
     return () => {
+      console.log('[RichTextEditor] Removing text-change listener');
       quill.off("text-change", handleTextChange);
     };
   }, [authFetch, onFileRemove]);
 
-  // 同步 value 變化到 previousContentRef
+  // 當 value 從外部改變時同步 previousContentRef
   useEffect(() => {
     previousContentRef.current = value;
   }, [value]);
@@ -250,10 +286,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }
 
             // 插入圖片到編輯器
-            const range = quill.getSelection(true);
-            const imageUrl = uploadedFile.url.startsWith("http")
-              ? uploadedFile.url
-              : `http://localhost:8000${uploadedFile.url}`;
+            const range = quill.getSelection(true) || { index: quill.getLength() - 1, length: 0 };
+            const imageUrl = getFullFileUrl(uploadedFile.url);
             quill.insertEmbed(range.index, "image", imageUrl);
             quill.setSelection(range.index + 1, 0);
           } catch (error: any) {

@@ -11,7 +11,7 @@ import DailyReportTab from "./components/DailyReportTab";
 // import ComprehensiveEditTab from './components/ComprehensiveEditTab';
 import EmployeeListTab from "./components/EmployeeListTab";
 import EmployeeDetailTab from "./components/EmployeeDetailTab";
-import { useAuth } from "./contexts/AuthContext";
+import { useAuth } from "./hooks/useAuth";
 import { Toaster } from "react-hot-toast";
 
 interface WritingStatus {

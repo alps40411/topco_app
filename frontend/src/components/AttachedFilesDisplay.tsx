@@ -2,44 +2,13 @@
 
 import React from "react";
 import { FileText, Download, BrainCircuit } from "lucide-react";
-// 確保您 App.tsx 中定義的類型名稱是 FileForUpload 或與之相符
 import type { FileForUpload } from "../App";
+import { getFullFileUrl } from "../utils/urlUtils";
 
 interface AttachedFilesDisplayProps {
   // 保持 props 名稱與 DataInputTab.tsx 中傳遞的一致
   files?: FileForUpload[];
 }
-
-// 從您舊版程式碼中保留這個重要的輔助函式，確保下載連結在任何環境下都有效
-const getFullUrl = (url: string) => {
-  if (!url) {
-    console.error("❌ AttachedFilesDisplay - 空的URL");
-    return "";
-  }
-
-  // 如果 URL 已經是完整的，直接返回
-  if (url.startsWith("http")) {
-    return url;
-  }
-
-  // 檢查是否為開發環境
-  const isDevelopment =
-    window.location.port === "5173" ||
-    window.location.port === "5174" ||
-    window.location.port === "3000" ||
-    window.location.hostname === "localhost";
-
-  // 在開發環境下，手動加上後端 URL；在生產環境下，假定路徑是相對的
-  const backendUrl = isDevelopment
-    ? `http://${window.location.hostname}:8000`
-    : "";
-
-  const fullUrl = url.startsWith("/")
-    ? `${backendUrl}${url}`
-    : `${backendUrl}/${url}`;
-
-  return fullUrl;
-};
 
 const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
   files,
@@ -90,7 +59,7 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
                 />
               )}
               <a
-                href={getFullUrl(file.url)}
+                href={getFullFileUrl(file.url)}
                 download={file.name} // 使用 download 屬性來觸發下載
                 className="inline-flex items-center p-1 text-gray-500 hover:text-blue-600"
                 title={`下載 ${file.name}`}

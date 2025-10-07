@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronDown } from "lucide-react";
-import { useWorkData } from "../contexts/WorkDataContext";
+import { useWorkData } from "../hooks/useWorkData";
 import InlineMultiSelect from "./InlineMultiSelect";
 
 interface CascadingWorkSelectorProps {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, UserCheck, User } from "lucide-react";
 import type { DailyReport, EmployeeInList } from "../App";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
 import SupervisorDateBar from "./SupervisorDateBar";
 import { toast } from "react-hot-toast";

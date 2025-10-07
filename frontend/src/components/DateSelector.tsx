@@ -2,19 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-
-interface DateOption {
-  value: string;
-  display: string;
-  date: string;
-  is_weekday: boolean;
-  is_today: boolean;
-  is_default: boolean;
-  can_write: boolean;
-  status: string;
-}
+import {
+  getDateCache,
+  setDateCache,
+  CACHE_DURATION,
+} from "../utils/dateCache";
+import type { DateOption } from "../utils/dateCache";
 
 interface DateSelectorProps {
   selectedDate: string;
@@ -24,21 +19,6 @@ interface DateSelectorProps {
   onRefreshRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   showOnlyWritableDates?: boolean; // 是否只顯示可填寫的日期
 }
-
-// 全局緩存日期數據
-let globalDateCache: {
-  data: DateOption[];
-  currentReportDate: string;
-  timestamp: number;
-  isLoading?: boolean;
-} | null = null;
-
-const CACHE_DURATION = 5 * 60 * 1000; // 5分鐘緩存
-
-// Export 清除快取函數，供登入頁面使用
-export const clearDateCache = () => {
-  globalDateCache = null;
-};
 
 const DateSelector: React.FC<DateSelectorProps> = ({
   selectedDate,
@@ -59,31 +39,34 @@ const DateSelector: React.FC<DateSelectorProps> = ({
 
       // 檢查緩存是否有效（除非強制刷新）
       const now = Date.now();
+      const cachedData = getDateCache();
+
       if (
         !forceRefresh &&
-        globalDateCache &&
-        now - globalDateCache.timestamp < CACHE_DURATION
+        cachedData &&
+        now - cachedData.timestamp < CACHE_DURATION
       ) {
-        setAvailableDates(globalDateCache.data);
-        setCurrentReportDate(globalDateCache.currentReportDate);
+        setAvailableDates(cachedData.data);
+        setCurrentReportDate(cachedData.currentReportDate);
 
         // 如果沒有選擇日期，使用預設日期（後端已設定為最新的可填寫日期）
-        if (!selectedDate && globalDateCache.currentReportDate) {
-          onDateChange(globalDateCache.currentReportDate);
+        if (!selectedDate && cachedData.currentReportDate) {
+          onDateChange(cachedData.currentReportDate);
         }
         setIsLoading(false);
         return;
       }
 
       // 防止多個實例同時發起請求 - 檢查是否已有請求正在進行
-      if (!forceRefresh && globalDateCache?.isLoading) {
+      if (!forceRefresh && cachedData?.isLoading) {
         // 等待一小段時間後重新檢查快取
         setTimeout(() => {
-          if (globalDateCache && !globalDateCache.isLoading) {
-            setAvailableDates(globalDateCache.data);
-            setCurrentReportDate(globalDateCache.currentReportDate);
-            if (!selectedDate && globalDateCache.currentReportDate) {
-              onDateChange(globalDateCache.currentReportDate);
+          const recheckCache = getDateCache();
+          if (recheckCache && !recheckCache.isLoading) {
+            setAvailableDates(recheckCache.data);
+            setCurrentReportDate(recheckCache.currentReportDate);
+            if (!selectedDate && recheckCache.currentReportDate) {
+              onDateChange(recheckCache.currentReportDate);
             }
             setIsLoading(false);
           }
@@ -95,10 +78,10 @@ const DateSelector: React.FC<DateSelectorProps> = ({
         setIsLoading(true);
 
         // 標記正在載入，防止其他實例重複請求
-        if (globalDateCache) {
-          globalDateCache.isLoading = true;
+        if (cachedData) {
+          setDateCache({ ...cachedData, isLoading: true });
         } else {
-          globalDateCache = { isLoading: true } as any;
+          setDateCache({ isLoading: true } as any);
         }
 
         const response = await authFetch("/api/legacy/daily-date-range");
@@ -109,12 +92,12 @@ const DateSelector: React.FC<DateSelectorProps> = ({
           const currentDate = data.current_report_date || "";
 
           // 更新全局緩存
-          globalDateCache = {
+          setDateCache({
             data: dateData,
             currentReportDate: currentDate,
             timestamp: now,
             isLoading: false,
-          };
+          });
 
           setAvailableDates(dateData);
           setCurrentReportDate(currentDate);
@@ -131,8 +114,9 @@ const DateSelector: React.FC<DateSelectorProps> = ({
         toast.error("載入日期選項失敗");
 
         // 清除載入狀態
-        if (globalDateCache) {
-          globalDateCache.isLoading = false;
+        const currentCache = getDateCache();
+        if (currentCache) {
+          setDateCache({ ...currentCache, isLoading: false });
         }
 
         // 失敗時使用當前日期作為備選

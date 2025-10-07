@@ -19,11 +19,12 @@ import type {
   WorkRecordCreate,
 } from "../App";
 import { getProjectColors, blueButtonStyle } from "../utils/colorUtils";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import AttachedFilesManager from "./AttachedFilesManager";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
+import { getFullFileUrl } from "../utils/urlUtils";
 import ServiceSelector from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
@@ -581,9 +582,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           const content = prev || "";
           const possibleUrls = [
             fileUrl,
-            fileUrl.startsWith("/")
-              ? `http://localhost:8000${fileUrl}`
-              : fileUrl,
+            getFullFileUrl(fileUrl),
             fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
           ];
 
@@ -693,9 +692,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           const content = prev.content || "";
           const possibleUrls = [
             fileUrl,
-            fileUrl.startsWith("/")
-              ? `http://localhost:8000${fileUrl}`
-              : fileUrl,
+            getFullFileUrl(fileUrl),
             fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
           ];
 

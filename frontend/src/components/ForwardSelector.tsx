@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Forward } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 
 // 原有的職稱轉寄資料結構

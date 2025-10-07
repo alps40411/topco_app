@@ -1,11 +1,11 @@
 // frontend/src/components/LoginPage.tsx
 
 import React, { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import { buildApiUrl } from "../config/api";
-import { clearDateCache } from "./DateSelector";
+import { clearDateCache } from "../utils/dateCache";
 
 const LoginPage: React.FC = () => {
   const [empno, setEmpno] = useState("");

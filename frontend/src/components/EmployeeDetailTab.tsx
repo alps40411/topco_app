@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, Star } from "lucide-react";
 import type { DailyReport } from "../App";
 import { getProjectColors } from "../utils/colorUtils";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ChatInterface from "./ChatInterface";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
