@@ -329,14 +329,15 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
   const handleRemoveFile = useCallback(
     async (urlOrPath: string) => {
       try {
+        let fullUrl: string;
         let relativePath: string;
 
-        // 判斷傳入的是完整URL還是相對路徑
         if (urlOrPath.startsWith("http")) {
-          const url = new URL(urlOrPath);
-          relativePath = url.pathname; // 得到 /upimages/image.png
+          fullUrl = urlOrPath;
+          relativePath = new URL(urlOrPath).pathname;
         } else {
-          relativePath = urlOrPath; // 已經是 /upimages/image.png
+          relativePath = urlOrPath;
+          fullUrl = getFullFileUrl(urlOrPath);
         }
 
         const filename = relativePath.split("/").pop();
@@ -360,7 +361,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         setCurrentRecord((prev) => ({
           ...prev,
           content: (prev.content || "").replace(
-            new RegExp(`<img[^>]*src="${urlOrPath}"[^>]*>`, "g"),
+            new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
             ""
           ),
         }));
@@ -603,4 +604,3 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
   );
 };
 export default DataInputTab;
-("");

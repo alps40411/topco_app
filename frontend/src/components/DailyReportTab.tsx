@@ -552,21 +552,23 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   };
 
   const handleRemoveEditFile = useCallback(
-    async (imageUrl: string) => {
+    async (urlOrPath: string) => {
       try {
+        let fullUrl: string;
         let relativePath: string;
 
-        if (imageUrl.startsWith("http")) {
-          const url = new URL(imageUrl);
-          relativePath = url.pathname;
+        if (urlOrPath.startsWith("http")) {
+          fullUrl = urlOrPath;
+          relativePath = new URL(urlOrPath).pathname;
         } else {
-          relativePath = imageUrl;
+          relativePath = urlOrPath;
+          fullUrl = getFullFileUrl(urlOrPath);
         }
 
         const filename = relativePath.split("/").pop();
 
         if (!filename) {
-          throw new Error("無法從 URL 中解析檔案名稱");
+          throw new Error("無法從路徑中解析檔案名稱");
         }
 
         await authFetch(`/api/records/delete/${filename}`, {
@@ -579,7 +581,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
         setEditContent((prev) =>
           (prev || "").replace(
-            new RegExp(`<img[^>]*src="${imageUrl}"[^>]*>`, "g"),
+            new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
             ""
           )
         );
@@ -642,21 +644,23 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   };
 
   const handleRemoveNewRecordFile = useCallback(
-    async (imageUrl: string) => {
+    async (urlOrPath: string) => {
       try {
+        let fullUrl: string;
         let relativePath: string;
 
-        if (imageUrl.startsWith("http")) {
-          const url = new URL(imageUrl);
-          relativePath = url.pathname;
+        if (urlOrPath.startsWith("http")) {
+          fullUrl = urlOrPath;
+          relativePath = new URL(urlOrPath).pathname;
         } else {
-          relativePath = imageUrl;
+          relativePath = urlOrPath;
+          fullUrl = getFullFileUrl(urlOrPath);
         }
 
         const filename = relativePath.split("/").pop();
 
         if (!filename) {
-          throw new Error("無法從 URL 中解析檔案名稱");
+          throw new Error("無法從路徑中解析檔案名稱");
         }
 
         await authFetch(`/api/records/delete/${filename}`, {
@@ -671,7 +675,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         setNewRecord((prev) => ({
           ...prev,
           content: (prev.content || "").replace(
-            new RegExp(`<img[^>]*src="${imageUrl}"[^>]*>`, "g"),
+            new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
             ""
           ),
         }));
