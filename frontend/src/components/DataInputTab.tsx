@@ -302,7 +302,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
   // 處理來自 RichTextEditor 的檔案上傳回調
   const handleEditorFileUpload = useCallback((file: FileForUpload) => {
     const t0 = performance.now();
-    console.log('[DataInputTab] handleEditorFileUpload 被呼叫:', file);
+    console.log("[DataInputTab] handleEditorFileUpload 被呼叫:", file);
 
     setCurrentRecord((prev) => ({
       ...prev,
@@ -310,7 +310,11 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     }));
 
     const t1 = performance.now();
-    console.log(`[DataInputTab] handleEditorFileUpload 執行時間: ${(t1 - t0).toFixed(2)}ms`);
+    console.log(
+      `[DataInputTab] handleEditorFileUpload 執行時間: ${(t1 - t0).toFixed(
+        2
+      )}ms`
+    );
   }, []);
 
   const handleAiSelectionChange = (fileUrl: string, isSelected: boolean) => {
@@ -322,109 +326,47 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     }));
   };
 
-  // 統一的檔案刪除處理函式（處理所有刪除操作）
   const handleRemoveFile = useCallback(
-    async (fileUrl: string) => {
+    async (urlOrPath: string) => {
       try {
-        // 從 URL 提取檔案名稱
-        // fileUrl 格式: /uploads/filename.jpg 或 http://localhost:8000/uploads/filename.jpg
-        let filename = fileUrl;
-        if (fileUrl.startsWith("http")) {
-          const url = new URL(fileUrl);
-          filename = url.pathname;
-        }
-        // 移除 /uploads/ 前綴
-        filename = filename.replace("/uploads/", "");
+        let relativePath: string;
 
-        // 解碼文件名（如果已經編碼），然後再編碼一次以確保正確傳遞
-        // 避免雙重編碼問題
-        try {
-          filename = decodeURIComponent(filename);
-        } catch (e) {
-          // 如果解碼失敗，說明可能未編碼，直接使用原始文件名
+        // 判斷傳入的是完整URL還是相對路徑
+        if (urlOrPath.startsWith("http")) {
+          const url = new URL(urlOrPath);
+          relativePath = url.pathname; // 得到 /upimages/image.png
+        } else {
+          relativePath = urlOrPath; // 已經是 /upimages/image.png
         }
 
-        // 1. 從後端伺服器刪除實體檔案
-        const response = await authFetch(
-          `/api/records/delete/${encodeURIComponent(filename)}`,
-          {
-            method: "DELETE",
-          }
-        );
+        const filename = relativePath.split("/").pop();
 
-        if (!response.ok) {
-          console.warn("Failed to delete file from server:", fileUrl);
-          // 即使伺服器刪除失敗，仍繼續刪除前端狀態
+        if (!filename) {
+          throw new Error("無法從路徑中解析檔案名稱");
         }
 
-        // 2. 從狀態中移除檔案
-        // 需要正規化 URL 進行比對（因為可能是相對路徑或完整 URL）
-        const normalizeUrl = (url: string) => {
-          let normalized = url;
-          if (url.startsWith("http")) {
-            try {
-              normalized = new URL(url).pathname;
-            } catch (e) {
-              // 保持原樣
-            }
-          }
-          // 解碼 URL 以便比對
-          try {
-            normalized = decodeURIComponent(normalized);
-          } catch (e) {
-            // 保持原樣
-          }
-          return normalized;
-        };
+        // 1. 呼叫後端 API 刪除實體檔案
+        await authFetch(`/api/records/delete/${filename}`, {
+          method: "DELETE",
+        });
 
-        const normalizedFileUrl = normalizeUrl(fileUrl);
-        console.log('[DataInputTab] Removing file:', normalizedFileUrl);
-
+        // 2. 從 currentRecord 的 files 列表中移除該檔案
         setCurrentRecord((prev) => ({
           ...prev,
-          files: (prev.files || []).filter((file) => {
-            const normalizedExistingUrl = normalizeUrl(file.url);
-            const shouldKeep = normalizedExistingUrl !== normalizedFileUrl;
-            console.log('[DataInputTab] Comparing:', {
-              existing: normalizedExistingUrl,
-              toRemove: normalizedFileUrl,
-              shouldKeep
-            });
-            return shouldKeep;
-          }),
+          files: (prev.files || []).filter((file) => file.url !== relativePath),
         }));
 
-        // 3. 從富文本編輯器內容中移除對應的圖片標籤
-        setCurrentRecord((prev) => {
-          const content = prev.content || "";
-          // 構建可能的圖片 URL 格式
-          const possibleUrls = [
-            fileUrl,
-            getFullFileUrl(fileUrl),
-            fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
-          ];
-
-          let updatedContent = content;
-          // 移除所有可能格式的圖片標籤
-          possibleUrls.forEach((url) => {
-            const imgRegex = new RegExp(
-              `<img[^>]*src="${url.replace(
-                /[.*+?^${}()|[\]\\]/g,
-                "\\$&"
-              )}"[^>]*>`,
-              "g"
-            );
-            updatedContent = updatedContent.replace(imgRegex, "");
-          });
-
-          return {
-            ...prev,
-            content: updatedContent,
-          };
-        });
+        // 3. 從 RichTextEditor 的內容中移除圖片
+        setCurrentRecord((prev) => ({
+          ...prev,
+          content: (prev.content || "").replace(
+            new RegExp(`<img[^>]*src="${urlOrPath}"[^>]*>`, "g"),
+            ""
+          ),
+        }));
       } catch (error) {
-        console.error("Error removing file:", error);
-        toast.error("檔案刪除失敗");
+        console.error("刪除檔案時發生錯誤:", error);
+        toast.error("刪除檔案失敗");
       }
     },
     [authFetch]
@@ -661,3 +603,4 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
   );
 };
 export default DataInputTab;
+("");

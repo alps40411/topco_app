@@ -255,18 +255,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           for (const imageUrl of previousImages) {
             if (!currentImages.has(imageUrl)) {
               // 圖片從編輯器中被移除了
-              // 從完整 URL 中提取相對路徑
-              let fileUrl = imageUrl;
-              if (imageUrl.startsWith("http")) {
-                try {
-                  const url = new URL(imageUrl);
-                  fileUrl = url.pathname;
-                } catch (e) {
-                  console.error('Invalid image URL:', imageUrl);
-                }
-              }
-              // 通知父元件並刪除檔案
-              onFileRemove(fileUrl);
+              // 直接將從 <img> 標籤 src 中獲取的完整 URL 傳遞給父元件
+              onFileRemove(imageUrl);
             }
           }
         }

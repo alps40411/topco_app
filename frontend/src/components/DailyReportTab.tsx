@@ -550,97 +550,41 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       )
     );
   };
-  // 統一的編輯區檔案刪除處理函式
+
   const handleRemoveEditFile = useCallback(
-    async (fileUrl: string) => {
+    async (imageUrl: string) => {
       try {
-        // 從 URL 提取檔案名稱
-        let filename = fileUrl;
-        if (fileUrl.startsWith("http")) {
-          const url = new URL(fileUrl);
-          filename = url.pathname;
-        }
-        filename = filename.replace("/uploads/", "");
+        let relativePath: string;
 
-        // 解碼文件名（如果已經編碼），然後再編碼一次以確保正確傳遞
-        // 避免雙重編碼問題
-        try {
-          filename = decodeURIComponent(filename);
-        } catch (e) {
-          // 如果解碼失敗，說明可能未編碼，直接使用原始文件名
+        if (imageUrl.startsWith("http")) {
+          const url = new URL(imageUrl);
+          relativePath = url.pathname;
+        } else {
+          relativePath = imageUrl;
         }
 
-        // 1. 從後端伺服器刪除實體檔案
-        const response = await authFetch(
-          `/api/records/delete/${encodeURIComponent(filename)}`,
-          {
-            method: "DELETE",
-          }
+        const filename = relativePath.split("/").pop();
+
+        if (!filename) {
+          throw new Error("無法從 URL 中解析檔案名稱");
+        }
+
+        await authFetch(`/api/records/delete/${filename}`, {
+          method: "DELETE",
+        });
+
+        setEditFiles((prev) =>
+          prev.filter((file) => file.url !== relativePath)
         );
 
-        if (!response.ok) {
-          console.warn("Failed to delete file from server:", fileUrl);
-        }
-
-        // 2. 從狀態中移除檔案
-        // 需要正規化 URL 進行比對（因為可能是相對路徑或完整 URL）
-        const normalizeUrl = (url: string) => {
-          let normalized = url;
-          if (url.startsWith("http")) {
-            try {
-              normalized = new URL(url).pathname;
-            } catch (e) {
-              // 保持原樣
-            }
-          }
-          // 解碼 URL 以便比對
-          try {
-            normalized = decodeURIComponent(normalized);
-          } catch (e) {
-            // 保持原樣
-          }
-          return normalized;
-        };
-
-        const normalizedFileUrl = normalizeUrl(fileUrl);
-        console.log('[DailyReportTab] Removing edit file:', normalizedFileUrl);
-
-        setEditFiles((prev) => prev.filter((file) => {
-          const normalizedExistingUrl = normalizeUrl(file.url);
-          const shouldKeep = normalizedExistingUrl !== normalizedFileUrl;
-          console.log('[DailyReportTab] Comparing:', {
-            existing: normalizedExistingUrl,
-            toRemove: normalizedFileUrl,
-            shouldKeep
-          });
-          return shouldKeep;
-        }));
-
-        // 3. 從富文本編輯器內容中移除對應的圖片標籤
-        setEditContent((prev) => {
-          const content = prev || "";
-          const possibleUrls = [
-            fileUrl,
-            getFullFileUrl(fileUrl),
-            fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
-          ];
-
-          let updatedContent = content;
-          possibleUrls.forEach((url) => {
-            const imgRegex = new RegExp(
-              `<img[^>]*src="${url.replace(
-                /[.*+?^${}()|[\]\\]/g,
-                "\\$&"
-              )}"[^>]*>`,
-              "g"
-            );
-            updatedContent = updatedContent.replace(imgRegex, "");
-          });
-
-          return updatedContent;
-        });
+        setEditContent((prev) =>
+          (prev || "").replace(
+            new RegExp(`<img[^>]*src="${imageUrl}"[^>]*>`, "g"),
+            ""
+          )
+        );
       } catch (error) {
-        console.error("Error removing edit file:", error);
+        console.error("刪除編輯檔案時發生錯誤:", error);
         toast.error("檔案刪除失敗");
       }
     },
@@ -696,103 +640,43 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       ),
     }));
   };
-  // 統一的新增記錄檔案刪除處理函式
+
   const handleRemoveNewRecordFile = useCallback(
-    async (fileUrl: string) => {
+    async (imageUrl: string) => {
       try {
-        // 從 URL 提取檔案名稱
-        let filename = fileUrl;
-        if (fileUrl.startsWith("http")) {
-          const url = new URL(fileUrl);
-          filename = url.pathname;
-        }
-        filename = filename.replace("/uploads/", "");
+        let relativePath: string;
 
-        // 解碼文件名（如果已經編碼），然後再編碼一次以確保正確傳遞
-        // 避免雙重編碼問題
-        try {
-          filename = decodeURIComponent(filename);
-        } catch (e) {
-          // 如果解碼失敗，說明可能未編碼，直接使用原始文件名
+        if (imageUrl.startsWith("http")) {
+          const url = new URL(imageUrl);
+          relativePath = url.pathname;
+        } else {
+          relativePath = imageUrl;
         }
 
-        // 1. 從後端伺服器刪除實體檔案
-        const response = await authFetch(
-          `/api/records/delete/${encodeURIComponent(filename)}`,
-          {
-            method: "DELETE",
-          }
-        );
+        const filename = relativePath.split("/").pop();
 
-        if (!response.ok) {
-          console.warn("Failed to delete file from server:", fileUrl);
+        if (!filename) {
+          throw new Error("無法從 URL 中解析檔案名稱");
         }
 
-        // 2. 從狀態中移除檔案
-        // 需要正規化 URL 進行比對（因為可能是相對路徑或完整 URL）
-        const normalizeUrl = (url: string) => {
-          let normalized = url;
-          if (url.startsWith("http")) {
-            try {
-              normalized = new URL(url).pathname;
-            } catch (e) {
-              // 保持原樣
-            }
-          }
-          // 解碼 URL 以便比對
-          try {
-            normalized = decodeURIComponent(normalized);
-          } catch (e) {
-            // 保持原樣
-          }
-          return normalized;
-        };
-
-        const normalizedFileUrl = normalizeUrl(fileUrl);
-        console.log('[DailyReportTab] Removing new record file:', normalizedFileUrl);
+        await authFetch(`/api/records/delete/${filename}`, {
+          method: "DELETE",
+        });
 
         setNewRecord((prev) => ({
           ...prev,
-          files: (prev.files || []).filter((file) => {
-            const normalizedExistingUrl = normalizeUrl(file.url);
-            const shouldKeep = normalizedExistingUrl !== normalizedFileUrl;
-            console.log('[DailyReportTab] Comparing:', {
-              existing: normalizedExistingUrl,
-              toRemove: normalizedFileUrl,
-              shouldKeep
-            });
-            return shouldKeep;
-          }),
+          files: (prev.files || []).filter((file) => file.url !== relativePath),
         }));
 
-        // 3. 從富文本編輯器內容中移除對應的圖片標籤
-        setNewRecord((prev) => {
-          const content = prev.content || "";
-          const possibleUrls = [
-            fileUrl,
-            getFullFileUrl(fileUrl),
-            fileUrl.startsWith("http") ? new URL(fileUrl).pathname : fileUrl,
-          ];
-
-          let updatedContent = content;
-          possibleUrls.forEach((url) => {
-            const imgRegex = new RegExp(
-              `<img[^>]*src="${url.replace(
-                /[.*+?^${}()|[\]\\]/g,
-                "\\$&"
-              )}"[^>]*>`,
-              "g"
-            );
-            updatedContent = updatedContent.replace(imgRegex, "");
-          });
-
-          return {
-            ...prev,
-            content: updatedContent,
-          };
-        });
+        setNewRecord((prev) => ({
+          ...prev,
+          content: (prev.content || "").replace(
+            new RegExp(`<img[^>]*src="${imageUrl}"[^>]*>`, "g"),
+            ""
+          ),
+        }));
       } catch (error) {
-        console.error("Error removing new record file:", error);
+        console.error("刪除新記錄檔案時發生錯誤:", error);
         toast.error("檔案刪除失敗");
       }
     },
@@ -1032,7 +916,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
     // 將純文字的換行符轉換為 HTML 的 <br> 標籤
     // 保持原始的換行格式（單換行和雙換行都保留）
-    const htmlContent = aiContent.replace(/\n/g, '<br>');
+    const htmlContent = aiContent.replace(/\n/g, "<br>");
 
     // 如果沒有圖片，直接套用轉換後的 AI 建議
     if (images.length === 0) {
@@ -1043,7 +927,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     }
 
     // 將圖片包裹在段落標籤中，保持編輯器格式一致性
-    const imageBlocks = images.map(img => `<p>${img}</p>`).join('');
+    const imageBlocks = images.map((img) => `<p>${img}</p>`).join("");
 
     // 組合新內容：AI 建議文字 + 保留的圖片
     const newContent = `${htmlContent}${imageBlocks}`;
@@ -1431,6 +1315,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   serviceTargets={serviceTargets}
                   required={false}
                 />
+                <ExecutionTimeSelector
+                  totalMinutes={newRecord.execution_time_minutes || 0}
+                  onChange={(minutes) =>
+                    setNewRecord((prev) => ({
+                      ...prev,
+                      execution_time_minutes: minutes,
+                    }))
+                  }
+                  required
+                />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     內容
@@ -1446,17 +1340,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                     placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
                   />
                 </div>
-
-                <ExecutionTimeSelector
-                  totalMinutes={newRecord.execution_time_minutes || 0}
-                  onChange={(minutes) =>
-                    setNewRecord((prev) => ({
-                      ...prev,
-                      execution_time_minutes: minutes,
-                    }))
-                  }
-                  required
-                />
 
                 <AttachedFilesManager
                   files={newRecord.files || []}
