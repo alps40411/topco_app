@@ -301,10 +301,16 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
 
   // 處理來自 RichTextEditor 的檔案上傳回調
   const handleEditorFileUpload = useCallback((file: FileForUpload) => {
+    const t0 = performance.now();
+    console.log('[DataInputTab] handleEditorFileUpload 被呼叫:', file);
+
     setCurrentRecord((prev) => ({
       ...prev,
       files: [...(prev.files || []), file],
     }));
+
+    const t1 = performance.now();
+    console.log(`[DataInputTab] handleEditorFileUpload 執行時間: ${(t1 - t0).toFixed(2)}ms`);
   }, []);
 
   const handleAiSelectionChange = (fileUrl: string, isSelected: boolean) => {
