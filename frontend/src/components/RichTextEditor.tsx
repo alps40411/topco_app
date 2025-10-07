@@ -41,6 +41,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const quillRef = useRef<ReactQuill>(null);
   const { authFetch } = useAuth();
   const previousContentRef = useRef<string>(value);
+  const isUploadingRef = useRef<boolean>(false);
 
   // 處理圖片上傳並插入編輯器
   const handleImageUpload = useCallback(() => {
@@ -49,78 +50,32 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     input.setAttribute("accept", "image/*");
     input.click();
 
-    input.onchange = async () => {
+    input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
 
       const quill = quillRef.current?.getEditor();
       if (!quill || !authFetch) return;
 
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        toast.loading('上傳中...', { id: 'image-upload' });
-
-        const response = await authFetch("/api/records/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) throw new Error(`圖片 ${file.name} 上傳失敗`);
-
-        const uploadedFile = await response.json();
-
-        // 回調通知父元件
-        if (onFileUpload) {
-          onFileUpload({
-            name: uploadedFile.name,
-            type: uploadedFile.type,
-            size: uploadedFile.size,
-            url: uploadedFile.url,
-            is_selected_for_ai: false,
-          });
-        }
-
-        // 插入圖片到編輯器
-        const range = quill.getSelection(true) || { index: quill.getLength() - 1, length: 0 };
-        const imageUrl = getFullFileUrl(uploadedFile.url);
-
-        quill.insertEmbed(range.index, "image", imageUrl);
-        quill.setSelection(range.index + 1, 0);
-
-        toast.success('圖片上傳成功', { id: 'image-upload' });
-      } catch (error: any) {
-        console.error(error);
-        toast.error(error.message, { id: 'image-upload' });
-      }
-    };
-  }, [authFetch, onFileUpload]);
-
-  // 處理一般檔案上傳（不插入編輯器）
-  const handlePaperclipUpload = useCallback(() => {
-    const input = document.createElement("input");
-    input.setAttribute("type", "file");
-    input.setAttribute("multiple", "true");
-    input.click();
-
-    input.onchange = async () => {
-      const files = input.files;
-      if (!files || files.length === 0 || !authFetch) return;
-
-      for (const file of Array.from(files)) {
+      // 立即返回，不阻塞 UI
+      // 使用 queueMicrotask 將上傳邏輯推遲，比 setTimeout 更快
+      queueMicrotask(async () => {
         const formData = new FormData();
         formData.append("file", file);
 
+        const range = quill.getSelection(true) || { index: quill.getLength() - 1, length: 0 };
+        const placeholderIndex = range.index;
+
         try {
-          toast.loading(`上傳 ${file.name}...`, { id: `file-upload-${file.name}` });
+          isUploadingRef.current = true;
+          toast.loading('上傳中...', { id: 'image-upload' });
 
           const response = await authFetch("/api/records/upload", {
             method: "POST",
             body: formData,
           });
 
-          if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
+          if (!response.ok) throw new Error(`圖片 ${file.name} 上傳失敗`);
 
           const uploadedFile = await response.json();
 
@@ -135,48 +90,115 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             });
           }
 
-          toast.success(`${file.name} 上傳成功`, { id: `file-upload-${file.name}` });
+          // 插入圖片到編輯器
+          const imageUrl = getFullFileUrl(uploadedFile.url);
+          quill.insertEmbed(placeholderIndex, "image", imageUrl);
+          quill.setSelection(placeholderIndex + 1, 0);
+
+          // 更新 previousContentRef
+          setTimeout(() => {
+            previousContentRef.current = quill.root.innerHTML;
+          }, 50);
+
+          toast.success('圖片上傳成功', { id: 'image-upload' });
         } catch (error: any) {
           console.error(error);
-          toast.error(error.message, { id: `file-upload-${file.name}` });
+          toast.error(error.message, { id: 'image-upload' });
+        } finally {
+          setTimeout(() => {
+            isUploadingRef.current = false;
+          }, 100);
         }
-      }
+      });
+    };
+  }, [authFetch, onFileUpload]);
+
+  // 處理一般檔案上傳（不插入編輯器）
+  const handlePaperclipUpload = useCallback(() => {
+    const input = document.createElement("input");
+    input.setAttribute("type", "file");
+    input.setAttribute("multiple", "true");
+    input.click();
+
+    input.onchange = () => {
+      const files = input.files;
+      if (!files || files.length === 0 || !authFetch) return;
+
+      // 立即返回，不阻塞 UI
+      queueMicrotask(async () => {
+        isUploadingRef.current = true;
+        try {
+          for (const file of Array.from(files)) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+              toast.loading(`上傳 ${file.name}...`, { id: `file-upload-${file.name}` });
+
+              const response = await authFetch("/api/records/upload", {
+                method: "POST",
+                body: formData,
+              });
+
+              if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
+
+              const uploadedFile = await response.json();
+
+              // 回調通知父元件
+              if (onFileUpload) {
+                onFileUpload({
+                  name: uploadedFile.name,
+                  type: uploadedFile.type,
+                  size: uploadedFile.size,
+                  url: uploadedFile.url,
+                  is_selected_for_ai: false,
+                });
+              }
+
+              toast.success(`${file.name} 上傳成功`, { id: `file-upload-${file.name}` });
+            } catch (error: any) {
+              console.error(error);
+              toast.error(error.message, { id: `file-upload-${file.name}` });
+            }
+          }
+        } finally {
+          setTimeout(() => {
+            isUploadingRef.current = false;
+          }, 100);
+        }
+      });
     };
   }, [authFetch, onFileUpload]);
 
   // 偵測編輯器內圖片被刪除（透過退格鍵或其他方式）
   useEffect(() => {
-    console.log('[RichTextEditor] Setting up text-change listener');
     const quill = quillRef.current?.getEditor();
-    if (!quill || !authFetch || !onFileRemove) {
-      console.log('[RichTextEditor] Skip setup - missing:', {
-        quill: !!quill,
-        authFetch: !!authFetch,
-        onFileRemove: !!onFileRemove
-      });
+    if (!quill || !onFileRemove) {
       return;
     }
 
-    let isProcessing = false;
+    let deleteCheckTimeout: NodeJS.Timeout | null = null;
 
     const handleTextChange = (delta: any, oldContents: any, source: string) => {
-      console.log('[RichTextEditor] text-change event:', { source, isProcessing });
-
       // 只處理用戶操作，忽略 API 或程式碼觸發的變更
       if (source !== "user") return;
-      if (isProcessing) return;
 
-      // ⚠️ 關鍵：用 oldContents 來重建之前的 HTML，而不是依賴 ref
-      // 因為 ref 可能已經被其他 useEffect 更新了
+      // 如果正在上傳，跳過檢查（避免誤刪）
+      if (isUploadingRef.current) return;
+
+      // 清除之前的延遲檢查
+      if (deleteCheckTimeout) {
+        clearTimeout(deleteCheckTimeout);
+      }
+
+      // 使用 oldContents 重建之前的 HTML
       const tempDiv = document.createElement('div');
       const tempQuill = new (quill.constructor as any)(tempDiv);
       tempQuill.setContents(oldContents);
       const previousContent = tempDiv.querySelector('.ql-editor')?.innerHTML || previousContentRef.current;
 
-      console.log('[RichTextEditor] Previous content from oldContents:', previousContent);
-
-      // 使用 setTimeout 確保 DOM 已更新
-      setTimeout(() => {
+      // 延遲 200ms 檢查，避免誤判移動為刪除
+      deleteCheckTimeout = setTimeout(() => {
         const currentContent = quill.root.innerHTML;
 
         // 提取當前內容中的所有圖片 URL
@@ -194,16 +216,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           previousImages.add(match[1]);
         }
 
-        console.log('[RichTextEditor] Image count:', {
-          current: currentImages.size,
-          previous: previousImages.size,
-          currentUrls: Array.from(currentImages),
-          previousUrls: Array.from(previousImages)
-        });
-
-        // 只有在圖片數量減少時才檢查刪除（拖移不會改變數量）
+        // 只有在圖片數量減少時才檢查刪除（移動不會減少數量）
         if (currentImages.size < previousImages.size) {
-          isProcessing = true;
           // 找出被刪除的圖片
           for (const imageUrl of previousImages) {
             if (!currentImages.has(imageUrl)) {
@@ -211,8 +225,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               // 從完整 URL 中提取相對路徑
               let fileUrl = imageUrl;
               if (imageUrl.startsWith("http")) {
-                const url = new URL(imageUrl);
-                fileUrl = url.pathname;
+                try {
+                  const url = new URL(imageUrl);
+                  fileUrl = url.pathname;
+                } catch (e) {
+                  console.error('Invalid image URL:', imageUrl);
+                }
               }
 
               console.log('[RichTextEditor] 偵測到圖片被刪除，呼叫 onFileRemove:', fileUrl);
@@ -220,24 +238,22 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onFileRemove(fileUrl);
             }
           }
-          setTimeout(() => {
-            isProcessing = false;
-          }, 100);
         }
 
         // 更新 ref
         previousContentRef.current = currentContent;
-      }, 0);
+      }, 200); // 延遲 200ms，讓移動操作有時間完成
     };
 
     quill.on("text-change", handleTextChange);
-    console.log('[RichTextEditor] text-change listener added');
 
     return () => {
-      console.log('[RichTextEditor] Removing text-change listener');
       quill.off("text-change", handleTextChange);
+      if (deleteCheckTimeout) {
+        clearTimeout(deleteCheckTimeout);
+      }
     };
-  }, [authFetch, onFileRemove]);
+  }, [onFileRemove]);
 
   // 當 value 從外部改變時同步 previousContentRef
   useEffect(() => {
@@ -265,6 +281,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           formData.append("file", file);
 
           try {
+            isUploadingRef.current = true;
+            toast.loading('上傳中...', { id: 'paste-upload' });
+
             const response = await authFetch("/api/records/upload", {
               method: "POST",
               body: formData,
@@ -290,9 +309,20 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             const imageUrl = getFullFileUrl(uploadedFile.url);
             quill.insertEmbed(range.index, "image", imageUrl);
             quill.setSelection(range.index + 1, 0);
+
+            // 更新 previousContentRef
+            setTimeout(() => {
+              previousContentRef.current = quill.root.innerHTML;
+            }, 50);
+
+            toast.success('圖片上傳成功', { id: 'paste-upload' });
           } catch (error: any) {
             console.error(error);
-            toast.error(error.message);
+            toast.error(error.message, { id: 'paste-upload' });
+          } finally {
+            setTimeout(() => {
+              isUploadingRef.current = false;
+            }, 100);
           }
 
           break;

@@ -330,6 +330,14 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         // 移除 /uploads/ 前綴
         filename = filename.replace("/uploads/", "");
 
+        // 解碼文件名（如果已經編碼），然後再編碼一次以確保正確傳遞
+        // 避免雙重編碼問題
+        try {
+          filename = decodeURIComponent(filename);
+        } catch (e) {
+          // 如果解碼失敗，說明可能未編碼，直接使用原始文件名
+        }
+
         // 1. 從後端伺服器刪除實體檔案
         const response = await authFetch(
           `/api/records/delete/${encodeURIComponent(filename)}`,
@@ -344,9 +352,40 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         }
 
         // 2. 從狀態中移除檔案
+        // 需要正規化 URL 進行比對（因為可能是相對路徑或完整 URL）
+        const normalizeUrl = (url: string) => {
+          let normalized = url;
+          if (url.startsWith("http")) {
+            try {
+              normalized = new URL(url).pathname;
+            } catch (e) {
+              // 保持原樣
+            }
+          }
+          // 解碼 URL 以便比對
+          try {
+            normalized = decodeURIComponent(normalized);
+          } catch (e) {
+            // 保持原樣
+          }
+          return normalized;
+        };
+
+        const normalizedFileUrl = normalizeUrl(fileUrl);
+        console.log('[DataInputTab] Removing file:', normalizedFileUrl);
+
         setCurrentRecord((prev) => ({
           ...prev,
-          files: (prev.files || []).filter((file) => file.url !== fileUrl),
+          files: (prev.files || []).filter((file) => {
+            const normalizedExistingUrl = normalizeUrl(file.url);
+            const shouldKeep = normalizedExistingUrl !== normalizedFileUrl;
+            console.log('[DataInputTab] Comparing:', {
+              existing: normalizedExistingUrl,
+              toRemove: normalizedFileUrl,
+              shouldKeep
+            });
+            return shouldKeep;
+          }),
         }));
 
         // 3. 從富文本編輯器內容中移除對應的圖片標籤

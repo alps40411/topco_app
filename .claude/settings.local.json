@@ -51,7 +51,10 @@
       "Bash(netstat:*)",
       "Bash(pip uninstall:*)",
       "Bash(npm install:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(cat:*)",
+      "Bash(npm show:*)",
+      "Bash(npm uninstall:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
