@@ -28,6 +28,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true); //  замість isInitialized
+  const [hasSubordinates, setHasSubordinates] = useState(false);
+  const [isCheckingSubordinates, setIsCheckingSubordinates] = useState(true);
 
   // 在應用程式啟動時驗證 token
   useEffect(() => {
