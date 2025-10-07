@@ -25,9 +25,11 @@ export const getFullFileUrl = (url: string): string => {
   // 建立後端 URL
   const protocol = window.location.protocol; // http: 或 https:
   const hostname = window.location.hostname;
-  const backendPort = isDevelopment ? "8000" : "8000"; // 可根據需求調整
 
-  const backendUrl = `${protocol}//${hostname}:${backendPort}`;
+  // 在開發環境中，後端服務在 8000 port；在正式環境中，API 和前端在同一個 domain 下，不需指定 port
+  const backendUrl = isDevelopment
+    ? `${protocol}//${hostname}:8000`
+    : `${protocol}//${hostname}`;
 
   // 處理相對路徑
   const fullUrl = url.startsWith("/")
