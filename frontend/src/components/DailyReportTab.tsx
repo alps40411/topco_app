@@ -63,9 +63,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 }) => {
   const [reports, setReports] = useState<ConsolidatedReport[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(
-    null
-  );
+  // ✅ writingStatus 改用 AuthContext 的全域狀態
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,7 +83,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [editOriginalFiles, setEditOriginalFiles] = useState<FileForUpload[]>([]);
   const [editPendingDeleteFiles, setEditPendingDeleteFiles] = useState<string[]>([]);
   const [editPendingUploadFiles, setEditPendingUploadFiles] = useState<string[]>([]);
-  const { authFetch, user } = useAuth();
+  const { authFetch, user, writingStatus, refreshWritingStatus } = useAuth(); // ✅ 使用全域狀態
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAllAi, setIsGeneratingAllAi] = useState(false);
@@ -182,21 +180,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     }
   };
 
-  const fetchWritingStatus = async (docDate?: string) => {
-    if (!authFetch) return;
-    try {
-      const url = docDate
-        ? `/api/records/writing-status?doc_date=${docDate}`
-        : "/api/records/writing-status";
-      const response = await authFetch(url);
-      if (response.ok) {
-        const status: WritingStatus = await response.json();
-        setWritingStatus(status);
-      }
-    } catch (error) {
-      console.error("無法獲取填寫狀態:", error);
-    }
-  };
+  // ✅ 移除本地的 fetchWritingStatus，改用 AuthContext 的 refreshWritingStatus
 
   const fetchProjects = async () => {
     if (!authFetch) return;
@@ -243,25 +227,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       }
     };
 
-    // 載入 writing status
-    const loadWritingStatus = async () => {
-      try {
-        const url = docDate
-          ? `/api/records/writing-status?doc_date=${docDate}`
-          : "/api/records/writing-status";
-        const response = await authFetch(url);
-        if (response.ok) {
-          const status: WritingStatus = await response.json();
-          setWritingStatus(status);
-        }
-      } catch (error) {
-        console.error("無法獲取填寫狀態:", error);
-      }
-    };
+    // ✅ 載入 writing status 使用全域 refreshWritingStatus
+    if (refreshWritingStatus) {
+      refreshWritingStatus(docDate);
+    }
 
     loadReports();
-    loadWritingStatus();
-  }, [authFetch, selectedDate]); // ✅ 只依賴真正需要的變數
+  }, [authFetch, selectedDate, refreshWritingStatus]); // ✅ 只依賴真正需要的變數
 
   // 處理日期變更
   const handleDateChange = (newDate: string) => {

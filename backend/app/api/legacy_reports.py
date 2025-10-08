@@ -30,101 +30,13 @@ logger = logging.getLogger(__name__)
 _work_data_cache = {}
 _cache_timeout = timedelta(minutes=10)  # 緩存 10 分鐘
 
-@router.get("/reports", response_model=List[Dict[str, Any]])
-async def get_daily_reports(
-    empno: str = Query(..., description="員工編號"),
-    doc_date: str = Query(..., description="日報日期 (YYYYMMDD)"),
-    cocode: Optional[str] = Query(None, description="公司別"),
-    deptno: Optional[str] = Query(None, description="部門代碼"),
-    db: Session = Depends(get_legacy_db)
-):
-    """
-    取得日報列表 BY 工號（主管）
-    
-    - **empno**: 員工編號（主管）
-    - **doc_date**: 日報日期，格式 YYYYMMDD (如: 20241225)
-    - **cocode**: 公司別 (可選)
-    - **deptno**: 部門代碼 (可選)
-    """
-    try:
-        reports = LegacyReportServiceV2.get_daily_reports_by_supervisor(
-            db=db,
-            empno=empno,
-            doc_date=doc_date,
-            cocode=cocode,
-            deptno=deptno
-        )
-        return reports
-    except Exception as e:
-        logger.error(f"Error getting daily reports: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得日報列表失敗: {str(e)}")
+# ✅ REMOVED: /api/legacy/reports - Replaced by /api/supervisor/daily-homepage
 
-@router.get("/reports/{daily_no}/content", response_model=List[Dict[str, Any]])
-async def get_daily_report_content(
-    daily_no: str,
-    db: Session = Depends(get_legacy_db)
-):
-    """
-    取得日報內容詳細
-    
-    - **daily_no**: 日報編號
-    """
-    try:
-        content = LegacyReportServiceV2.get_daily_report_content(
-            db=db,
-            daily_no=daily_no
-        )
-        
-        if not content:
-            raise HTTPException(status_code=404, detail="找不到指定的日報內容")
-        
-        return content
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting daily report content: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得日報內容失敗: {str(e)}")
+# ✅ REMOVED: /api/legacy/reports/{daily_no}/content - Replaced by /api/supervisor/reports/{report_id}
 
-@router.get("/work-plans", response_model=List[Dict[str, Any]])
-async def get_work_plans(
-    empno: str = Query(..., description="員工編號"),
-    db: Session = Depends(get_legacy_db)
-):
-    """
-    取得工作計畫
-    
-    - **empno**: 員工編號
-    """
-    try:
-        plans = LegacyReportServiceV2.get_work_plans(
-            db=db,
-            empno=empno
-        )
-        return plans
-    except Exception as e:
-        logger.error(f"Error getting work plans: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得工作計畫失敗: {str(e)}")
+# ✅ REMOVED: /api/legacy/work-plans - Replaced by /api/legacy/work-data
 
-@router.get("/companies")
-async def get_companies(db: Session = Depends(get_legacy_db)):
-    """取得服務公司列表"""
-    try:
-        from sqlalchemy import text
-        sql = text("SELECT cocode, coabbv FROM jps.dcd001$master WHERE eip_active = 'Y'")
-        result = db.execute(sql)
-        
-        companies = []
-        for row in result.fetchall():
-            companies.append({
-                "id": row[0],  # cocode as id
-                "cocode": row[0],
-                "coabbv": row[1]
-            })
-        
-        return companies
-    except Exception as e:
-        logger.error(f"Error getting companies: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得公司列表失敗: {str(e)}")
+# ✅ REMOVED: /api/legacy/companies - Replaced by /api/legacy/work-data
 
 @router.get("/next-daily-no")
 async def get_next_daily_no(db: Session = Depends(get_legacy_db)):
@@ -143,27 +55,7 @@ async def get_next_daily_no(db: Session = Depends(get_legacy_db)):
 
 
 
-@router.post("/attachments")
-async def save_attachment(
-    attachment_data: AttachmentSaveRequest,
-    db: Session = Depends(get_legacy_db)
-):
-    """保存附件"""
-    try:
-        att_id = LegacyReportServiceV2.save_attachment(
-            db=db,
-            draft_id=attachment_data.draft_id,
-            file_name=attachment_data.file_name,
-            file_path=attachment_data.file_path,
-            file_size=attachment_data.file_size,
-            file_type=attachment_data.file_type,
-            is_selected_for_ai=attachment_data.is_selected_for_ai
-        )
-        
-        return {"att_id": att_id, "message": "附件保存成功"}
-    except Exception as e:
-        logger.error(f"Error saving attachment: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"附件保存失敗: {str(e)}")
+# ✅ REMOVED: /api/legacy/attachments - Replaced by /api/records/upload
 
 # 舊的提交端點已移除，請使用 /upload-daily-report 端點
 
@@ -200,92 +92,12 @@ async def get_api_status():
         }
     }
 
-@router.get("/work-items")
-async def get_work_items(
-    sopno: str = Query(..., description="執行工作編號"),
-    db: Session = Depends(get_legacy_db)
-):
-    """取得工作項目列表 (基於執行工作)"""
-    try:
-        from sqlalchemy import text
-        
-        sql = text("""
-            SELECT seq, name
-            FROM jps.tpm_sop_detail
-            WHERE sopno = :sopno
-            ORDER BY seq
-        """)
-        
-        result = db.execute(sql, {"sopno": sopno})
-        
-        work_items = []
-        for row in result.fetchall():
-            work_items.append({
-                "id": f"{sopno}_{row[0]}",  # sopno_seq
-                "name": row[1] or f"工作項目 {row[0]}",  # name
-                "seq": row[0],
-                "sopno": sopno
-            })
-        
-        return work_items
-    except Exception as e:
-        logger.error(f"Error getting work items: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得工作項目失敗: {str(e)}")
+# ✅ REMOVED: /api/legacy/work-items - Replaced by /api/legacy/work-data
 
-@router.get("/service-companies")
-async def get_service_companies(db: Session = Depends(get_legacy_db)):
-    """取得服務公司列表 (重用現有的公司API)"""
-    return await get_companies(db)
+# ✅ REMOVED: /api/legacy/service-companies - Duplicate of /api/legacy/companies, replaced by /api/legacy/work-data
 
 
-@router.get("/test-tables")
-async def test_tables(db: Session = Depends(get_legacy_db)):
-    """測試資料庫連接並查看可用的表格"""
-    try:
-        from sqlalchemy import text
-        
-        # 查看所有 schema
-        sql = text("""
-            SELECT DISTINCT table_schema
-            FROM information_schema.tables 
-            WHERE table_type = 'BASE TABLE'
-            ORDER BY table_schema
-        """)
-        
-        result = db.execute(sql)
-        
-        schemas = []
-        for row in result.fetchall():
-            schemas.append(row[0])
-        
-        # 查看所有表格
-        sql2 = text("""
-            SELECT table_schema, table_name 
-            FROM information_schema.tables 
-            WHERE table_type = 'BASE TABLE'
-            ORDER BY table_schema, table_name
-            LIMIT 100
-        """)
-        
-        result2 = db.execute(sql2)
-        
-        tables = []
-        for row in result2.fetchall():
-            tables.append({
-                "schema": row[0],
-                "table": row[1],
-                "full_name": f"{row[0]}.{row[1]}"
-            })
-        
-        return {
-            "message": "資料庫連接成功",
-            "schemas": schemas,
-            "table_count": len(tables),
-            "tables": tables
-        }
-    except Exception as e:
-        logger.error(f"Error testing database: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"資料庫測試失敗: {str(e)}")
+# ✅ REMOVED: /api/legacy/test-tables - Development only endpoint, not used in production
 
 @router.get("/service-targets")
 async def get_service_targets(db: Session = Depends(get_legacy_db)):

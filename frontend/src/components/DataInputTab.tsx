@@ -52,34 +52,17 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     execution_time_minutes: 0,
   });
   const [isUploading, setIsUploading] = useState<boolean>(false);
-  const { authFetch, user } = useAuth();
+  const { authFetch, user, writingStatus, refreshWritingStatus } = useAuth(); // ✅ 使用全域狀態
   const [isSaving, setIsSaving] = useState(false);
   const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
   const [serviceTargets, setServiceTargets] = useState<any[]>([]);
   const [hasWorkItems, setHasWorkItems] = useState<boolean>(true);
-  const [writingStatus, setWritingStatus] = useState<any>(null);
+  // ✅ writingStatus 改用 AuthContext 的全域狀態
 
   // 資料同步hook
   const { immediateSync, batchSync } = useDataSync({ debounceMs: 200 });
 
-  const fetchWritingStatus = useCallback(
-    async (docDate?: string) => {
-      if (!authFetch) return;
-      try {
-        const url = docDate
-          ? `/api/records/writing-status?doc_date=${docDate}`
-          : "/api/records/writing-status";
-        const response = await authFetch(url);
-        if (response.ok) {
-          const status = await response.json();
-          setWritingStatus(status);
-        }
-      } catch (error) {
-        console.error("無法獲取填寫狀態:", error);
-      }
-    },
-    [authFetch]
-  );
+  // ✅ 移除本地的 fetchWritingStatus，改用 AuthContext 的 refreshWritingStatus
 
   const fetchConsolidatedRecords = useCallback(
     async (docDate?: string) => {
@@ -128,26 +111,13 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
       }
     };
 
-    // 載入 writing status
-    const loadWritingStatus = async () => {
-      if (!docDate) return;
-      try {
-        const url = `/api/records/writing-status?doc_date=${docDate}`;
-        const response = await authFetch(url);
-        if (response.ok) {
-          const status = await response.json();
-          setWritingStatus(status);
-        }
-      } catch (error) {
-        console.error("無法獲取填寫狀態:", error);
-      }
-    };
+    // ✅ 載入 writing status 使用全域 refreshWritingStatus
+    if (refreshWritingStatus && docDate) {
+      refreshWritingStatus(docDate);
+    }
 
     loadData();
-    if (docDate) {
-      loadWritingStatus();
-    }
-  }, [authFetch, selectedDate]); // ✅ 只依賴真正需要的變數
+  }, [authFetch, selectedDate, refreshWritingStatus]); // ✅ 只依賴真正需要的變數
 
   // 處理日期變更
   const handleDateChange = (newDate: string) => {
@@ -270,12 +240,12 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         throw new Error("保存暫存失敗");
       }
 
-      // 使用批次同步重新獲取最新資料，確保顯示正確的整合狀態
+      // ✅ 使用批次同步重新獲取最新資料，確保顯示正確的整合狀態
       const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
-      await batchSync([
-        () => fetchConsolidatedRecords(docDate),
-        () => fetchWritingStatus(docDate),
-      ]);
+      await fetchConsolidatedRecords(docDate);
+      if (refreshWritingStatus && docDate) {
+        await refreshWritingStatus(docDate);
+      }
 
       setCurrentRecord({
         content: "",

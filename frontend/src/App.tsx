@@ -157,7 +157,7 @@ export interface User {
   employee?: EmployeeForUser;
 }
 function App() {
-  const { user, logout, authFetch, hasSubordinates } = useAuth(); // ✅ 從 AuthContext 獲取
+  const { user, logout, authFetch, hasSubordinates, writingStatus, refreshWritingStatus } = useAuth(); // ✅ 從 AuthContext 獲取全域狀態
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -168,9 +168,7 @@ function App() {
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeInList | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
-  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(
-    null
-  );
+  // ✅ writingStatus 已移至 AuthContext，不再需要本地狀態
 
   // 全局日期狀態，讓隨筆紀錄頁和日報編輯頁共享
   const [globalSelectedDate, setGlobalSelectedDate] = useState<string | null>(
@@ -234,8 +232,11 @@ function App() {
 
     // 使用 navigate 返回列表頁 (相對於 basename)
     navigate(url, { replace: false });
-    // 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
-    fetchWritingStatus();
+    // ✅ 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
+    if (refreshWritingStatus) {
+      const docDate = globalSelectedDate ? globalSelectedDate.replace(/-/g, "") : undefined;
+      refreshWritingStatus(docDate);
+    }
   };
 
   // 處理上傳完成後的跳轉
@@ -256,36 +257,16 @@ function App() {
     [navigate]
   );
 
-  const fetchWritingStatus = useCallback(
-    async (docDate?: string) => {
-      if (!authFetch || !user?.employee) return;
-
-      try {
-        const url = docDate
-          ? `/api/records/writing-status?doc_date=${docDate}`
-          : "/api/records/writing-status";
-        const response = await authFetch(url);
-        if (response.ok) {
-          const status: WritingStatus = await response.json();
-          setWritingStatus(status);
-        }
-      } catch (error) {
-        console.error("獲取寫入狀態失敗:", error);
-      }
-    },
-    [authFetch, user?.employee]
-  );
-
-  // ✅ 修復: 移除 fetchWritingStatus 依賴,避免無限循環
+  // ✅ 修復: 使用 AuthContext 的 refreshWritingStatus，避免重複 API 呼叫
   useEffect(() => {
-    if (authFetch && user?.employee) {
+    if (refreshWritingStatus && user?.employee) {
       // 使用全局選中的日期，如果沒有則不傳入doc_date讓後端使用預設邏輯
       const docDate = globalSelectedDate
         ? globalSelectedDate.replace(/-/g, "")
         : undefined;
-      fetchWritingStatus(docDate);
+      refreshWritingStatus(docDate);
     }
-  }, [authFetch, user?.employee, globalSelectedDate]); // 移除 fetchWritingStatus 依賴
+  }, [refreshWritingStatus, user?.employee, globalSelectedDate]);
 
   // 監聽 URL 參數變化並同步狀態
   useEffect(() => {

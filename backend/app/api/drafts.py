@@ -2,14 +2,11 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from typing import List, Dict, Any, Optional
-from datetime import datetime, time, timedelta
 import logging
-import json
 
 from ..core.legacy_database import get_legacy_db
-from ..services.legacy_service_v2 import LegacyReportServiceV2
+from ..services.draft_service import DraftService
 
 router = APIRouter(tags=["Drafts"])
 logger = logging.getLogger(__name__)
@@ -24,29 +21,21 @@ async def save_draft(
     try:
         logger.info(f"🔥 DRAFTS API - 收到暫存數據: {draft_data}")
         
-        # 提取數據
         daily_no = draft_data.get("daily_no")
         empno = draft_data.get("empno")
-        cocode = draft_data.get("cocode", "001")
-        draft_type = draft_data.get("draft_type", "TEMP")
-        draft_content = draft_data.get("draft_content", {})
-        doc_date = draft_data.get("doc_date")  # 從前端傳入的doc_date
-        
-        logger.info(f"🔥 DRAFTS API - 解析參數: daily_no={daily_no}, empno={empno}, cocode={cocode}, draft_type={draft_type}, doc_date={doc_date}")
-        logger.info(f"🔥 DRAFTS API - draft_content: {draft_content}")
+        doc_date = draft_data.get("doc_date")
         
         if not all([daily_no, empno, doc_date]):
             raise HTTPException(status_code=400, detail="缺少必要欄位: daily_no, empno, doc_date")
         
-        # 保存暫存
-        logger.info(f"🔥 DRAFTS API - 開始調用 LegacyReportServiceV2.save_draft")
-        result_daily_no = LegacyReportServiceV2.save_draft(
+        # Refactored to use DraftService
+        result_daily_no = DraftService.save_draft(
             db=db,
             empno=empno,
-            cocode=cocode,
-            doc_date=doc_date,  # 使用前端傳入的doc_date
-            draft_type=draft_type,
-            draft_content=draft_content,
+            cocode=draft_data.get("cocode", "001"),
+            doc_date=doc_date,
+            draft_type=draft_data.get("draft_type", "TEMP"),
+            draft_content=draft_data.get("draft_content", {}),
             daily_no=daily_no
         )
         
@@ -73,144 +62,17 @@ async def update_draft_by_daily_planno_sopno(
 ):
     """根據 daily_no、planno 和 sopno 更新特定的暫存記錄"""
     try:
-        # 處理空的 planno - 前端傳入 "NULL" 表示空值
-        if planno == "NULL":
-            planno = ""
-
-        logger.info(f"🔥 UPDATE DRAFT API - 收到更新數據: daily_no={daily_no}, planno='{planno}', sopno={sopno}, data={update_data}")
-
-        # 檢查記錄是否存在 - 使用 planno + sopno 組合
-        check_sql = text("""
-            SELECT RECORD_ID, CONTENT, FILES, ATT_FILE1, ATT_FILE2
-            FROM jps.tdr_draft
-            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
-        """)
+        logger.info(f"🔥 UPDATE DRAFT API - 收到更新數據: daily_no={daily_no}, planno='{planno}', sopno={sopno}")
         
-        existing_record = db.execute(check_sql, {
-            "daily_no": daily_no,
-            "planno": planno,
-            "sopno": sopno
-        }).fetchone()
+        # Refactored to use DraftService
+        DraftService.update_draft(
+            db=db,
+            daily_no=daily_no,
+            planno=planno,
+            sopno=sopno,
+            update_data=update_data
+        )
         
-        if not existing_record:
-            raise HTTPException(status_code=404, detail="找不到指定的暫存記錄")
-        
-        # 準備更新數據
-        content = update_data.get('content', '')
-        files = update_data.get('files', [])
-        new_planno = update_data.get('planno', '')  # 新的工作計畫編號
-        new_sopno = update_data.get('sopno', '')    # 新的執行工作編號
-        work_item_ids = update_data.get('work_item_ids', [])  # 工作項目ID列表
-
-        # 服務對象完整資料（從前端直接接收）
-        service_cocode = update_data.get('service_cocode', '')
-        service_empno = update_data.get('service_empno', '')
-        service_empnamec = update_data.get('service_empnamec', '')  # 從前端接收
-        service_target_cocode = update_data.get('service_target_cocode', '')  # 新增
-        service_deptno = update_data.get('service_deptno', '')  # 從前端接收
-
-        execution_time_minutes = update_data.get('execution_time_minutes', 0)
-
-        # 處理檔案
-        att_file1_list = []
-        att_file2_list = []
-        files_json_list = []
-
-        for file_info in files:
-            if isinstance(file_info, dict):
-                file_name = file_info.get('name', '')
-                file_url = file_info.get('url', '')
-                if file_name:
-                    att_file1_list.append(file_name)
-                if file_url:
-                    att_file2_list.append(file_url)
-                files_json_list.append(file_info)
-
-        att_file1 = ','.join(att_file1_list) if att_file1_list else ""
-        att_file2 = ','.join(att_file2_list) if att_file2_list else ""
-        files_json = json.dumps(files_json_list, ensure_ascii=False) if files_json_list else "[]"
-
-        # 計算字數
-        word_count = len(content) if content else 0
-
-        # 處理工作項目序號 (將ID列表轉換為 "1/2/3" 格式)
-        work_item_seq = '/'.join(str(id) for id in work_item_ids) if work_item_ids else ""
-
-        # 查詢新的工作計畫名稱和執行工作名稱
-        plan_subj_c = ""
-        if new_planno:
-            plan_sql = text("""
-                SELECT plan_subj_c FROM jps.tjp_master
-                WHERE planno = :planno
-            """)
-            plan_result = db.execute(plan_sql, {"planno": new_planno}).fetchone()
-            if plan_result:
-                plan_subj_c = plan_result[0]
-
-        sop_desc_c = ""
-        if new_sopno:
-            sop_sql = text("""
-                SELECT sop_desc_c FROM jps.tpm_sop
-                WHERE sopno = :sopno
-            """)
-            sop_result = db.execute(sop_sql, {"sopno": new_sopno}).fetchone()
-            if sop_result:
-                sop_desc_c = sop_result[0]
-
-        # 更新記錄（不再查詢服務對象名稱，由前端提供完整資料）
-        from datetime import datetime
-        now = datetime.now()
-        current_date = now.strftime('%Y%m%d')
-        current_time = now.strftime('%H:%M:%S')
-
-        update_sql = text("""
-            UPDATE jps.tdr_draft
-            SET CONTENT = :content,
-                WORD_COUNT = :word_count,
-                ATT_FILE1 = :att_file1,
-                ATT_FILE2 = :att_file2,
-                FILES = :files,
-                PLANNO = :new_planno,
-                PLAN_SUBJ_C = :plan_subj_c,
-                SOPNO = :new_sopno,
-                SOP_DESC_C = :sop_desc_c,
-                WORK_ITEM_SEQ = :work_item_seq,
-                SERVICE_COCODE = :service_cocode,
-                SERVICE_EMPNO = :service_empno,
-                SERVICE_EMPNAMEC = :service_empnamec,
-                SERVICE_TARGET_COCODE = :service_target_cocode,
-                SERVICE_DEPTNO = :service_deptno,
-                EXECUTION_TIME_MINUTES = :execution_time_minutes,
-                UPDATED_DATE = :updated_date,
-                UPDATED_TIME = :updated_time
-            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
-        """)
-
-        db.execute(update_sql, {
-            "content": content,
-            "word_count": word_count,
-            "att_file1": att_file1,
-            "att_file2": att_file2,
-            "files": files_json,
-            "new_planno": new_planno,
-            "plan_subj_c": plan_subj_c,
-            "new_sopno": new_sopno,
-            "sop_desc_c": sop_desc_c,
-            "work_item_seq": work_item_seq,
-            "service_cocode": service_cocode,
-            "service_empno": service_empno,
-            "service_empnamec": service_empnamec,
-            "service_target_cocode": service_target_cocode,
-            "service_deptno": service_deptno,
-            "execution_time_minutes": execution_time_minutes,
-            "updated_date": current_date,
-            "updated_time": current_time,
-            "daily_no": daily_no,
-            "planno": planno,
-            "sopno": sopno
-        })
-        
-        db.commit()
         logger.info(f"🔥 UPDATE DRAFT API - 更新完成: daily_no={daily_no}, planno={planno}, sopno={sopno}")
         
         return {
@@ -219,11 +81,9 @@ async def update_draft_by_daily_planno_sopno(
             "planno": planno,
             "sopno": sopno
         }
-        
-    except HTTPException:
-        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        db.rollback()
         logger.error(f"Error updating draft: {str(e)}")
         raise HTTPException(status_code=500, detail=f"更新暫存記錄失敗: {str(e)}")
 
@@ -236,69 +96,13 @@ async def get_drafts(
 ):
     """取得員工的暫存資料，使用前端傳入的doc_date"""
     try:
-        logger.info(f"取得員工 {empno} 在 {doc_date} 的暫存資料")
-        
-        # 構建查詢條件，不使用STATUS
-        where_clause = "WHERE EMPNO = :empno AND DOC_DATE = :doc_date"
-        params = {"empno": empno, "doc_date": doc_date}
-        
-        if draft_type:
-            where_clause += " AND DRAFT_TYPE = :draft_type"
-            params["draft_type"] = draft_type
-        
-        sql = text(f"""
-            SELECT DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE, 
-                   PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C, WORK_ITEM_SEQ,
-                   SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
-                   CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
-                   ATT_FILE1, ATT_FILE2, FILES,
-                   CREATED_DATE, CREATED_TIME, UPDATED_DATE, UPDATED_TIME
-            FROM jps.tdr_draft
-            {where_clause}
-            ORDER BY UPDATED_DATE DESC, UPDATED_TIME DESC
-        """)
-        
-        result = db.execute(sql, params)
-        
-        drafts = []
-        for row in result.fetchall():
-            # 解析檔案清單
-            files = []
-            if row[19]:  # FILES 欄位
-                try:
-                    files = json.loads(row[19])
-                except:
-                    files = []
-            
-            draft = {
-                "daily_no": row[0],
-                "empno": row[1],
-                "cocode": row[2],
-                "doc_date": row[3],
-                "draft_type": row[4],
-                "planno": row[5],
-                "plan_subj_c": row[6],
-                "sopno": row[7],
-                "sop_desc_c": row[8],
-                "work_item_seq": row[9],
-                "service_cocode": row[10],
-                "service_empno": row[11],
-                "service_empnamec": row[12],
-                "service_deptno": row[13],
-                "content": row[14],
-                "execution_time_minutes": row[15],
-                "word_count": row[16],
-                "att_file1": row[17],
-                "att_file2": row[18],
-                "files": files,
-                "created_date": row[20],
-                "created_time": row[21],
-                "updated_date": row[22],
-                "updated_time": row[23]
-            }
-            drafts.append(draft)
-        
-        logger.info(f"找到 {len(drafts)} 筆今日暫存記錄")
+        # Refactored to use DraftService
+        drafts = DraftService.get_drafts(
+            db=db,
+            empno=empno,
+            doc_date=doc_date,
+            draft_type=draft_type
+        )
         return drafts
     except Exception as e:
         logger.error(f"Error getting drafts: {str(e)}")
