@@ -780,6 +780,7 @@ async def get_writing_status(
 @records_router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
+    doc_date: str = Query(..., description="日報日期 (YYYYMMDD)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
@@ -787,14 +788,14 @@ async def upload_file(
     try:
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-        
+
         # 檢查檔案大小
         if file.size and file.size > settings.MAX_FILE_SIZE:
             raise HTTPException(
-                status_code=413, 
+                status_code=413,
                 detail=f"檔案太大，最大允許 {settings.MAX_FILE_SIZE // (1024*1024)}MB"
             )
-        
+
         # 檢查檔案類型
         allowed_extensions = {'.txt', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.gif'}
         file_ext = Path(file.filename or "").suffix.lower()
@@ -803,11 +804,14 @@ async def upload_file(
                 status_code=400,
                 detail=f"不支援的檔案類型: {file_ext}"
             )
-        
-        # 創建上傳目錄
-        upload_dir = Path(settings.UPLOAD_DIR)
-        upload_dir.mkdir(exist_ok=True)
-        
+
+        # 從 doc_date 提取年月 (YYYYMM)
+        year_month = doc_date[:6]  # 取前6位，例如 "20251007" -> "202510"
+
+        # 創建上傳目錄，包含年月子目錄
+        upload_dir = Path(settings.UPLOAD_DIR) / year_month
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
         # 生成唯一檔案名（時間戳記 + 短 hash）
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
         short_hash = uuid.uuid4().hex[:8]
@@ -818,19 +822,22 @@ async def upload_file(
             original_name = original_name[:50]
         safe_filename = f"{timestamp}_{short_hash}_{original_name}{file_ext}"
         file_path = upload_dir / safe_filename
-        
+
         # 保存檔案
         async with aiofiles.open(file_path, 'wb') as f:
             content = await file.read()
             await f.write(content)
-        
-        # 返回檔案資訊（模擬前端期待的格式）
+
+        # 返回檔案資訊（包含年月子目錄）
+        # 從完整路徑中提取相對於 settings.UPLOAD_DIR 的路徑
+        relative_path = file_path.relative_to(Path(settings.UPLOAD_DIR).parent)
+
         return {
             "id": f"{timestamp}_{short_hash}",
             "name": file.filename,
             "type": file.content_type or "application/octet-stream",
             "size": len(content),
-            "url": f"/uploads/{safe_filename}",
+            "url": f"/{relative_path.as_posix()}",
             "path": str(file_path),
             "upload_date": datetime.now().strftime('%Y%m%d'),
             "upload_time": datetime.now().strftime('%H%M%S'),
@@ -841,22 +848,28 @@ async def upload_file(
         logger.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"檔案上傳失敗: {str(e)}")
 
-@records_router.delete("/delete/{filename}")
+@records_router.delete("/delete/{year_month}/{filename}")
 async def delete_upload(
+    year_month: str,
     filename: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
     """
     從伺服器上刪除一個已上傳的檔案。
+    路徑格式: /delete/YYYYMM/filename
     """
     try:
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
 
+        # 驗證 year_month 格式 (應為6位數字 YYYYMM)
+        if not year_month.isdigit() or len(year_month) != 6:
+            raise HTTPException(status_code=400, detail="年月格式錯誤，應為 YYYYMM")
+
         # 組合檔案的完整路徑
         upload_dir = Path(settings.UPLOAD_DIR)
-        file_path = upload_dir / filename
+        file_path = upload_dir / year_month / filename
 
         # 安全性檢查：確保檔案路徑是在我們預期的 UPLOAD_DIR 底下
         if not file_path.is_file() or not str(file_path.resolve()).startswith(str(upload_dir.resolve())):
@@ -866,7 +879,7 @@ async def delete_upload(
         os.remove(file_path)
         logger.info(f"File deleted successfully: {file_path}")
 
-        return {"message": "檔案刪除成功", "filename": filename}
+        return {"message": "檔案刪除成功", "filename": f"{year_month}/{filename}"}
 
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="檔案不存在")

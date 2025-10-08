@@ -334,20 +334,24 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
 
         if (urlOrPath.startsWith("http")) {
           fullUrl = urlOrPath;
-          relativePath = new URL(urlOrPath).pathname;
+          // 解碼 URL 編碼的路徑
+          relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
         } else {
           relativePath = urlOrPath;
           fullUrl = getFullFileUrl(urlOrPath);
         }
 
-        const filename = relativePath.split("/").pop();
+        // 從路徑中提取 YYYYMM/filename
+        const pathParts = relativePath.split("/");
+        const yearMonth = pathParts[pathParts.length - 2];
+        const filename = pathParts[pathParts.length - 1];
 
-        if (!filename) {
-          throw new Error("無法從路徑中解析檔案名稱");
+        if (!yearMonth || !filename) {
+          throw new Error("無法從路徑中解析年月或檔案名稱");
         }
 
         // 1. 呼叫後端 API 刪除實體檔案
-        await authFetch(`/api/records/delete/${filename}`, {
+        await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
           method: "DELETE",
         });
 
@@ -367,7 +371,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         }));
       } catch (error) {
         console.error("刪除檔案時發生錯誤:", error);
-        toast.error("刪除檔案失敗");
+        toast.error("檔案刪除失敗");
       }
     },
     [authFetch]
@@ -514,6 +518,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                 onFileRemove={handleRemoveFile}
                 files={currentRecord.files || []}
                 placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
+                docDate={selectedDate?.replace(/-/g, '') || undefined}
               />
             </div>
 

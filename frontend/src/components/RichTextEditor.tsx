@@ -26,6 +26,7 @@ interface RichTextEditorProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  docDate?: string; // 日報日期 (YYYYMMDD)
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
@@ -37,6 +38,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   placeholder = "記錄您的想法... (可直接貼上圖片或者附上檔案)",
   disabled = false,
   className = "",
+  docDate,
 }) => {
   const quillRef = useRef<ReactQuill>(null);
   const { authFetch } = useAuth();
@@ -97,7 +99,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           isUploadingRef.current = true;
           toast.loading('上傳中...', { id: 'image-upload' });
 
-          const response = await authFetch("/api/records/upload", {
+          // 如果沒有提供 docDate,使用當前日期
+          const uploadDocDate = docDate || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+          const response = await authFetch(`/api/records/upload?doc_date=${uploadDocDate}`, {
             method: "POST",
             body: formData,
           });
@@ -167,7 +171,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             try {
               toast.loading(`上傳 ${file.name}...`, { id: `file-upload-${file.name}` });
 
-              const response = await authFetch("/api/records/upload", {
+              // 如果沒有提供 docDate,使用當前日期
+              const uploadDocDate = docDate || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+              const response = await authFetch(`/api/records/upload?doc_date=${uploadDocDate}`, {
                 method: "POST",
                 body: formData,
               });
@@ -256,7 +262,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             if (!currentImages.has(imageUrl)) {
               // 圖片從編輯器中被移除了
               // 直接將從 <img> 標籤 src 中獲取的完整 URL 傳遞給父元件
-              onFileRemove(imageUrl);
+              if (onFileRemove) {
+                onFileRemove(imageUrl);
+              }
             }
           }
         }
@@ -305,7 +313,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             isUploadingRef.current = true;
             toast.loading('上傳中...', { id: 'paste-upload' });
 
-            const response = await authFetch("/api/records/upload", {
+            // 如果沒有提供 docDate,使用當前日期
+            const uploadDocDate = docDate || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const response = await authFetch(`/api/records/upload?doc_date=${uploadDocDate}`, {
               method: "POST",
               body: formData,
             });

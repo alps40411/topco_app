@@ -424,13 +424,15 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const cancelEdit = async () => {
     try {
       // 刪除編輯期間新上傳的檔案
-      for (const filename of editPendingUploadFiles) {
+      for (const filePath of editPendingUploadFiles) {
         try {
-          await authFetch(`/api/records/delete/${filename}`, {
+          // filePath 格式: YYYYMM/filename
+          const [yearMonth, filename] = filePath.split("/");
+          await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
             method: "DELETE",
           });
         } catch (error) {
-          console.error(`清理檔案 ${filename} 失敗:`, error);
+          console.error(`清理檔案 ${filePath} 失敗:`, error);
         }
       }
 
@@ -482,13 +484,15 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       if (!response.ok) throw new Error("更新報告失敗");
 
       // 儲存成功後，實際刪除標記為待刪除的檔案
-      for (const filename of editPendingDeleteFiles) {
+      for (const filePath of editPendingDeleteFiles) {
         try {
-          await authFetch(`/api/records/delete/${filename}`, {
+          // filePath 格式: YYYYMM/filename
+          const [yearMonth, filename] = filePath.split("/");
+          await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
             method: "DELETE",
           });
         } catch (error) {
-          console.error(`刪除檔案 ${filename} 失敗:`, error);
+          console.error(`刪除檔案 ${filePath} 失敗:`, error);
         }
       }
 
@@ -568,11 +572,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   const handleEditFileUpload = async (filesToUpload: FileList) => {
     if (!filesToUpload || filesToUpload.length === 0 || !authFetch) return;
+    const uploadDocDate = selectedDate?.replace(/-/g, '') || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
     const uploadPromises = Array.from(filesToUpload).map(async (file) => {
       const formData = new FormData();
       formData.append("file", file);
       try {
-        const response = await authFetch("/api/records/upload", {
+        const response = await authFetch(`/api/records/upload?doc_date=${uploadDocDate}`, {
           method: "POST",
           body: formData,
         });
@@ -586,10 +592,12 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           is_selected_for_ai: false,
         };
 
-        // 追蹤新上傳的檔案
-        const filename = uploadedFile.url.split("/").pop();
-        if (filename) {
-          setEditPendingUploadFiles((prev) => [...prev, filename]);
+        // 追蹤新上傳的檔案 (從 URL 中提取完整的 YYYYMM/filename)
+        const urlParts = uploadedFile.url.split("/");
+        const yearMonth = urlParts[urlParts.length - 2]; // 倒數第二個是 YYYYMM
+        const filename = urlParts[urlParts.length - 1]; // 最後一個是檔名
+        if (yearMonth && filename) {
+          setEditPendingUploadFiles((prev) => [...prev, `${yearMonth}/${filename}`]);
         }
 
         setEditFiles((prev) => [...prev, newFile]);
@@ -620,20 +628,24 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
         if (urlOrPath.startsWith("http")) {
           fullUrl = urlOrPath;
-          relativePath = new URL(urlOrPath).pathname;
+          // 解碼 URL 編碼的路徑
+          relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
         } else {
           relativePath = urlOrPath;
           fullUrl = getFullFileUrl(urlOrPath);
         }
 
-        const filename = relativePath.split("/").pop();
+        // 從路徑中提取 YYYYMM/filename (例如: /uploads/202510/xxx.png -> 202510/xxx.png)
+        const pathParts = relativePath.split("/");
+        const yearMonth = pathParts[pathParts.length - 2]; // 倒數第二個是 YYYYMM
+        const filename = pathParts[pathParts.length - 1]; // 最後一個是檔名
 
-        if (!filename) {
-          throw new Error("無法從路徑中解析檔案名稱");
+        if (!yearMonth || !filename) {
+          throw new Error("無法從路徑中解析年月或檔案名稱");
         }
 
-        // 不立即刪除實體檔案,而是標記為待刪除
-        setEditPendingDeleteFiles((prev) => [...prev, filename]);
+        // 不立即刪除實體檔案,而是標記為待刪除 (包含年月目錄)
+        setEditPendingDeleteFiles((prev) => [...prev, `${yearMonth}/${filename}`]);
 
         setEditFiles((prev) =>
           prev.filter((file) => file.url !== relativePath)
@@ -655,10 +667,12 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   // 處理來自編輯用 RichTextEditor 的檔案上傳回調
   const handleEditEditorFileUpload = useCallback((file: FileForUpload) => {
-    // 標記為新上傳的檔案
-    const filename = file.url.split("/").pop();
-    if (filename) {
-      setEditPendingUploadFiles((prev) => [...prev, filename]);
+    // 標記為新上傳的檔案 (從 URL 中提取完整的 YYYYMM/filename)
+    const urlParts = file.url.split("/");
+    const yearMonth = urlParts[urlParts.length - 2]; // 倒數第二個是 YYYYMM
+    const filename = urlParts[urlParts.length - 1]; // 最後一個是檔名
+    if (yearMonth && filename) {
+      setEditPendingUploadFiles((prev) => [...prev, `${yearMonth}/${filename}`]);
     }
 
     setEditFiles((prev) => [...prev, file]);
@@ -667,11 +681,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const handleNewRecordUpload = async (filesToUpload: FileList) => {
     if (!filesToUpload || filesToUpload.length === 0 || !authFetch) return;
     setIsUploadingNewFile(true);
+    const uploadDocDate = selectedDate?.replace(/-/g, '') || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
     const uploadPromises = Array.from(filesToUpload).map(async (file) => {
       const formData = new FormData();
       formData.append("file", file);
       try {
-        const response = await authFetch("/api/records/upload", {
+        const response = await authFetch(`/api/records/upload?doc_date=${uploadDocDate}`, {
           method: "POST",
           body: formData,
         });
@@ -717,19 +733,23 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
         if (urlOrPath.startsWith("http")) {
           fullUrl = urlOrPath;
-          relativePath = new URL(urlOrPath).pathname;
+          // 解碼 URL 編碼的路徑
+          relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
         } else {
           relativePath = urlOrPath;
           fullUrl = getFullFileUrl(urlOrPath);
         }
 
-        const filename = relativePath.split("/").pop();
+        // 從路徑中提取 YYYYMM/filename
+        const pathParts = relativePath.split("/");
+        const yearMonth = pathParts[pathParts.length - 2];
+        const filename = pathParts[pathParts.length - 1];
 
-        if (!filename) {
-          throw new Error("無法從路徑中解析檔案名稱");
+        if (!yearMonth || !filename) {
+          throw new Error("無法從路徑中解析年月或檔案名稱");
         }
 
-        await authFetch(`/api/records/delete/${filename}`, {
+        await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
           method: "DELETE",
         });
 
@@ -760,24 +780,22 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     // 刪除所有臨時檔案
     for (const fileUrl of newRecordTempFilesRef.current) {
       try {
-        let filename = fileUrl;
+        let relativePath = fileUrl;
         if (fileUrl.startsWith("http")) {
           const url = new URL(fileUrl);
-          filename = url.pathname;
-        }
-        filename = filename.replace("/uploads/", "");
-
-        // 解碼文件名（如果已經編碼），然後再編碼一次以確保正確傳遞
-        // 避免雙重編碼問題
-        try {
-          filename = decodeURIComponent(filename);
-        } catch (e) {
-          // 如果解碼失敗，說明可能未編碼，直接使用原始文件名
+          relativePath = url.pathname;
         }
 
-        await authFetch(`/api/records/delete/${encodeURIComponent(filename)}`, {
-          method: "DELETE",
-        });
+        // 從路徑中提取 YYYYMM/filename
+        const pathParts = relativePath.split("/");
+        const yearMonth = pathParts[pathParts.length - 2];
+        const filename = pathParts[pathParts.length - 1];
+
+        if (yearMonth && filename) {
+          await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
+            method: "DELETE",
+          });
+        }
       } catch (error) {
         console.error("Failed to delete temp file:", fileUrl, error);
       }
@@ -1224,6 +1242,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                         onFileRemove={handleRemoveEditFile}
                         files={editFiles}
                         placeholder="編輯記錄內容... (可直接貼上圖片)"
+                        docDate={selectedDate?.replace(/-/g, '') || undefined}
                       />
                       <AttachedFilesManager
                         files={editFiles}
@@ -1406,6 +1425,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                     }
                     onFileUpload={handleNewRecordEditorFileUpload}
                     onFileRemove={handleRemoveNewRecordFile}
+                    docDate={selectedDate?.replace(/-/g, '') || undefined}
                     files={newRecord.files || []}
                     placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
                   />
