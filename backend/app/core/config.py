@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # File upload settings
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    STATIC_URL_PREFIX: str = ""  # 靜態檔案 URL 前綴，例如 /MyReportAI
 
 
     class Config:

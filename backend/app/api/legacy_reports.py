@@ -831,19 +831,7 @@ async def upload_file(
         # 返回檔案資訊（包含年月子目錄）
         # 從完整路徑中提取相對於 settings.UPLOAD_DIR 的路徑
         relative_path = file_path.relative_to(Path(settings.UPLOAD_DIR).parent)
-        final_url = f"/{relative_path.as_posix()}"
-
-        print("=" * 80)
-        print("檔案上傳完成 - Debug 資訊:")
-        print(f"  原始檔名: {file.filename}")
-        print(f"  安全檔名: {safe_filename}")
-        print(f"  年月目錄: {year_month}")
-        print(f"  UPLOAD_DIR: {settings.UPLOAD_DIR}")
-        print(f"  完整路徑: {file_path}")
-        print(f"  相對路徑: {relative_path}")
-        print(f"  返回 URL: {final_url}")
-        print(f"  檔案是否存在: {file_path.exists()}")
-        print("=" * 80)
+        final_url = f"{settings.STATIC_URL_PREFIX}/{relative_path.as_posix()}"
 
         return {
             "id": f"{timestamp}_{short_hash}",
