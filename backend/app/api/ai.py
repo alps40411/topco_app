@@ -144,15 +144,13 @@ async def enhance_record(
         if planno == "NULL":
             planno = ""
 
-        print("!!! FUNCTION CALLED !!!")  # 強制輸出
         logger.error(f"! [FORCE] 函數被調用: daily_no={daily_no}, planno='{planno}', sopno={sopno}")
 
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="User has no employee information")
 
         empno = current_user.employee.empno
-        logger.info(f"[DEBUG] 請求參數: daily_no={daily_no}, planno='{planno}', sopno={sopno}, empno={empno}")
-        
+
         # 查詢記錄內容 - 使用 daily_no + planno + sopno 來精確識別單一記錄，同時取得FILES欄位
         record_sql = text("""
             SELECT DAILY_NO, CONTENT, PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C,
@@ -161,65 +159,42 @@ async def enhance_record(
             FROM jps.tdr_draft
             WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
         """)
-        
+
         record_result = db.execute(record_sql, {
             "daily_no": daily_no,
             "planno": planno,
             "sopno": sopno,
             "empno": empno
         }).fetchone()
-        
+
         if not record_result:
-            logger.error(f"[DEBUG] 找不到記錄: daily_no={daily_no}, sopno={sopno}, empno={empno}")
             raise HTTPException(status_code=404, detail="Record not found")
-        
-        logger.info(f"[DEBUG] 找到記錄: daily_no={daily_no}, sopno={sopno}")
-        logger.info(f"[DEBUG] 記錄內容長度: {len(record_result[1] or '')}")
-        
+
         # 處理FILES欄位中的檔案
         files_json = record_result[12] or "[]"  # FILES欄位是第13個（索引12）
-        logger.info(f"[DEBUG] 原始FILES欄位內容: {repr(files_json)}")
-        
+
         files = []
         try:
             files = json.loads(files_json) if files_json != "[]" else []
-            logger.info(f"[DEBUG] JSON解析成功")
         except Exception as e:
-            logger.error(f"[DEBUG] JSON解析失敗: {e}")
+            logger.error(f"JSON解析失敗: {e}")
             files = []
-        
-        logger.info(f"[DEBUG] FILES欄位檔案數量: {len(files)}")
-        logger.info(f"[DEBUG] FILES內容: {files}")
-        
+
         # 檢查FILES中標記為AI參考的檔案
         ai_files = []
-        for i, f in enumerate(files):
-            is_ai_selected = f.get('is_selected_for_ai', False)
-            logger.info(f"[DEBUG] 檔案{i}: name={f.get('name')}, is_selected_for_ai={is_ai_selected} (type: {type(is_ai_selected)})")
-            if is_ai_selected:
+        for f in files:
+            if f.get('is_selected_for_ai', False):
                 ai_files.append(f)
-                logger.info(f"[DEBUG] 檔案{i}被加入AI參考列表")
-        
-        logger.info(f"[DEBUG] AI參考檔案數量: {len(ai_files)}")
-        logger.info(f"[DEBUG] AI參考檔案列表: {ai_files}")
-        
+
         # 生成 AI 增強內容
         original_content = record_result[1] or ""
-        
+
         # 檢查是否有AI參考檔案可以處理
         has_ai_files = len(ai_files) > 0
-        
-        logger.info(f"[DEBUG] 內容檢查 - 原始內容: '{original_content}' (長度: {len(original_content)})")
-        logger.info(f"[DEBUG] 內容檢查 - 原始內容strip(): '{original_content.strip()}' (長度: {len(original_content.strip())})")
-        logger.info(f"[DEBUG] 內容檢查 - AI參考檔案: {has_ai_files}")
-        logger.info(f"[DEBUG] 內容檢查 - AI檔案列表: {ai_files}")
-        
+
         # 如果既沒有文字內容也沒有AI參考檔案，才拒絕處理
         if not original_content.strip() and not has_ai_files:
-            logger.error(f"[DEBUG] 拒絕處理: 無文字內容且無AI參考檔案")
             raise HTTPException(status_code=400, detail="Record content is empty and no AI reference data available")
-        
-        logger.info(f"[DEBUG] 通過檢查，準備AI增強")
 
         # 將AI參考檔案轉換為附件格式
         attachments = []
@@ -228,11 +203,11 @@ async def enhance_record(
                 # 轉換URL為檔案路徑
                 url_path = ai_file.get('url', '')
                 if url_path.startswith('/uploads/'):
-                    # 轉換為實際檔案路徑  
+                    # 轉換為實際檔案路徑
                     file_path = settings.UPLOAD_DIR + url_path.replace('/uploads/', '/')
                 else:
                     file_path = url_path
-                
+
                 # 創建附件記錄
                 attachments.append({
                     "att_id": f"files_{ai_file.get('name', 'unknown')}",
@@ -242,7 +217,6 @@ async def enhance_record(
                     "file_type": ai_file.get('type', ''),
                     "is_selected_for_ai": True  # 已經篩選過了
                 })
-                logger.info(f"[DEBUG] 轉換檔案: {ai_file.get('name')} -> {file_path}")
 
         enhanced_content = await _generate_enhanced_content(
             original_content=original_content,

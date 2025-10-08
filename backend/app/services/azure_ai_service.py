@@ -282,23 +282,37 @@ async def process_attachments_for_ai(attachment_records: List[dict]) -> List[str
     處理附件列表，提取標記為 AI 參考的檔案內容
     """
     reference_texts = []
-    
+
     logger.info(f"開始處理附件，總數: {len(attachment_records)}")
-    
+
     for attachment in attachment_records:
         logger.info(f"檢查附件: {attachment}")
-        
+
         if not attachment.get('is_selected_for_ai', False):
             logger.info(f"附件 {attachment.get('file_name', '未知')} 未標記為AI參考，跳過")
             continue
-        
+
         file_path = attachment.get('file_path')
         file_name = attachment.get('file_name', '未知檔案')
-        
+
         if not file_path:
             logger.warning(f"附件 {file_name} 沒有檔案路徑")
             continue
-        
+
+        # 將 URL 路徑轉換為實體檔案路徑
+        # 移除 STATIC_URL_PREFIX (如 /MyReportAI)
+        if settings.STATIC_URL_PREFIX and file_path.startswith(settings.STATIC_URL_PREFIX):
+            file_path = file_path[len(settings.STATIC_URL_PREFIX):]
+
+        # 移除開頭的 /，並組合成完整路徑
+        # 例如: /upimages/202510/xxx.pdf -> D:\Websites\MyReport\MyReport\upimages\202510\xxx.pdf
+        if file_path.startswith('/'):
+            file_path = file_path[1:]
+
+        # 使用 UPLOAD_DIR 的父目錄作為基準
+        upload_base = Path(settings.UPLOAD_DIR).parent
+        file_path = str(upload_base / file_path)
+
         logger.info(f"開始處理AI參考檔案: {file_name} (路徑: {file_path})")
         
         try:
