@@ -350,20 +350,33 @@ async def create_report_comment(
         content = comment_data.get("content", "").strip()
         if not content:
             raise HTTPException(status_code=400, detail="留言內容不能為空")
-        
+
+        # 取得日報的 doc_date 和 empno
+        report_info_sql = text("""
+            SELECT doc_date, empno
+            FROM jps.tdr_master
+            WHERE daily_no = :daily_no
+        """)
+        report_info = db.execute(report_info_sql, {"daily_no": report_id}).fetchone()
+        if not report_info:
+            raise HTTPException(status_code=404, detail="找不到指定的日報")
+
+        doc_date = report_info[0]
+        report_empno = report_info[1]
+
         # 取得下一個回應編號
         max_reply_sql = text("""
-            SELECT COALESCE(MAX(reply_nos), 0) + 1 
-            FROM jps.tdr_reply 
+            SELECT COALESCE(MAX(reply_nos), 0) + 1
+            FROM jps.tdr_reply
             WHERE daily_no = :daily_no
         """)
         reply_nos = db.execute(max_reply_sql, {"daily_no": report_id}).scalar()
-        
+
         # 插入回應記錄
         now = datetime.now()
         current_date = now.strftime('%Y%m%d')
         current_time = now.strftime('%H:%M:%S')
-        
+
         insert_reply_sql = text("""
             INSERT INTO jps.tdr_reply (
                 daily_no, reply_nos, empno, memo, xuser, xdate, xtime, memo1, from_where
@@ -371,7 +384,7 @@ async def create_report_comment(
                 :daily_no, :reply_nos, :empno, :memo, :xuser, :xdate, :xtime, '', 0
             )
         """)
-        
+
         db.execute(insert_reply_sql, {
             "daily_no": report_id,
             "reply_nos": reply_nos,
@@ -381,7 +394,28 @@ async def create_report_comment(
             "xdate": current_date,
             "xtime": current_time
         })
-        
+
+        # 檢查是否為罐頭訊息，如果不是則記錄為特殊訊息
+        is_general_sql = text("""
+            SELECT COUNT(*) FROM jps.TDR_REPLY_GENERAL_COMMENT
+            WHERE memo = :memo
+        """)
+        is_general_count = db.execute(is_general_sql, {"memo": content}).scalar()
+
+        # 如果不是罐頭訊息，則插入特殊訊息記錄
+        if is_general_count == 0:
+            insert_special_sql = text("""
+                INSERT INTO jps.TDR_REPLY_SPECIAL_COMMENT
+                (DAILY_NO, DOC_DATE, EMPNO, UPDATETIME)
+                VALUES (:daily_no, :doc_date, :empno, SYSDATE)
+            """)
+
+            db.execute(insert_special_sql, {
+                "daily_no": report_id,
+                "doc_date": doc_date,
+                "empno": report_empno
+            })
+
         db.commit()
         
         return {

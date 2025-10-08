@@ -39,18 +39,18 @@ class ReviewService:
             current_date = now.strftime('%Y%m%d')
             current_time = now.strftime('%H:%M:%S')
             
-            # 取得原始日報作者工號和基本資訊
+            # 取得原始日報作者工號和基本資訊（包含 doc_date）
             report_author_sql = text("""
-                SELECT empno, empnamec, sop_desc_c, cocode
-                FROM jps.tdr_master 
+                SELECT empno, empnamec, sop_desc_c, cocode, doc_date
+                FROM jps.tdr_master
                 WHERE daily_no = :daily_no
             """)
             report_result = db.execute(report_author_sql, {"daily_no": daily_no}).fetchone()
-            
+
             if not report_result:
                 raise ValueError(f"日報 {daily_no} 不存在")
-            
-            report_empno, report_empname, sop_desc_c, report_cocode = report_result
+
+            report_empno, report_empname, sop_desc_c, report_cocode, doc_date = report_result
             
             # 取得planno (從 tdr_detail2 中取得第一筆記錄的planno)
             planno_sql = text("""
@@ -78,7 +78,7 @@ class ReviewService:
                         :daily_no, :reply_nos, :empno, :memo, :xuser, :xdate, :xtime, '', 0
                     )
                 """)
-                
+
                 db.execute(reply_sql, {
                     "daily_no": daily_no,
                     "reply_nos": reply_nos,
@@ -88,6 +88,27 @@ class ReviewService:
                     "xdate": current_date,
                     "xtime": current_time
                 })
+
+                # 檢查是否為罐頭訊息，如果不是則記錄為特殊訊息
+                is_general_sql = text("""
+                    SELECT COUNT(*) FROM jps.TDR_REPLY_GENERAL_COMMENT
+                    WHERE memo = :memo
+                """)
+                is_general_count = db.execute(is_general_sql, {"memo": reply_memo}).scalar()
+
+                # 如果不是罐頭訊息，則插入特殊訊息記錄
+                if is_general_count == 0:
+                    insert_special_sql = text("""
+                        INSERT INTO jps.TDR_REPLY_SPECIAL_COMMENT
+                        (DAILY_NO, DOC_DATE, EMPNO, UPDATETIME)
+                        VALUES (:daily_no, :doc_date, :empno, SYSDATE)
+                    """)
+
+                    db.execute(insert_special_sql, {
+                        "daily_no": daily_no,
+                        "doc_date": doc_date,
+                        "empno": report_empno
+                    })
             
             # 3. 回應紀錄 - 取得日報內容項目數量
             detail_count_sql = text("""

@@ -4,20 +4,28 @@ import React from "react";
 import SearchableDropdown from "./SearchableDropdown";
 import SimpleDropdown from "./SimpleDropdown";
 
+export interface ServiceCompany {
+  id?: string;
+  cocode: string;
+  coabbv: string;
+}
+
+export interface ServiceTarget {
+  cocode: string;
+  coabbv: string;
+  deptno: string;
+  deptabbv: string;
+  empno: string;
+  empnamec: string;
+}
+
 interface ServiceSelectorProps {
   selectedCompanyId?: string;
   selectedTargetId?: string;
-  onCompanyChange: (companyId?: string) => void;
-  onTargetChange: (targetId?: string) => void;
-  serviceCompanies?: Array<{ id: string; cocode: string; coabbv: string }>;
-  serviceTargets?: Array<{
-    cocode: string;
-    coabbv: string;
-    deptno: string;
-    deptabbv: string;
-    empno: string;
-    empnamec: string;
-  }>;
+  onCompanyChange: (companyId?: string, company?: ServiceCompany) => void;
+  onTargetChange: (targetId?: string, target?: ServiceTarget) => void;
+  serviceCompanies?: ServiceCompany[];
+  serviceTargets?: ServiceTarget[];
   required?: boolean;
   className?: string;
 }
@@ -42,6 +50,18 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     name: target.empnamec || target.empno,
   }));
 
+  const handleCompanyChange = (companyId?: string | number) => {
+    const id = companyId?.toString();
+    const company = serviceCompanies.find(c => c.cocode === id || c.id === id);
+    onCompanyChange(id, company);
+  };
+
+  const handleTargetChange = (targetId?: string | number) => {
+    const id = targetId?.toString();
+    const target = serviceTargets.find(t => t.empno === id);
+    onTargetChange(id, target);
+  };
+
   return (
     <div className={`space-y-4 ${className}`}>
       {/* 服務公司選擇 */}
@@ -50,7 +70,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         placeholder="請選擇服務公司"
         options={companyOptions}
         selectedValue={selectedCompanyId}
-        onSelectionChange={onCompanyChange}
+        onSelectionChange={handleCompanyChange}
         isLoading={false}
         required={required}
       />
@@ -61,7 +81,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         placeholder="請選擇服務對象"
         options={targetOptions}
         selectedValue={selectedTargetId}
-        onSelectionChange={onTargetChange}
+        onSelectionChange={handleTargetChange}
         isLoading={false}
         required={required}
       />

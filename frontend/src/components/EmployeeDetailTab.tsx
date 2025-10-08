@@ -230,6 +230,16 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                       {projectReport.work_item_name}
                     </div>
                   )}
+                  {projectReport.service_company_name && (
+                    <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-orange-100 text-orange-800">
+                      {projectReport.service_company_name}
+                    </div>
+                  )}
+                  {projectReport.service_target_name && (
+                    <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-cyan-100 text-cyan-800">
+                      {projectReport.service_target_name}
+                    </div>
+                  )}
                   {projectReport.total_execution_time_minutes !== undefined &&
                   projectReport.total_execution_time_minutes > 0 ? (
                     <span className="text-base text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">

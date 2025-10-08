@@ -56,7 +56,7 @@ interface ChatInterfaceProps {
   reportOwnerId?: number; // 報告擁有者的員工ID
   reportOwnerEmpno?: string; // 報告擁有者的員工編號
   reportOwnerName?: string; // 報告擁有者的姓名
-  reportAuthor?: {empno: string, empname: string} | null; // ✅ 新增: 已獲取的作者資訊
+  reportAuthor?: { empno: string; empname: string } | null; // ✅ 新增: 已獲取的作者資訊
   className?: string;
   reportStatus?: string;
   approvals: SupervisorApprovalInfo[];
@@ -263,7 +263,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [fetchComments, authFetch]);
 
   const handleSubmitMessage = async (useDefaultMessage = false) => {
-    const finalMessage = useDefaultMessage ? "瞭解!" : newMessage.trim();
+    const finalMessage = useDefaultMessage ? "瞭解 !" : newMessage.trim();
     if (!finalMessage || !authFetch) return;
     setIsSubmitting(true);
     try {
@@ -287,10 +287,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onForwardUsersChange?.([]); // 清空轉寄選擇
         await fetchComments();
 
-        // 如果是點擊「瞭解!」按鈕，返回上一頁
-        if (useDefaultMessage) {
-          navigate(-1);
-        }
+        // 送出回覆後返回上一頁
+        navigate(-1);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交回覆失敗");
@@ -304,7 +302,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const handleSubmitReview = async (useDefaultComment = false) => {
-    const finalComment = useDefaultComment ? "瞭解!" : reviewComment.trim();
+    const finalComment = useDefaultComment ? "瞭解 !" : reviewComment.trim();
     if (!finalComment) {
       toast.error("請輸入審閱意見");
       return;
@@ -342,15 +340,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();
 
-        // 如果是點擊「瞭解!」按鈕，返回上一頁
-        if (useDefaultComment) {
-          navigate(-1);
-        } else if (onReviewCompleted) {
-          // 評分完成後跳轉回審閱列表
-          setTimeout(() => {
-            onReviewCompleted();
-          }, 1500); // 延遲1.5秒讓用戶看到成功訊息
-        }
+        // 送出審閱後返回上一頁
+        navigate(-1);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交審閱失敗");
@@ -583,9 +574,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const suggestedReplies = [
     "好的，我會修改",
     "收到，謝謝主管指導",
-    "關於這點，我想補充說明...",
     "我會在下次注意這個問題",
     "謝謝建議，我會改進",
+    "已瞭解",
   ];
 
   const supervisorSuggestedReplies = [
@@ -593,7 +584,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     "Go Ahead !",
     "Well Done & Thanks !",
     "內容過於簡單 !",
-    "瞭解!",
+    "瞭解 !",
   ];
   if (isLoading) {
     return (
@@ -651,7 +642,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             disabled={isSubmitting}
             className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
-            {isSubmitting ? "送出中..." : urlStatus === "P" ? "確認" : "瞭解!"}
+            {isSubmitting ? "送出中..." : urlStatus === "P" ? "確認" : "瞭解 !"}
           </button>
         </div>
       </div>

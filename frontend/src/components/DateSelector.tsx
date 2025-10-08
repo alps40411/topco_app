@@ -4,11 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import {
-  getDateCache,
-  setDateCache,
-  CACHE_DURATION,
-} from "../utils/dateCache";
+import { getDateCache, setDateCache, CACHE_DURATION } from "../utils/dateCache";
 import type { DateOption } from "../utils/dateCache";
 
 interface DateSelectorProps {
@@ -216,9 +212,9 @@ const DateSelector: React.FC<DateSelectorProps> = ({
             } else if (selectedOption.value === currentReportDate) {
               return "預設日期";
             } else if (!selectedOption.is_weekday) {
-              return "假日補報";
+              return "假日補繳";
             } else {
-              return "補報/預報";
+              return "補繳/預繳";
             }
           })()}
         </div>

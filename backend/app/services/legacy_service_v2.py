@@ -188,13 +188,14 @@ class LegacyReportServiceV2:
                 
                 # 更新現有記錄
                 update_sql = text("""
-                    UPDATE jps.tdr_draft 
+                    UPDATE jps.tdr_draft
                     SET PLAN_SUBJ_C = :plan_subj_c,
                         SOP_DESC_C = :sop_desc_c,
                         WORK_ITEM_SEQ = :work_item_seq,
                         SERVICE_COCODE = COALESCE(:service_cocode, SERVICE_COCODE),
                         SERVICE_EMPNO = COALESCE(:service_empno, SERVICE_EMPNO),
                         SERVICE_EMPNAMEC = COALESCE(:service_empnamec, SERVICE_EMPNAMEC),
+                        SERVICE_TARGET_COCODE = COALESCE(:service_target_cocode, SERVICE_TARGET_COCODE),
                         SERVICE_DEPTNO = COALESCE(:service_deptno, SERVICE_DEPTNO),
                         CONTENT = :content,
                         EXECUTION_TIME_MINUTES = :execution_time_minutes,
@@ -214,6 +215,7 @@ class LegacyReportServiceV2:
                     "service_cocode": draft_content.get('service_cocode'),
                     "service_empno": draft_content.get('service_empno'),
                     "service_empnamec": draft_content.get('service_empnamec'),
+                    "service_target_cocode": draft_content.get('service_target_cocode'),
                     "service_deptno": draft_content.get('service_deptno'),
                     "content": merged_content,
                     "execution_time_minutes": total_time,
@@ -348,14 +350,14 @@ class LegacyReportServiceV2:
                     INSERT INTO jps.tdr_draft (
                         DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE,
                         PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C, WORK_ITEM_SEQ,
-                        SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
+                        SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_TARGET_COCODE, SERVICE_DEPTNO,
                         CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
                         ATT_FILE1, ATT_FILE2, FILES,
                         STATUS, CREATED_DATE, CREATED_TIME, UPDATED_DATE, UPDATED_TIME
                     ) VALUES (
                         :daily_no, :empno, :cocode, :doc_date, :draft_type,
                         :planno, :plan_subj_c, :sopno, :sop_desc_c, :work_item_seq,
-                        :service_cocode, :service_empno, :service_empnamec, :service_deptno,
+                        :service_cocode, :service_empno, :service_empnamec, :service_target_cocode, :service_deptno,
                         :content, :execution_time_minutes, :word_count,
                         :att_file1, :att_file2, :files,
                         'A', :created_date, :created_time, :updated_date, :updated_time
@@ -376,6 +378,7 @@ class LegacyReportServiceV2:
                     "service_cocode": draft_content.get('service_cocode'),
                     "service_empno": draft_content.get('service_empno'),
                     "service_empnamec": draft_content.get('service_empnamec'),
+                    "service_target_cocode": draft_content.get('service_target_cocode'),
                     "service_deptno": draft_content.get('service_deptno'),
                     "content": content,
                     "execution_time_minutes": draft_content.get('execution_time_minutes', 0),
@@ -471,306 +474,6 @@ class LegacyReportServiceV2:
         except Exception as e:
             logger.error(f"Error getting today drafts: {str(e)}")
             return []
-    
-    @staticmethod
-    def submit_draft_to_final(db: Session, daily_no: str, empno: str, cocode: str, 
-                             doc_date: str) -> str:
-        """將暫存提交為正式日報 - 使用新的資料表結構，支援多個工作計畫"""
-        try:
-            # 取得所有暫存資料（可能有多個工作計畫）
-            draft_sql = text("""
-                SELECT DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE,
-                       PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C, WORK_ITEM_SEQ,
-                       SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
-                       CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
-                       ATT_FILE1, ATT_FILE2, FILES,
-                       CREATED_DATE, CREATED_TIME, UPDATED_DATE, UPDATED_TIME, STATUS
-                FROM jps.tdr_draft 
-                WHERE DAILY_NO = :daily_no
-                ORDER BY PLANNO, SOPNO
-            """)
-            draft_results = db.execute(draft_sql, {"daily_no": daily_no}).fetchall()
-            
-            if not draft_results:
-                raise ValueError(f"Draft {daily_no} not found")
-            
-            # 使用原始的 COCODE（不需要轉換）
-            original_cocode = cocode
-            
-            # 取得員工和部門資訊 (JOIN 部門主檔)
-            emp_sql = text("""
-                SELECT e.empnamec, e.deptno, d.deptnamec, e.g_deptno, e.leader
-                FROM jps.dcd003$master e
-                LEFT JOIN jps.dcd002$master d ON e.deptno = d.deptno AND e.cocode = d.cocode
-                WHERE e.empno = :empno AND e.cocode = :original_cocode
-            """)
-            emp_result = db.execute(emp_sql, {"empno": empno, "original_cocode": original_cocode}).fetchone()
-            
-            if not emp_result:
-                raise ValueError(f"Employee {empno} not found")
-            
-            empnamec, deptno, deptnamec, g_deptno, leader = emp_result
-            
-            # 取得目前日期時間
-            now = datetime.now()
-            current_date = now.strftime('%Y%m%d')
-            current_time = now.strftime('%H:%M:%S')
-            
-            # 計算總字數和按 sopno 分組收集檔案
-            total_word_count = 0
-            all_att_file1 = None
-            all_att_file2 = None
-            sopno_groups = {}
-            
-            for draft in draft_results:
-                total_word_count += draft[16] or 0  # WORD_COUNT
-                sopno = draft[7]  # SOPNO
-                
-                # 按 sopno 分組
-                if sopno not in sopno_groups:
-                    sopno_groups[sopno] = {
-                        'drafts': [],
-                        'files': []
-                    }
-                sopno_groups[sopno]['drafts'].append(draft)
-                
-                # 收集此 draft 的檔案
-                if draft[19]:  # FILES
-                    try:
-                        files = json.loads(draft[19])
-                        sopno_groups[sopno]['files'].extend(files)
-                    except:
-                        pass
-                        
-                # 收集所有檔案名稱和路徑 - 修復：用逗號分隔所有檔案
-                if draft[17]:  # ATT_FILE1 (檔案名稱)
-                    if all_att_file1:
-                        all_att_file1 += "," + draft[17]
-                    else:
-                        all_att_file1 = draft[17]
-                if draft[18]:  # ATT_FILE2 (檔案路徑)
-                    if all_att_file2:
-                        all_att_file2 += "," + draft[18]
-                    else:
-                        all_att_file2 = draft[18]
-            
-            # 檢查是否為重新提交（tdr_master 已存在）
-            check_master_sql = text("""
-                SELECT COUNT(*) FROM jps.tdr_master 
-                WHERE daily_no = :daily_no
-            """)
-            master_exists = db.execute(check_master_sql, {"daily_no": daily_no}).scalar() > 0
-            
-            if master_exists:
-                logger.info(f"重新提交日報 {daily_no}，保留 master 資料，重建 detail 資料")
-                
-                # 刪除現有的 detail1、detail2 和檔案記錄
-                delete_detail1_sql = text("DELETE FROM jps.tdr_detail1 WHERE daily_no = :daily_no")
-                delete_detail2_sql = text("DELETE FROM jps.tdr_detail2 WHERE daily_no = :daily_no")
-                # 根據 daily_no 的檔案ID模式刪除檔案
-                daily_no_prefix = int(daily_no) * 1000000
-                delete_files_sql = text("""
-                    DELETE FROM jps.tdr_upload_file 
-                    WHERE id >= :daily_no_start AND id < :daily_no_end
-                """)
-                
-                logger.info(f"開始刪除舊記錄：daily_no={daily_no}, empno={empno}")
-                
-                detail1_deleted = db.execute(delete_detail1_sql, {"daily_no": daily_no}).rowcount
-                detail2_deleted = db.execute(delete_detail2_sql, {"daily_no": daily_no}).rowcount
-                files_deleted = db.execute(delete_files_sql, {
-                    "daily_no_start": daily_no_prefix,
-                    "daily_no_end": daily_no_prefix + 1000000
-                }).rowcount
-                
-                logger.info(f"服務層刪除結果：detail1={detail1_deleted}筆, detail2={detail2_deleted}筆, files={files_deleted}筆")
-                
-                # 更新 master 資料的一些欄位（如字數、時間等）
-                update_master_sql = text("""
-                    UPDATE jps.tdr_master SET 
-                        WORD_COUNT = :word_count,
-                        XDATE = :current_date,
-                        XTIME = :current_time,
-                        ATT_FILE1 = :att_file1,
-                        ATT_FILE2 = :att_file2,
-                        SOP_DESC_C = :sop_desc_c
-                    WHERE daily_no = :daily_no
-                """)
-            else:
-                logger.info(f"首次提交日報 {daily_no}，創建新的 master 資料")
-                
-                # 插入新的 tdr_master
-                master_sql = text("""
-                    INSERT INTO tdr_master (
-                        DAILY_NO, COCODE, EMPNO, DEPTNO, DOC_DATE, EMERGENCY, CLASSIFY, SCORE,
-                        XUSER, XDATE, XTIME, STATUS, LEADER, G_DEPTNO, EMPNAMEC, DEPTNAMEC,
-                        UPLOAD_SITE, EMPNAMEC_N, WFINBOX_STATUS, SOP_DESC_C, CUST_ENAME1, CUST_COMP_ABBV1,
-                        WORD_COUNT, ATT_FILE1, ATT_FILE2, openpath, openwebpage
-                    ) VALUES (
-                        :daily_no, :cocode, :empno, :deptno, :doc_date, NULL, NULL, 0,
-                        :empno, :current_date, :current_time, 'N', :leader, :g_deptno, :empnamec, :deptnamec,
-                        'D', :empnamec, 'N', :sop_desc_c, NULL, NULL,
-                        :word_count, :att_file1, :att_file2, '/MyReport/', 'viewed.aspx'
-                    )
-                """)
-            
-            # 從 tpm_sop 重新取得正確的 SOP_DESC_C（忽略暫存中的錯誤資料）
-            main_sop_desc_c = ''
-            first_sopno = draft_results[0][7] if len(draft_results) > 0 and draft_results[0][7] else None  # SOPNO
-            if first_sopno:
-                try:
-                    sop_sql = text("SELECT sop_desc_c FROM jps.tpm_sop WHERE sopno = :sopno")
-                    sop_result = db.execute(sop_sql, {"sopno": first_sopno}).fetchone()
-                    if sop_result and sop_result[0]:
-                        main_sop_desc_c = sop_result[0]
-                        # 限制長度為50字元
-                        if len(main_sop_desc_c) > 50:
-                            main_sop_desc_c = main_sop_desc_c[:47] + '...'
-                except Exception as e:
-                    logger.warning(f"無法取得 sopno {first_sopno} 的正確執行工作描述: {str(e)}")
-                    # 如果無法取得正確描述，使用暫存中的資料並截斷
-                    main_sop_desc_c = draft_results[0][8] if draft_results[0][8] else ''
-                    if len(main_sop_desc_c) > 50:
-                        main_sop_desc_c = main_sop_desc_c[:47] + '...'
-            
-            # 執行對應的 SQL（INSERT 或 UPDATE）
-            master_params = {
-                "daily_no": daily_no,
-                "cocode": cocode,
-                "empno": empno,
-                "deptno": deptno,
-                "doc_date": doc_date,
-                "leader": leader,
-                "g_deptno": g_deptno,
-                "empnamec": empnamec,
-                "deptnamec": deptnamec,
-                "sop_desc_c": main_sop_desc_c,
-                "word_count": total_word_count,
-                "att_file1": all_att_file1,
-                "att_file2": all_att_file2,
-                "current_date": current_date,
-                "current_time": current_time
-            }
-            
-            if master_exists:
-                # 執行更新
-                db.execute(update_master_sql, master_params)
-            else:
-                # 執行插入
-                db.execute(master_sql, master_params)
-            
-            # 為每個sopno組創建detail1和detail2記錄
-            daily_sub_nos = 1
-            sopno_to_daily_sub_nos = {}  # 記錄 sopno 對應的 daily_sub_nos
-            
-            for sopno, group_data in sopno_groups.items():
-                drafts_in_group = group_data['drafts']
-                group_files = group_data['files']
-                
-                # 記錄對應關係
-                sopno_to_daily_sub_nos[sopno] = daily_sub_nos
-                
-                logger.info(f"服務層處理 sopno={sopno}, daily_sub_nos={daily_sub_nos}, 檔案數量={len(group_files)}")
-                # 插入 tdr_detail1（每個sopno組一次）
-                detail1_sql = text("""
-                    INSERT INTO tdr_detail1 (
-                        DAILY_NO, DAILY_SUB_NOS, XUSER, XDATE, XTIME, CUNO1, COMP_SERNO1
-                    ) VALUES (
-                        :daily_no, :daily_sub_nos, :empno, :current_date, :current_time, NULL, NULL
-                    )
-                """)
-                
-                db.execute(detail1_sql, {
-                    "daily_no": daily_no,
-                    "daily_sub_nos": daily_sub_nos,
-                    "empno": empno,
-                    "current_date": current_date,
-                    "current_time": current_time
-                })
-                
-                # 插入 tdr_detail2（該sopno組內的每個記錄）
-                daily_job_nos = 1
-                for draft in drafts_in_group:
-                    detail2_sql = text("""
-                        INSERT INTO tdr_detail2 (
-                            DAILY_NO, DAILY_SUB_NOS, DAILY_JOB_NOS, COCODE, EMPNO, SOP_CODE, STATUS,
-                            XUSER, XDATE, XTIME, ITEMDESC1, PROD_CATE, EXETIME, ESTIMATE, ATTITUDE,
-                            PROD_NO, SOLUT_SUBJ, SOLUT_STATUS, EMPNAME1, EMPNAME2, EMPNAME3, EMPNAME4, EMPNAME5,
-                            PPS_SERVECOCODE, PPS_EMPNO, PPS_COCODE, PPS_DEPTNO, MEMO_COLLECT, MEMO,
-                            PPS_EMPNAMEC, PLANNO, SOPNO
-                        ) VALUES (
-                            :daily_no, :daily_sub_nos, :daily_job_nos, :cocode, :empno, :work_item_seq, 'N',
-                            :empnamec, :current_date, :current_time, :content, NULL, :execution_time_minutes, NULL, NULL,
-                            NULL, NULL, NULL, '0', NULL, NULL, NULL, NULL,
-                            :service_cocode, :service_empno, :service_cocode, :service_deptno, '1', :content,
-                            :service_empnamec, :planno, :sopno
-                        )
-                    """)
-                    
-                    db.execute(detail2_sql, {
-                        "daily_no": daily_no,
-                        "daily_sub_nos": daily_sub_nos,
-                        "daily_job_nos": daily_job_nos,
-                        "cocode": cocode,
-                        "empno": empno,
-                        "work_item_seq": draft[9],  # WORK_ITEM_SEQ
-                        "empnamec": empnamec,
-                        "content": draft[14],  # CONTENT
-                        "execution_time_minutes": draft[15],  # EXECUTION_TIME_MINUTES
-                        "service_cocode": draft[10],  # SERVICE_COCODE
-                        "service_empno": draft[11],   # SERVICE_EMPNO
-                        "service_deptno": draft[13],  # SERVICE_DEPTNO
-                        "service_empnamec": draft[12], # SERVICE_EMPNAMEC
-                        "planno": draft[5],  # PLANNO (should be numeric from tdr_draft.PLANNO)
-                        "sopno": draft[7],   # SOPNO (should be numeric from tdr_draft.SOPNO)
-                        "current_date": current_date,
-                        "current_time": current_time
-                    })
-                    
-                    daily_job_nos += 1
-                
-                daily_sub_nos += 1
-            
-            # 更新所有暫存狀態為已提交
-            update_draft_sql = text("""
-                UPDATE jps.tdr_draft SET STATUS = 'S' WHERE DAILY_NO = :daily_no
-            """)
-            db.execute(update_draft_sql, {"daily_no": daily_no})
-            
-            # 為每個 sopno 組處理其對應的檔案
-            total_files_processed = 0
-            for sopno, group_data in sopno_groups.items():
-                group_files = group_data['files']
-                corresponding_daily_sub_nos = sopno_to_daily_sub_nos[sopno]
-                
-                if group_files:
-                    logger.info(f"服務層處理 sopno={sopno} (daily_sub_nos={corresponding_daily_sub_nos}) 的 {len(group_files)} 個檔案")
-                    for i, f in enumerate(group_files):
-                        logger.info(f"  檔案{i}: {f}")
-                    
-                    LegacyReportServiceV2.process_files_for_specific_daily_sub_nos(
-                        db=db,
-                        daily_no=daily_no,
-                        daily_sub_nos=corresponding_daily_sub_nos,
-                        empno=empno,
-                        cocode=original_cocode,
-                        doc_date=doc_date,
-                        files=group_files
-                    )
-                    total_files_processed += len(group_files)
-                    logger.info(f"服務層 sopno={sopno} 檔案處理完成")
-                else:
-                    logger.info(f"服務層 sopno={sopno} (daily_sub_nos={corresponding_daily_sub_nos}) 沒有檔案")
-            
-            logger.info(f"服務層檔案處理完成，總共處理 {total_files_processed} 個檔案")
-            db.commit()
-            logger.info(f"Successfully submitted draft {daily_no} to final with {len(draft_results)} work items")
-            return daily_no
-            
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error submitting draft to final: {str(e)}")
-            raise
     
     @staticmethod
     def get_reports_by_date(db: Session, doc_date: str, supervisor_empno: str, cocode: str) -> List[Dict[str, Any]]:

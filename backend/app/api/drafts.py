@@ -98,12 +98,24 @@ async def update_draft_by_daily_planno_sopno(
         # 準備更新數據
         content = update_data.get('content', '')
         files = update_data.get('files', [])
-        
+        new_planno = update_data.get('planno', '')  # 新的工作計畫編號
+        new_sopno = update_data.get('sopno', '')    # 新的執行工作編號
+        work_item_ids = update_data.get('work_item_ids', [])  # 工作項目ID列表
+
+        # 服務對象完整資料（從前端直接接收）
+        service_cocode = update_data.get('service_cocode', '')
+        service_empno = update_data.get('service_empno', '')
+        service_empnamec = update_data.get('service_empnamec', '')  # 從前端接收
+        service_target_cocode = update_data.get('service_target_cocode', '')  # 新增
+        service_deptno = update_data.get('service_deptno', '')  # 從前端接收
+
+        execution_time_minutes = update_data.get('execution_time_minutes', 0)
+
         # 處理檔案
         att_file1_list = []
         att_file2_list = []
         files_json_list = []
-        
+
         for file_info in files:
             if isinstance(file_info, dict):
                 file_name = file_info.get('name', '')
@@ -113,38 +125,84 @@ async def update_draft_by_daily_planno_sopno(
                 if file_url:
                     att_file2_list.append(file_url)
                 files_json_list.append(file_info)
-        
+
         att_file1 = ','.join(att_file1_list) if att_file1_list else ""
         att_file2 = ','.join(att_file2_list) if att_file2_list else ""
         files_json = json.dumps(files_json_list, ensure_ascii=False) if files_json_list else "[]"
-        
+
         # 計算字數
         word_count = len(content) if content else 0
-        
-        # 更新記錄
+
+        # 處理工作項目序號 (將ID列表轉換為 "1/2/3" 格式)
+        work_item_seq = '/'.join(str(id) for id in work_item_ids) if work_item_ids else ""
+
+        # 查詢新的工作計畫名稱和執行工作名稱
+        plan_subj_c = ""
+        if new_planno:
+            plan_sql = text("""
+                SELECT plan_subj_c FROM jps.tjp_master
+                WHERE planno = :planno
+            """)
+            plan_result = db.execute(plan_sql, {"planno": new_planno}).fetchone()
+            if plan_result:
+                plan_subj_c = plan_result[0]
+
+        sop_desc_c = ""
+        if new_sopno:
+            sop_sql = text("""
+                SELECT sop_desc_c FROM jps.tpm_sop
+                WHERE sopno = :sopno
+            """)
+            sop_result = db.execute(sop_sql, {"sopno": new_sopno}).fetchone()
+            if sop_result:
+                sop_desc_c = sop_result[0]
+
+        # 更新記錄（不再查詢服務對象名稱，由前端提供完整資料）
         from datetime import datetime
         now = datetime.now()
         current_date = now.strftime('%Y%m%d')
         current_time = now.strftime('%H:%M:%S')
-        
+
         update_sql = text("""
-            UPDATE jps.tdr_draft 
+            UPDATE jps.tdr_draft
             SET CONTENT = :content,
                 WORD_COUNT = :word_count,
                 ATT_FILE1 = :att_file1,
                 ATT_FILE2 = :att_file2,
                 FILES = :files,
+                PLANNO = :new_planno,
+                PLAN_SUBJ_C = :plan_subj_c,
+                SOPNO = :new_sopno,
+                SOP_DESC_C = :sop_desc_c,
+                WORK_ITEM_SEQ = :work_item_seq,
+                SERVICE_COCODE = :service_cocode,
+                SERVICE_EMPNO = :service_empno,
+                SERVICE_EMPNAMEC = :service_empnamec,
+                SERVICE_TARGET_COCODE = :service_target_cocode,
+                SERVICE_DEPTNO = :service_deptno,
+                EXECUTION_TIME_MINUTES = :execution_time_minutes,
                 UPDATED_DATE = :updated_date,
                 UPDATED_TIME = :updated_time
             WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
         """)
-        
+
         db.execute(update_sql, {
             "content": content,
             "word_count": word_count,
             "att_file1": att_file1,
             "att_file2": att_file2,
             "files": files_json,
+            "new_planno": new_planno,
+            "plan_subj_c": plan_subj_c,
+            "new_sopno": new_sopno,
+            "sop_desc_c": sop_desc_c,
+            "work_item_seq": work_item_seq,
+            "service_cocode": service_cocode,
+            "service_empno": service_empno,
+            "service_empnamec": service_empnamec,
+            "service_target_cocode": service_target_cocode,
+            "service_deptno": service_deptno,
+            "execution_time_minutes": execution_time_minutes,
             "updated_date": current_date,
             "updated_time": current_time,
             "daily_no": daily_no,

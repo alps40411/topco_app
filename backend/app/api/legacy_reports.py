@@ -461,7 +461,7 @@ async def get_all_work_data(
                 project_execution_works[planno] = list(project_execution_works[planno].values())
         
         # 4. 取得服務公司列表
-        service_companies_sql = text("SELECT cocode, coabbv FROM jps.dcd001$master WHERE eip_active = 'Y'")
+        service_companies_sql = text("SELECT cocode, coabbv FROM jps.dcd001$master WHERE eip_active = 'Y' order by cocode")
         service_companies_result = db.execute(service_companies_sql)
         service_companies = []
         for row in service_companies_result.fetchall():
@@ -541,12 +541,13 @@ async def get_consolidated_today(
         
         # 查詢指定日期的所有活躍記錄
         draft_sql = text("""
-            SELECT d.DAILY_NO, d.CONTENT, d.PLANNO, d.PLAN_SUBJ_C, d.SOPNO, d.SOP_DESC_C, 
-                   d.WORK_ITEM_SEQ, d.SERVICE_COCODE, d.SERVICE_EMPNO, d.SERVICE_EMPNAMEC, 
+            SELECT d.DAILY_NO, d.CONTENT, d.PLANNO, d.PLAN_SUBJ_C, d.SOPNO, d.SOP_DESC_C,
+                   d.WORK_ITEM_SEQ, d.SERVICE_COCODE, d.SERVICE_EMPNO, d.SERVICE_EMPNAMEC,
+                   d.SERVICE_TARGET_COCODE, d.SERVICE_DEPTNO,
                    d.EXECUTION_TIME_MINUTES, d.FILES, d.AI_CONTENT, d.STATUS
             FROM jps.tdr_draft d
-            WHERE d.EMPNO = :empno 
-            AND d.DOC_DATE = :doc_date 
+            WHERE d.EMPNO = :empno
+            AND d.DOC_DATE = :doc_date
             ORDER BY d.CREATED_DATE DESC
         """)
         
@@ -564,7 +565,7 @@ async def get_consolidated_today(
             content = row[1] or ""
             planno = row[2] or ""
             plan_subj_c = row[3] or "基本工作項目"
-            
+
             logger.info(f"處理記錄: daily_no={daily_no}, planno={planno}, plan_subj_c={plan_subj_c}")
             sopno = row[4] or ""
             sop_desc_c = row[5] or ""
@@ -572,13 +573,16 @@ async def get_consolidated_today(
             service_cocode = row[7] or ""
             service_empno = row[8] or ""
             service_empnamec = row[9] or ""
-            execution_time_minutes = row[10] or 0
-            files_json = row[11] or "[]"
-            ai_content = row[12]
-            status = row[13]
-            
+            service_target_cocode = row[10] or ""  # 新增
+            service_deptno = row[11] or ""         # 新增
+            execution_time_minutes = row[12] or 0  # 索引調整
+            files_json = row[13] or "[]"           # 索引調整
+            ai_content = row[14]                   # 索引調整
+            status = row[15]                       # 索引調整
+
             # 解析多個工作項目序號並取得對應的中文名稱
             work_item_names = []
+            work_item_ids = []
             if work_item_seq and sopno:
                 logger.info(f"處理工作項目序列: '{work_item_seq}', sopno: '{sopno}'")
                 # 分割工作項目序號（如 "1/2" → ["1", "2"]）
@@ -586,50 +590,89 @@ async def get_consolidated_today(
                 logger.info(f"分割後的序號: {seq_parts}")
                 for seq in seq_parts:
                     if seq.strip():
+                        # 將序號轉換為整數ID (用於前端編輯)
+                        try:
+                            work_item_ids.append(int(seq.strip()))
+                        except ValueError:
+                            pass
+
                         # 查詢每個序號對應的中文名稱
                         work_item_sql = text("""
-                            SELECT name FROM jps.tpm_sop_detail 
+                            SELECT name FROM jps.tpm_sop_detail
                             WHERE sopno = :sopno AND seq = :seq
                         """)
                         work_item_result = db.execute(work_item_sql, {
                             "sopno": sopno,
                             "seq": seq.strip()
                         }).fetchone()
-                        
+
                         if work_item_result and work_item_result[0]:
                             work_item_names.append(work_item_result[0])
                             logger.info(f"找到工作項目 {seq}: '{work_item_result[0]}'")
                         else:
                             work_item_names.append(f"工作項目 {seq}")
                             logger.warning(f"未找到工作項目 sopno={sopno}, seq={seq} 的中文名稱")
-            
+
             # 合併工作項目名稱
             work_item_name = " / ".join(work_item_names) if work_item_names else work_item_seq
             logger.info(f"最終工作項目名稱: '{work_item_name}'")
-            
+
             # 解析檔案
             try:
                 files = json.loads(files_json) if files_json else []
             except:
                 files = []
-            
+
+            # 查詢服務公司中文名稱
+            service_company_name = service_cocode
+            if service_cocode:
+                company_sql = text("""
+                    SELECT coabbv FROM jps.dcd001$master
+                    WHERE cocode = :cocode
+                """)
+                company_result = db.execute(company_sql, {"cocode": service_cocode}).fetchone()
+                if company_result:
+                    service_company_name = company_result[0]
+
             # 構建服務對象名稱
             service_target_name = ""
             if service_empnamec and service_empno:
-                service_target_name = f"{service_empnamec}({service_empno})"
-            
+                service_target_name = f"{service_empnamec}"
+
+            # 將 planno 轉換為整數 ID (如果存在)
+            project_id = None
+            if planno:
+                try:
+                    project_id = int(planno)
+                except (ValueError, TypeError):
+                    project_id = planno
+
+            # 將 sopno 轉換為整數 ID (如果存在)
+            execution_work_id = None
+            if sopno:
+                try:
+                    execution_work_id = int(sopno)
+                except (ValueError, TypeError):
+                    execution_work_id = sopno
+
             consolidated_records.append({
                 "daily_no": daily_no,  # 添加 daily_no 字段
                 "sopno": sopno,        # 添加 sopno 字段用於精確識別記錄
                 "project": {
-                    "id": planno,
+                    "id": project_id,
                     "planno": planno,
                     "plan_subj_c": plan_subj_c
                 },
+                "execution_work_id": execution_work_id,  # 執行工作ID
                 "execution_work_name": sop_desc_c,
+                "work_item_ids": work_item_ids,  # 工作項目ID列表
                 "work_item_name": work_item_name,  # 使用中文工作項目名稱
-                "service_company_name": service_cocode,
-                "service_target_name": service_target_name,
+                "service_cocode": service_cocode,  # 服務公司代碼
+                "service_company_name": service_company_name,  # 服務公司中文名稱
+                "service_empno": service_empno,  # 服務對象員工編號
+                "service_target_name": service_target_name,  # 服務對象名稱
+                "service_target_cocode": service_target_cocode,  # 服務對象公司別
+                "service_deptno": service_deptno,  # 服務對象部門
                 "content": content,
                 "files": files,
                 "record_count": 1,
@@ -1004,10 +1047,10 @@ async def upload_daily_report(
         draft_sql = text("""
             SELECT DAILY_NO, EMPNO, COCODE, DOC_DATE, DRAFT_TYPE,
                    PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C, WORK_ITEM_SEQ,
-                   SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_DEPTNO,
+                   SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC, SERVICE_TARGET_COCODE, SERVICE_DEPTNO,
                    CONTENT, EXECUTION_TIME_MINUTES, WORD_COUNT,
                    ATT_FILE1, ATT_FILE2, FILES, STATUS
-            FROM jps.tdr_draft 
+            FROM jps.tdr_draft
             WHERE EMPNO = :empno AND COCODE = :cocode AND DOC_DATE = :doc_date
             ORDER BY CREATED_DATE, CREATED_TIME
         """)
@@ -1062,24 +1105,24 @@ async def upload_daily_report(
         all_att_file2 = None
         
         for draft in draft_results:
-            total_word_count += draft[16] or 0  # WORD_COUNT
-            if draft[19]:  # FILES
+            total_word_count += draft[17] or 0  # WORD_COUNT (索引調整 16→17)
+            if draft[20]:  # FILES (索引調整 19→20)
                 try:
-                    files = json.loads(draft[19])
+                    files = json.loads(draft[20])
                     all_files.extend(files)
                 except:
                     pass
             # 收集所有檔案名稱和路徑 - 修復：用逗號分隔所有檔案
-            if draft[17]:  # ATT_FILE1 (檔案名稱)
+            if draft[18]:  # ATT_FILE1 (檔案名稱，索引調整 17→18)
                 if all_att_file1:
-                    all_att_file1 += "," + draft[17]
+                    all_att_file1 += "," + draft[18]
                 else:
-                    all_att_file1 = draft[17]
-            if draft[18]:  # ATT_FILE2 (檔案路徑)
+                    all_att_file1 = draft[18]
+            if draft[19]:  # ATT_FILE2 (檔案路徑，索引調整 18→19)
                 if all_att_file2:
-                    all_att_file2 += "," + draft[18]
+                    all_att_file2 += "," + draft[19]
                 else:
-                    all_att_file2 = draft[18]
+                    all_att_file2 = draft[19]
 
         
         # 取得執行工作描述
@@ -1208,10 +1251,10 @@ async def upload_daily_report(
         # 按照 planno + sopno 組合分組草稿，並為每組收集檔案
         planno_sopno_groups = {}
         for draft in draft_results:
-            planno = draft[2] or ""  # PLANNO
+            planno = draft[5] or ""  # PLANNO
             sopno = draft[7]  # SOPNO
             group_key = f"{planno}_{sopno}"  # 使用 planno + sopno 作為分組鍵
-            
+
             if group_key not in planno_sopno_groups:
                 planno_sopno_groups[group_key] = {
                     'planno': planno,
@@ -1220,11 +1263,11 @@ async def upload_daily_report(
                     'files': []
                 }
             planno_sopno_groups[group_key]['drafts'].append(draft)
-            
+
             # 收集此 draft 的檔案
-            if draft[19]:  # FILES
+            if draft[20]:  # FILES (索引調整 19→20)
                 try:
-                    files = json.loads(draft[19])
+                    files = json.loads(draft[20])
                     planno_sopno_groups[group_key]['files'].extend(files)
                 except:
                     pass
@@ -1297,7 +1340,7 @@ async def upload_daily_report(
                         :daily_no, :daily_sub_nos, :daily_job_nos, :cocode, :empno, :work_item_name, 'N',
                         :empnamec, :current_date, :current_time, NULL, NULL, :execution_time_minutes, NULL, NULL,
                         NULL, NULL, NULL, '0', NULL, NULL, NULL, NULL,
-                        :service_cocode, :service_empno, :service_cocode, :service_deptno, '1', :content,
+                        :service_cocode, :service_empno, :service_target_cocode, :service_deptno, '1', :content,
                         :service_empnamec, :planno, :sopno
                     )
                 """)
@@ -1310,11 +1353,12 @@ async def upload_daily_report(
                     "empno": empno,
                     "work_item_name": work_item_name,
                     "empnamec": empnamec,
-                    "content": draft[14],  # CONTENT
-                    "execution_time_minutes": draft[15]/60,  # EXECUTION_TIME_MINUTES
+                    "content": draft[15],  # CONTENT (索引調整 14→15)
+                    "execution_time_minutes": draft[16]/60,  # EXECUTION_TIME_MINUTES (索引調整 15→16)
                     "service_cocode": draft[10],  # SERVICE_COCODE
                     "service_empno": draft[11],   # SERVICE_EMPNO
-                    "service_deptno": draft[13],  # SERVICE_DEPTNO
+                    "service_target_cocode": draft[13],  # SERVICE_TARGET_COCODE (新增)
+                    "service_deptno": draft[14],  # SERVICE_DEPTNO (索引調整 13→14)
                     "service_empnamec": draft[12], # SERVICE_EMPNAMEC
                     "planno": draft[5] or '0',  # PLANNO
                     "sopno": draft[7],   # SOPNO

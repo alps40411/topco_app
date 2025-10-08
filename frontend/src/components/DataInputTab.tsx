@@ -14,7 +14,7 @@ import AttachedFilesManager from "./AttachedFilesManager";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import { getFullFileUrl } from "../utils/urlUtils";
-import ServiceSelector from "./ServiceSelector";
+import ServiceSelector, { ServiceCompany, ServiceTarget } from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
@@ -46,6 +46,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     service_cocode: undefined,
     service_empno: undefined,
     service_empnamec: undefined,
+    service_target_cocode: undefined,
     service_deptno: undefined,
     files: [],
     execution_time_minutes: 0,
@@ -249,6 +250,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
           service_cocode: currentRecord.service_cocode,
           service_empno: currentRecord.service_empno,
           service_empnamec: currentRecord.service_empnamec,
+          service_target_cocode: currentRecord.service_target_cocode,
           service_deptno: currentRecord.service_deptno,
           files: currentRecord.files || [],
           execution_time_minutes: currentRecord.execution_time_minutes || 0,
@@ -286,6 +288,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         service_cocode: undefined,
         service_empno: undefined,
         service_empnamec: undefined,
+        service_target_cocode: undefined,
         service_deptno: undefined,
         files: [],
         execution_time_minutes: 0,
@@ -475,16 +478,19 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
             <ServiceSelector
               selectedCompanyId={currentRecord.service_cocode}
               selectedTargetId={currentRecord.service_empno}
-              onCompanyChange={(cocode) => {
+              onCompanyChange={(cocode, company) => {
                 setCurrentRecord((prev) => ({
                   ...prev,
                   service_cocode: cocode,
                 }));
               }}
-              onTargetChange={(empno) => {
+              onTargetChange={(empno, target) => {
                 setCurrentRecord((prev) => ({
                   ...prev,
                   service_empno: empno,
+                  service_empnamec: target?.empnamec,
+                  service_target_cocode: target?.cocode,
+                  service_deptno: target?.deptno,
                 }));
               }}
               serviceCompanies={serviceCompanies}

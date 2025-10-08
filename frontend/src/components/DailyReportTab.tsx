@@ -25,7 +25,7 @@ import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import { getFullFileUrl } from "../utils/urlUtils";
-import ServiceSelector from "./ServiceSelector";
+import ServiceSelector, { ServiceCompany, ServiceTarget } from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
@@ -36,6 +36,9 @@ interface DailyRecordCreate
   extends Omit<WorkRecordCreate, "service_company_id" | "service_target_id"> {
   service_cocode?: string;
   service_empno?: string;
+  service_empnamec?: string;
+  service_target_cocode?: string;
+  service_deptno?: string;
 }
 
 interface WritingStatus {
@@ -69,6 +72,15 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [editingSopno, setEditingSopno] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
+  const [editProjectId, setEditProjectId] = useState<number | undefined>(undefined);
+  const [editExecutionWorkId, setEditExecutionWorkId] = useState<number | undefined>(undefined);
+  const [editWorkItemIds, setEditWorkItemIds] = useState<number[]>([]);
+  const [editServiceCocode, setEditServiceCocode] = useState<string | undefined>(undefined);
+  const [editServiceEmpno, setEditServiceEmpno] = useState<string | undefined>(undefined);
+  const [editServiceEmpnamec, setEditServiceEmpnamec] = useState<string | undefined>(undefined);
+  const [editServiceTargetCocode, setEditServiceTargetCocode] = useState<string | undefined>(undefined);
+  const [editServiceDeptno, setEditServiceDeptno] = useState<string | undefined>(undefined);
+  const [editExecutionTimeMinutes, setEditExecutionTimeMinutes] = useState<number>(0);
   const [editOriginalContent, setEditOriginalContent] = useState<string>("");
   const [editOriginalFiles, setEditOriginalFiles] = useState<FileForUpload[]>([]);
   const [editPendingDeleteFiles, setEditPendingDeleteFiles] = useState<string[]>([]);
@@ -90,6 +102,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     work_item_id: undefined,
     service_cocode: undefined,
     service_empno: undefined,
+    service_empnamec: undefined,
+    service_target_cocode: undefined,
+    service_deptno: undefined,
     files: [],
     execution_time_minutes: 0,
   });
@@ -416,6 +431,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setEditContent(content);
     setEditFiles(files);
 
+    // 載入所有編輯欄位的值
+    setEditProjectId(report.project?.id ? Number(report.project.id) : undefined);
+    setEditExecutionWorkId(report.execution_work_id);
+    setEditWorkItemIds(report.work_item_ids || []);
+    setEditServiceCocode(report.service_cocode);
+    setEditServiceEmpno(report.service_empno);
+    setEditServiceEmpnamec(report.service_target_name?.match(/^(.+)\(/)?.[1]); // 從 "姓名(工號)" 提取姓名
+    setEditServiceTargetCocode(report.service_target_cocode);
+    setEditServiceDeptno(report.service_deptno);
+    setEditExecutionTimeMinutes(report.total_execution_time_minutes || 0);
+
     // 清空 pending 列表
     setEditPendingDeleteFiles([]);
     setEditPendingUploadFiles([]);
@@ -436,10 +462,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         }
       }
 
-      // 清空狀態
+      // 清空所有編輯狀態
       setEditingSopno(null);
       setEditContent("");
       setEditFiles([]);
+      setEditProjectId(undefined);
+      setEditExecutionWorkId(undefined);
+      setEditWorkItemIds([]);
+      setEditServiceCocode(undefined);
+      setEditServiceEmpno(undefined);
+      setEditExecutionTimeMinutes(0);
       setEditOriginalContent("");
       setEditOriginalFiles([]);
       setEditPendingDeleteFiles([]);
@@ -454,6 +486,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   const saveEdit = async () => {
     if (editingSopno === null || !authFetch) return;
+
+    // 驗證必填欄位
+    if (!editExecutionWorkId) {
+      toast.error("請選擇執行工作");
+      return;
+    }
+    if (editExecutionTimeMinutes === 0) {
+      toast.error("請設定執行時間");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const reportToUpdate = reports.find((r) => r.sopno === editingSopno);
@@ -477,6 +520,15 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           body: JSON.stringify({
             content: editContent,
             files: editFiles,
+            planno: editProjectId?.toString(),
+            sopno: editExecutionWorkId?.toString(),
+            work_item_ids: editWorkItemIds,
+            service_cocode: editServiceCocode,
+            service_empno: editServiceEmpno,
+            service_empnamec: editServiceEmpnamec,
+            service_target_cocode: editServiceTargetCocode,
+            service_deptno: editServiceDeptno,
+            execution_time_minutes: editExecutionTimeMinutes,
           }),
         }
       );
@@ -505,6 +557,12 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       setEditingSopno(null);
       setEditContent("");
       setEditFiles([]);
+      setEditProjectId(undefined);
+      setEditExecutionWorkId(undefined);
+      setEditWorkItemIds([]);
+      setEditServiceCocode(undefined);
+      setEditServiceEmpno(undefined);
+      setEditExecutionTimeMinutes(0);
       setEditOriginalContent("");
       setEditOriginalFiles([]);
       setEditPendingDeleteFiles([]);
@@ -527,12 +585,15 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       toast.error("請先選擇日期。");
       return;
     }
-    if (!window.confirm("確定要提交此版本作為今日的最終日報嗎？")) return;
+
+    // 將選中的日期轉換為 YYYYMMDD 格式（如果有破折號則移除）
+    const docDate = selectedDate.replace(/-/g, "");
+    // 格式化日期為中文顯示 (YYYYMMDD -> YYYY年MM月DD日)
+    const formattedDate = docDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1年$2月$3日');
+    if (!window.confirm(`確定要提交此版本作為 ${formattedDate} 的最終日報嗎？`)) return;
 
     setIsSubmitting(true);
     try {
-      // 將選中的日期轉換為 YYYYMMDD 格式
-      const docDate = selectedDate.replace(/-/g, "");
       const response = await authFetch(
         `/api/legacy/upload-daily-report?doc_date=${docDate}`,
         {
@@ -829,6 +890,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       work_item_id: undefined,
       service_cocode: undefined,
       service_empno: undefined,
+      service_empnamec: undefined,
+      service_target_cocode: undefined,
+      service_deptno: undefined,
       files: [],
       execution_time_minutes: 0,
     });
@@ -946,8 +1010,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           work_item_name: undefined,
           service_cocode: newRecord.service_cocode,
           service_empno: newRecord.service_empno,
-          service_empnamec: undefined,
-          service_deptno: undefined,
+          service_empnamec: newRecord.service_empnamec,
+          service_target_cocode: newRecord.service_target_cocode,
+          service_deptno: newRecord.service_deptno,
           files: newRecord.files || [],
           execution_time_minutes: newRecord.execution_time_minutes || 0,
         },
@@ -977,6 +1042,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         work_item_id: undefined,
         service_cocode: undefined,
         service_empno: undefined,
+        service_empnamec: undefined,
+        service_target_cocode: undefined,
+        service_deptno: undefined,
         files: [],
         execution_time_minutes: 0,
       });
@@ -1235,15 +1303,61 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <div className="flex-grow">
                   {editingSopno === report.sopno ? (
                     <div className="space-y-4">
-                      <RichTextEditor
-                        value={editContent}
-                        onChange={setEditContent}
-                        onFileUpload={handleEditEditorFileUpload}
-                        onFileRemove={handleRemoveEditFile}
-                        files={editFiles}
-                        placeholder="編輯記錄內容... (可直接貼上圖片)"
-                        docDate={selectedDate?.replace(/-/g, '') || undefined}
+                      {/* 級聯工作選擇器 */}
+                      <CascadingWorkSelector
+                        selectedProjectId={editProjectId?.toString()}
+                        selectedExecutionWorkId={editExecutionWorkId?.toString()}
+                        selectedWorkItemId={editWorkItemIds.map(id => id.toString())}
+                        onProjectChange={(projectId) => setEditProjectId(projectId ? parseInt(projectId) : undefined)}
+                        onExecutionWorkChange={(executionWorkId) => setEditExecutionWorkId(executionWorkId ? parseInt(executionWorkId) : undefined)}
+                        onWorkItemChange={(workItemIds) => setEditWorkItemIds(workItemIds?.map(id => parseInt(id)) || [])}
+                        onServiceDataLoaded={handleServiceDataLoaded}
+                        required={false}
                       />
+
+                      {/* 服務選擇器 */}
+                      <ServiceSelector
+                        selectedCompanyId={editServiceCocode}
+                        selectedTargetId={editServiceEmpno}
+                        onCompanyChange={(cocode, company) => {
+                          setEditServiceCocode(cocode);
+                        }}
+                        onTargetChange={(empno, target) => {
+                          setEditServiceEmpno(empno);
+                          if (target) {
+                            setEditServiceTargetCocode(target.cocode);
+                            setEditServiceDeptno(target.deptno);
+                            setEditServiceEmpnamec(target.empnamec);
+                          }
+                        }}
+                        serviceCompanies={serviceCompanies}
+                        serviceTargets={serviceTargets}
+                        required={false}
+                      />
+
+                      {/* 執行時間選擇器 */}
+                      <ExecutionTimeSelector
+                        totalMinutes={editExecutionTimeMinutes}
+                        onChange={(minutes) => setEditExecutionTimeMinutes(minutes)}
+                        required
+                      />
+
+                      {/* 內容編輯器 */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          內容
+                        </label>
+                        <RichTextEditor
+                          value={editContent}
+                          onChange={setEditContent}
+                          onFileUpload={handleEditEditorFileUpload}
+                          onFileRemove={handleRemoveEditFile}
+                          files={editFiles}
+                          placeholder="編輯記錄內容... (可直接貼上圖片)"
+                          docDate={selectedDate?.replace(/-/g, '') || undefined}
+                        />
+                      </div>
+
                       <AttachedFilesManager
                         files={editFiles}
                         onRemoveFile={handleRemoveEditFile}
@@ -1251,6 +1365,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                         isUploading={false}
                         showUploadButton={false}
                       />
+
                       <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                         <button
                           onClick={saveEdit}
@@ -1388,18 +1503,21 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <ServiceSelector
                   selectedCompanyId={newRecord.service_cocode}
                   selectedTargetId={newRecord.service_empno}
-                  onCompanyChange={(cocode) =>
+                  onCompanyChange={(cocode, company) =>
                     setNewRecord((prev) => ({
                       ...prev,
                       service_cocode: cocode,
                     }))
                   }
-                  onTargetChange={(empno) =>
+                  onTargetChange={(empno, target) => {
                     setNewRecord((prev) => ({
                       ...prev,
                       service_empno: empno,
-                    }))
-                  }
+                      service_empnamec: target?.empnamec,
+                      service_target_cocode: target?.cocode,
+                      service_deptno: target?.deptno,
+                    }));
+                  }}
                   serviceCompanies={serviceCompanies}
                   serviceTargets={serviceTargets}
                   required={false}

@@ -530,6 +530,27 @@ async def get_report_detail(
                 })
                 file_index += 1
 
+            # 構建服務公司和對象資訊
+            service_cocode = detail_row[58] or ""  # pps_servecocode - 服務公司別
+            service_empno = detail_row[45] or ""   # pps_empno - 服務對象工號
+            service_empnamec = detail_row[47] or "" # pps_empnamec - 服務對象姓名
+
+            # 查詢服務公司中文名稱
+            service_company_name = service_cocode
+            if service_cocode:
+                company_sql = text("""
+                    SELECT coabbv FROM jps.dcd001$master
+                    WHERE cocode = :cocode AND eip_active = 'Y'
+                """)
+                company_result = legacy_db.execute(company_sql, {"cocode": service_cocode}).fetchone()
+                if company_result:
+                    service_company_name = company_result[0]
+
+            # 構建服務對象名稱
+            service_target_name = ""
+            if service_empnamec and service_empno:
+                service_target_name = f"{service_empnamec}"
+
             content_item = {
                 "project": {
                     "plan_subj_c": plan_name,  # 處理後的工作計畫中文名稱
@@ -538,6 +559,8 @@ async def get_report_detail(
                 "content": detail_row[36] or "",  # memo - 工作內容
                 "execution_work_name": execution_work_name_c or detail_row[62] or f"執行工作 {detail_row[2] or ''}",  # 中文執行工作名稱
                 "work_item_name": work_item_display,  # 處理後的工作項目名稱
+                "service_company_name": service_company_name,  # 服務公司
+                "service_target_name": service_target_name,  # 服務對象
                 "total_execution_time_minutes": float(detail_row[6] or 0),  # exetime - 執行時間
                 "daily_sub_nos": detail_row[1],  # daily_sub_nos
                 "prod_cate": detail_row[4] or "",  # prod_cate
@@ -796,8 +819,18 @@ async def get_daily_homepage_reports(
                     END) AS deptnamec,
                     (SELECT COUNT(daily_no) FROM tdr_reply WHERE daily_no = a.daily_no) AS reply_count,
                     (SELECT COUNT(daily_no) FROM tdr_reply WHERE daily_no = a.daily_no AND empno = :empno) AS replier_count,
-                    (SELECT CASE WHEN COUNT(daily_no) > 0 THEN 'true' ELSE '' END FROM tdr_reply WHERE daily_no = a.daily_no AND empno = :empno AND memo NOT LIKE '電子表單%' AND memo NOT IN (SELECT memo FROM TDR_REPLY_GENERAL_COMMENT)) AS my_ask,
-                    (SELECT CASE WHEN COUNT(daily_no) > 0 THEN 'true' ELSE '' END FROM tdr_reply WHERE daily_no = a.daily_no AND empno <> :empno AND memo NOT LIKE '電子表單%' AND memo NOT IN (SELECT memo FROM TDR_REPLY_GENERAL_COMMENT)) AS other_ask,
+                    (SELECT CASE WHEN COUNT(*) > 0 THEN 'true' ELSE '' END
+                     FROM TDR_REPLY_SPECIAL_COMMENT sc
+                     WHERE sc.daily_no = a.daily_no
+                     AND sc.empno = a.empno
+                     AND sc.doc_date = a.doc_date
+                     AND EXISTS (SELECT 1 FROM tdr_reply r WHERE r.daily_no = a.daily_no AND r.empno = :empno AND r.memo NOT LIKE '電子表單%' AND r.memo NOT IN (SELECT memo FROM TDR_REPLY_GENERAL_COMMENT))) AS my_ask,
+                    (SELECT CASE WHEN COUNT(*) > 0 THEN 'true' ELSE '' END
+                     FROM TDR_REPLY_SPECIAL_COMMENT sc
+                     WHERE sc.daily_no = a.daily_no
+                     AND sc.empno = a.empno
+                     AND sc.doc_date = a.doc_date
+                     AND EXISTS (SELECT 1 FROM tdr_reply r WHERE r.daily_no = a.daily_no AND r.empno <> :empno AND r.memo NOT LIKE '電子表單%' AND r.memo NOT IN (SELECT memo FROM TDR_REPLY_GENERAL_COMMENT))) AS other_ask,
                     (SELECT CASE WHEN COUNT(daily_no) > 0 THEN 'true' ELSE 'false' END FROM tdr_msg_send_log WHERE daily_no = a.daily_no AND from_empno = :empno) AS isForwarded,
                     a.LASTDATETIME, e.practice_cocode, f.coabbv
                 FROM tdr_master a

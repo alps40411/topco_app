@@ -64,10 +64,16 @@ export interface ConsolidatedReport {
   daily_no: string; // 添加 daily_no 字段
   sopno?: string; // 添加 sopno 字段用於精確識別記錄
   project: Project;
+  execution_work_id?: number; // 執行工作ID
   execution_work_name?: string;
+  work_item_ids?: number[]; // 工作項目ID列表
   work_item_name?: string;
-  service_company_name?: string;
-  service_target_name?: string;
+  service_cocode?: string; // 服務公司代碼
+  service_company_name?: string; // 服務公司中文名稱
+  service_empno?: string; // 服務對象員工編號
+  service_target_name?: string; // 服務對象名稱
+  service_target_cocode?: string; // 服務對象公司別
+  service_deptno?: string; // 服務對象部門
   content: string;
   files: FileAttachment[];
   record_count: number;
@@ -171,6 +177,9 @@ function App() {
     null
   );
 
+  // ✅ 使用 ref 追蹤已載入的 report ID，避免重複查詢
+  const loadedReportRef = useRef<number | null>(null);
+
   // 添加歷史管理的標籤切換函數
   const changeTab = useCallback(
     (tab: "input" | "daily" | "supervisor" | "ai" | "comprehensive") => {
@@ -187,8 +196,15 @@ function App() {
     setSelectedEmployee(employee);
     setSelectedReportId(reportId);
     setActiveTab("supervisor"); // 切換到審閱模式
+
+    // 保留當前的日期參數（如果有的話）
+    const dateParam = searchParams.get("date");
+    const url = dateParam
+      ? `?tab=supervisor&date=${dateParam}&employee=${employee.id}&report=${reportId}`
+      : `?tab=supervisor&employee=${employee.id}&report=${reportId}`;
+
     // 使用 navigate 更新 URL (相對於 basename)
-    navigate(`?tab=supervisor&employee=${employee.id}&report=${reportId}`, {
+    navigate(url, {
       replace: false,
     });
   };
@@ -197,8 +213,13 @@ function App() {
     setSelectedEmployee(null);
     setSelectedReportId(null);
     setActiveTab("supervisor");
+
+    // 保留當前的日期參數（如果有的話）
+    const dateParam = searchParams.get("date");
+    const url = dateParam ? `?tab=supervisor&date=${dateParam}` : "?tab=supervisor";
+
     // 使用 navigate 返回列表頁 (相對於 basename)
-    navigate("?tab=supervisor", { replace: false });
+    navigate(url, { replace: false });
   };
 
   const handleReviewCompleted = () => {
@@ -206,8 +227,13 @@ function App() {
     setSelectedEmployee(null);
     setSelectedReportId(null);
     setActiveTab("supervisor");
+
+    // 保留當前的日期參數（如果有的話）
+    const dateParam = searchParams.get("date");
+    const url = dateParam ? `?tab=supervisor&date=${dateParam}` : "?tab=supervisor";
+
     // 使用 navigate 返回列表頁 (相對於 basename)
-    navigate("?tab=supervisor", { replace: false });
+    navigate(url, { replace: false });
     // 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
     fetchWritingStatus();
   };
@@ -272,6 +298,7 @@ function App() {
       | null;
     const dateParam = searchParams.get("date");
     const reportParam = searchParams.get("report");
+    const employeeParam = searchParams.get("employee");
 
     // 同步 tab
     if (tab) {
@@ -294,21 +321,26 @@ function App() {
       setGlobalSelectedDate(dateParam);
     }
 
-    // 同步 report
-    if (reportParam) {
+    // 同步 report 和 employee - 必須同時存在或同時不存在
+    if (reportParam && employeeParam) {
       const reportId = parseInt(reportParam);
       if (reportId !== selectedReportId) {
         setSelectedReportId(reportId);
       }
-    } else if (selectedReportId) {
-      // 如果 URL 沒有 report 但 state 有，則清空
-      setSelectedReportId(null);
-      setSelectedEmployee(null);
+    } else {
+      // 如果 URL 沒有 report 或 employee，清空狀態
+      if (selectedReportId !== null) {
+        setSelectedReportId(null);
+      }
+      if (selectedEmployee !== null) {
+        setSelectedEmployee(null);
+      }
+      // 清空 loadedReportRef
+      if (loadedReportRef.current !== null) {
+        loadedReportRef.current = null;
+      }
     }
-  }, [searchParams, activeTab, globalSelectedDate, selectedReportId, navigate]);
-
-  // ✅ 修復: 使用 ref 追蹤已載入的 report ID，避免重複查詢
-  const loadedReportRef = useRef<number | null>(null);
+  }, [searchParams, navigate]); // 簡化依賴，只監聽 URL 變化
 
   // 獲取員工詳細資訊
   useEffect(() => {
