@@ -45,6 +45,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const previousContentRef = useRef<string>(value);
   const isUploadingRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleImageUploadRef = useRef<() => void>();
+  const handlePaperclipUploadRef = useRef<() => void>();
 
   // 在組件掛載時創建一個可重用的 file input
   useEffect(() => {
@@ -141,7 +143,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
 
     input.click();
-  }, [authFetch, onFileUpload]);
+  }, [authFetch, onFileUpload, docDate]);
 
   // 處理一般檔案上傳（不插入編輯器）
   const handlePaperclipUpload = useCallback(() => {
@@ -153,18 +155,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     input.multiple = true;
 
     input.onchange = () => {
-      const files = input.files;
-      
+      const fileList = input.files;
+
+      // 立即複製 FileList 到陣列,因為 FileList 是 live object
+      const files = fileList ? Array.from(fileList) : [];
+
       // 重置 onchange 和 value
       input.onchange = null;
       input.value = '';
 
-      if (!files || files.length === 0 || !authFetch) return;
+      if (files.length === 0 || !authFetch) return;
 
       queueMicrotask(async () => {
         isUploadingRef.current = true;
         try {
-          for (const file of Array.from(files)) {
+          for (const file of files) {
             const formData = new FormData();
             formData.append("file", file);
 
@@ -207,7 +212,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
 
     input.click();
-  }, [authFetch, onFileUpload]);
+  }, [authFetch, onFileUpload, docDate]);
+
+  // 更新 ref,讓 modules 可以使用最新的 handlers
+  handleImageUploadRef.current = handleImageUpload;
+  handlePaperclipUploadRef.current = handlePaperclipUpload;
 
   // 偵測編輯器內圖片被刪除（透過退格鍵或其他方式）
   useEffect(() => {
@@ -366,7 +375,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     return () => {
       quill.root.removeEventListener("paste", handlePaste);
     };
-  }, [authFetch, onFileUpload]);
+  }, [authFetch, onFileUpload, docDate]);
 
   // 工具列模組配置
   const modules = useMemo(
@@ -379,12 +388,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           ["clean"],
         ],
         handlers: {
-          image: handleImageUpload,
-          paperclip: handlePaperclipUpload,
+          image: () => handleImageUploadRef.current?.(),
+          paperclip: () => handlePaperclipUploadRef.current?.(),
         },
       },
     }),
-    [handleImageUpload, handlePaperclipUpload]
+    [] // 空依賴,因為使用 ref
   );
 
   // 格式配置
