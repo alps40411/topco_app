@@ -33,7 +33,9 @@ interface AuthContextType {
   refreshWritingStatus: (docDate?: string) => Promise<void>; // ✅ 新增刷新函數
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
@@ -41,7 +43,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true); //  замість isInitialized
   const [hasSubordinates, setHasSubordinates] = useState(false);
   const [isCheckingSubordinates, setIsCheckingSubordinates] = useState(true);
-  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(null); // ✅ 新增全域寫入狀態
+  const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(
+    null
+  ); // ✅ 新增全域寫入狀態
 
   // 在應用程式啟動時驗證 token
   useEffect(() => {
@@ -83,45 +87,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setIsCheckingSubordinates(true);
     try {
-      const response = await fetch(buildApiUrl("/api/supervisor/has-subordinates"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        buildApiUrl("/api/users/has-subordinates"),
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
         setHasSubordinates(data.has_subordinates);
-        console.log("[AuthContext] 下屬檢查完成:", data.has_subordinates);
       }
     } catch (error) {
-      console.error("[AuthContext] 檢查下屬關係失敗:", error);
       setHasSubordinates(false);
     } finally {
       setIsCheckingSubordinates(false);
     }
   }, [token]);
 
-  // ✅ 刷新寫入狀態的函數
-  const refreshWritingStatus = useCallback(async (docDate?: string) => {
-    if (!token || !user?.employee) return;
+  // ✅ 刷新寫入狀態的函數（改用 dates/range）
+  const refreshWritingStatus = useCallback(
+    async (docDate?: string) => {
+      if (!token || !user?.employee) return;
 
-    try {
-      const url = docDate
-        ? buildApiUrl(`/api/records/writing-status?doc_date=${docDate}`)
-        : buildApiUrl("/api/records/writing-status");
+      try {
+        const response = await fetch(buildApiUrl("/api/dates/range"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        if (response.ok) {
+          const data = await response.json();
 
-      if (response.ok) {
-        const status: WritingStatus = await response.json();
-        setWritingStatus(status);
-        console.log("[AuthContext] Writing status updated:", status);
-      }
-    } catch (error) {
-      console.error("[AuthContext] 無法獲取寫入狀態:", error);
-    }
-  }, [token, user?.employee]);
+          // 從 dates/range 的返回數據構建 WritingStatus
+          const status: WritingStatus = {
+            allowed: data.allowed,
+            message: data.message,
+            current_date: data.current_report_date || "",
+            current_time: data.current_time || "",
+            next_available_time: "", // 不再需要此欄位
+            has_other_writable_dates: data.has_other_writable_dates,
+          };
+
+          setWritingStatus(status);
+        }
+      } catch (error) {}
+    },
+    [token, user?.employee]
+  );
 
   // ✅ 只在登入後檢查一次下屬關係和寫入狀態
   useEffect(() => {

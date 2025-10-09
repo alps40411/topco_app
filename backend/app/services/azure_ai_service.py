@@ -13,11 +13,13 @@ logger = logging.getLogger(__name__)
 def _build_client() -> Optional[AsyncAzureOpenAI]:
     if not settings.AZURE_OPENAI_KEY or not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_DEPLOYMENT_NAME:
         return None
-    
+
     return AsyncAzureOpenAI(
         api_key=settings.AZURE_OPENAI_KEY,
         api_version="2024-02-01",
         azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+        timeout=60.0,  # 設置 60 秒超時
+        max_retries=2,  # 最多重試 2 次
     )
 
 async def get_ai_enhanced_report(original_content: str, project_name: str, reference_texts: List[str] = []) -> str:
@@ -68,8 +70,11 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
     print("User Prompt:", user_prompt)  # Debugging line to check the prompt content
     client = _build_client()
     if client is None:
+        logger.error("Azure OpenAI client not configured")
         return "AI service not available."
+
     try:
+        logger.info(f"Calling Azure OpenAI API with model: {settings.AZURE_OPENAI_DEPLOYMENT_NAME}")
         response = await client.chat.completions.create(
             model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
             messages=[
@@ -80,9 +85,13 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
             max_tokens=1500,
         )
         ai_content = response.choices[0].message.content
+        logger.info(f"Azure OpenAI API call successful, response length: {len(ai_content) if ai_content else 0}")
         return ai_content if ai_content else "Unable to get content from AI service."
     except Exception as e:
-        return "AI service temporarily unavailable."
+        logger.error(f"Azure OpenAI API call failed: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return f"AI service temporarily unavailable: {str(e)}"
 
 async def get_completion(prompt: str, temperature: float = 0.3, max_tokens: int = 1000) -> str:
     """

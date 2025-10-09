@@ -13,6 +13,34 @@ from ..schemas.user import User
 router = APIRouter(tags=["Users"])
 logger = logging.getLogger(__name__)
 
+@router.get("/has-subordinates")
+async def check_has_subordinates(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """檢查當前用戶是否有下屬 - 從 supervisor.py 遷移過來"""
+    try:
+        if not current_user.employee:
+            return {"has_subordinates": False}
+
+        # 從 JPS 查詢是否有下屬
+        subordinates_sql = text("""
+            SELECT COUNT(*) as subordinate_count
+            FROM jps.groupfoodchn
+            WHERE supervisor = :empno AND cocode = 'A'
+        """)
+
+        result = db.execute(subordinates_sql, {"empno": current_user.employee.empno})
+        row = result.fetchone()
+
+        has_subordinates = row[0] > 0 if row else False
+        return {"has_subordinates": has_subordinates}
+
+    except Exception as e:
+        logger.error(f"Error checking subordinates: {str(e)}")
+        return {"has_subordinates": False}
+
+
 @router.get("/profile")
 async def get_user_profile(
     current_user: User = Depends(get_current_user)

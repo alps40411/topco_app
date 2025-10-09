@@ -21,6 +21,7 @@ import { toast } from "react-hot-toast";
 import { formatMinutesToHours } from "../utils/timeUtils";
 import { useDataSync } from "../hooks/useDataSync";
 import { TypographyClasses } from "../styles/typography";
+import { RecordsApi } from "../services/recordsApi";
 
 interface DataInputTabProps {
   selectedDate: string | null;
@@ -195,8 +196,8 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
 
       // 如果沒有找到現有的 daily_no，才取得新的
       if (!daily_no) {
-        const dailyNoResponse = await authFetch("/api/legacy/next-daily-no");
-        const { daily_no: newDailyNo } = await dailyNoResponse.json();
+        const dailyNoResponse = await authFetch("/api/dates/next-daily-no");
+        const { next_daily_no: newDailyNo } = await dailyNoResponse.json();
         daily_no = newDailyNo;
       }
 
@@ -324,9 +325,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         }
 
         // 1. 呼叫後端 API 刪除實體檔案
-        await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
-          method: "DELETE",
-        });
+        await RecordsApi.deleteFile(yearMonth, filename, authFetch);
 
         // 2. 從 currentRecord 的 files 列表中移除該檔案
         setCurrentRecord((prev) => ({

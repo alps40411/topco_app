@@ -491,7 +491,7 @@ async def delete_report(
         insert_eai_sql = text("""
             INSERT INTO jps.eai_source
             (eai_seq, source, subject, cocode, xuser, touser, doc_date, doc_time, key, action, doc_bady, status, planno)
-            VALUES (:eai_seq, 'JpsReportDailyDelete', 'Daily_Dele_Report', :cocode, :xuser, '', :doc_date, :doc_time, :key, 'Del_inbox', :doc_bady, 'N', '')
+            VALUES (:eai_seq, 'JpsReportDailyDelete', 'Daily_Dele_Report', :cocode, :xuser, '', :doc_date, :doc_time, :key, 'Del_inbox', :doc_bady, 'N', NULL)
         """)
 
         db.execute(insert_eai_sql, {

@@ -10,6 +10,8 @@ import {
   X,
   ArrowUp,
   ArrowLeft,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import type {
   ConsolidatedReport,
@@ -25,12 +27,16 @@ import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import { getFullFileUrl } from "../utils/urlUtils";
-import ServiceSelector, { ServiceCompany, ServiceTarget } from "./ServiceSelector";
+import ServiceSelector, {
+  ServiceCompany,
+  ServiceTarget,
+} from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
 import { TypographyClasses } from "../styles/typography";
 import { formatMinutesToHours } from "../utils/timeUtils";
+import { RecordsApi } from "../services/recordsApi";
 
 interface DailyRecordCreate
   extends Omit<WorkRecordCreate, "service_company_id" | "service_target_id"> {
@@ -70,19 +76,40 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [editingSopno, setEditingSopno] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
-  const [editProjectId, setEditProjectId] = useState<number | undefined>(undefined);
-  const [editExecutionWorkId, setEditExecutionWorkId] = useState<number | undefined>(undefined);
+  const [editProjectId, setEditProjectId] = useState<number | undefined>(
+    undefined
+  );
+  const [editExecutionWorkId, setEditExecutionWorkId] = useState<
+    number | undefined
+  >(undefined);
   const [editWorkItemIds, setEditWorkItemIds] = useState<number[]>([]);
-  const [editServiceCocode, setEditServiceCocode] = useState<string | undefined>(undefined);
-  const [editServiceEmpno, setEditServiceEmpno] = useState<string | undefined>(undefined);
-  const [editServiceEmpnamec, setEditServiceEmpnamec] = useState<string | undefined>(undefined);
-  const [editServiceTargetCocode, setEditServiceTargetCocode] = useState<string | undefined>(undefined);
-  const [editServiceDeptno, setEditServiceDeptno] = useState<string | undefined>(undefined);
-  const [editExecutionTimeMinutes, setEditExecutionTimeMinutes] = useState<number>(0);
+  const [editServiceCocode, setEditServiceCocode] = useState<
+    string | undefined
+  >(undefined);
+  const [editServiceEmpno, setEditServiceEmpno] = useState<string | undefined>(
+    undefined
+  );
+  const [editServiceEmpnamec, setEditServiceEmpnamec] = useState<
+    string | undefined
+  >(undefined);
+  const [editServiceTargetCocode, setEditServiceTargetCocode] = useState<
+    string | undefined
+  >(undefined);
+  const [editServiceDeptno, setEditServiceDeptno] = useState<
+    string | undefined
+  >(undefined);
+  const [editExecutionTimeMinutes, setEditExecutionTimeMinutes] =
+    useState<number>(0);
   const [editOriginalContent, setEditOriginalContent] = useState<string>("");
-  const [editOriginalFiles, setEditOriginalFiles] = useState<FileForUpload[]>([]);
-  const [editPendingDeleteFiles, setEditPendingDeleteFiles] = useState<string[]>([]);
-  const [editPendingUploadFiles, setEditPendingUploadFiles] = useState<string[]>([]);
+  const [editOriginalFiles, setEditOriginalFiles] = useState<FileForUpload[]>(
+    []
+  );
+  const [editPendingDeleteFiles, setEditPendingDeleteFiles] = useState<
+    string[]
+  >([]);
+  const [editPendingUploadFiles, setEditPendingUploadFiles] = useState<
+    string[]
+  >([]);
   const { authFetch, user, writingStatus, refreshWritingStatus } = useAuth(); // ✅ 使用全域狀態
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
@@ -90,6 +117,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [generatingAiFor, setGeneratingAiFor] = useState<Set<string>>(
     new Set()
   );
+  const [isFocusMode, setIsFocusMode] = useState(true); // 預設隱藏其他欄位（專注模式）
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
@@ -404,7 +432,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setEditFiles(files);
 
     // 載入所有編輯欄位的值
-    setEditProjectId(report.project?.id ? Number(report.project.id) : undefined);
+    setEditProjectId(
+      report.project?.id ? Number(report.project.id) : undefined
+    );
     setEditExecutionWorkId(report.execution_work_id);
     setEditWorkItemIds(report.work_item_ids || []);
     setEditServiceCocode(report.service_cocode);
@@ -426,9 +456,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         try {
           // filePath 格式: YYYYMM/filename
           const [yearMonth, filename] = filePath.split("/");
-          await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
-            method: "DELETE",
-          });
+          await RecordsApi.deleteFile(yearMonth, filename, authFetch);
         } catch (error) {
           console.error(`清理檔案 ${filePath} 失敗:`, error);
         }
@@ -512,9 +540,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         try {
           // filePath 格式: YYYYMM/filename
           const [yearMonth, filename] = filePath.split("/");
-          await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
-            method: "DELETE",
-          });
+          await RecordsApi.deleteFile(yearMonth, filename, authFetch);
         } catch (error) {
           console.error(`刪除檔案 ${filePath} 失敗:`, error);
         }
@@ -561,27 +587,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     // 將選中的日期轉換為 YYYYMMDD 格式（如果有破折號則移除）
     const docDate = selectedDate.replace(/-/g, "");
     // 格式化日期為中文顯示 (YYYYMMDD -> YYYY年MM月DD日)
-    const formattedDate = docDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1年$2月$3日');
-    if (!window.confirm(`確定要提交此版本作為 ${formattedDate} 的最終日報嗎？`)) return;
+    const formattedDate = docDate.replace(
+      /(\d{4})(\d{2})(\d{2})/,
+      "$1年$2月$3日"
+    );
+    if (!window.confirm(`確定要提交此版本作為 ${formattedDate} 的最終日報嗎？`))
+      return;
 
     setIsSubmitting(true);
     try {
-      const response = await authFetch(
-        `/api/legacy/upload-daily-report?doc_date=${docDate}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      if (!response.ok) {
-        const errData = await response
-          .json()
-          .catch(() => ({ detail: "提交失敗" }));
-        throw new Error(errData.detail);
-      }
-      const result = await response.json();
+      const result = await RecordsApi.submit(docDate, authFetch);
       toast.success(`日報已成功上傳！日報編號: ${result.daily_no}`);
 
       // 立即跳轉到日報首頁
@@ -605,18 +620,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   const handleEditFileUpload = async (filesToUpload: FileList) => {
     if (!filesToUpload || filesToUpload.length === 0 || !authFetch) return;
-    const uploadDocDate = selectedDate?.replace(/-/g, '') || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const uploadDocDate =
+      selectedDate?.replace(/-/g, "") ||
+      new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
     const uploadPromises = Array.from(filesToUpload).map(async (file) => {
-      const formData = new FormData();
-      formData.append("file", file);
       try {
-        const response = await authFetch(`/api/records/upload?doc_date=${uploadDocDate}`, {
-          method: "POST",
-          body: formData,
-        });
-        if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
-        const uploadedFile: FileAttachment = await response.json();
+        const uploadedFile: FileAttachment = await RecordsApi.uploadFile(
+          file,
+          uploadDocDate,
+          authFetch
+        );
         const newFile: FileForUpload = {
           name: uploadedFile.name,
           type: uploadedFile.type,
@@ -630,7 +644,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         const yearMonth = urlParts[urlParts.length - 2]; // 倒數第二個是 YYYYMM
         const filename = urlParts[urlParts.length - 1]; // 最後一個是檔名
         if (yearMonth && filename) {
-          setEditPendingUploadFiles((prev) => [...prev, `${yearMonth}/${filename}`]);
+          setEditPendingUploadFiles((prev) => [
+            ...prev,
+            `${yearMonth}/${filename}`,
+          ]);
         }
 
         setEditFiles((prev) => [...prev, newFile]);
@@ -653,50 +670,48 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     );
   };
 
-  const handleRemoveEditFile = useCallback(
-    async (urlOrPath: string) => {
-      try {
-        let fullUrl: string;
-        let relativePath: string;
+  const handleRemoveEditFile = useCallback(async (urlOrPath: string) => {
+    try {
+      let fullUrl: string;
+      let relativePath: string;
 
-        if (urlOrPath.startsWith("http")) {
-          fullUrl = urlOrPath;
-          // 解碼 URL 編碼的路徑
-          relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
-        } else {
-          relativePath = urlOrPath;
-          fullUrl = getFullFileUrl(urlOrPath);
-        }
-
-        // 從路徑中提取 YYYYMM/filename (例如: /uploads/202510/xxx.png -> 202510/xxx.png)
-        const pathParts = relativePath.split("/");
-        const yearMonth = pathParts[pathParts.length - 2]; // 倒數第二個是 YYYYMM
-        const filename = pathParts[pathParts.length - 1]; // 最後一個是檔名
-
-        if (!yearMonth || !filename) {
-          throw new Error("無法從路徑中解析年月或檔案名稱");
-        }
-
-        // 不立即刪除實體檔案,而是標記為待刪除 (包含年月目錄)
-        setEditPendingDeleteFiles((prev) => [...prev, `${yearMonth}/${filename}`]);
-
-        setEditFiles((prev) =>
-          prev.filter((file) => file.url !== relativePath)
-        );
-
-        setEditContent((prev) =>
-          (prev || "").replace(
-            new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
-            ""
-          )
-        );
-      } catch (error) {
-        console.error("刪除編輯檔案時發生錯誤:", error);
-        toast.error("檔案刪除失敗");
+      if (urlOrPath.startsWith("http")) {
+        fullUrl = urlOrPath;
+        // 解碼 URL 編碼的路徑
+        relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
+      } else {
+        relativePath = urlOrPath;
+        fullUrl = getFullFileUrl(urlOrPath);
       }
-    },
-    []
-  );
+
+      // 從路徑中提取 YYYYMM/filename (例如: /uploads/202510/xxx.png -> 202510/xxx.png)
+      const pathParts = relativePath.split("/");
+      const yearMonth = pathParts[pathParts.length - 2]; // 倒數第二個是 YYYYMM
+      const filename = pathParts[pathParts.length - 1]; // 最後一個是檔名
+
+      if (!yearMonth || !filename) {
+        throw new Error("無法從路徑中解析年月或檔案名稱");
+      }
+
+      // 不立即刪除實體檔案,而是標記為待刪除 (包含年月目錄)
+      setEditPendingDeleteFiles((prev) => [
+        ...prev,
+        `${yearMonth}/${filename}`,
+      ]);
+
+      setEditFiles((prev) => prev.filter((file) => file.url !== relativePath));
+
+      setEditContent((prev) =>
+        (prev || "").replace(
+          new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
+          ""
+        )
+      );
+    } catch (error) {
+      console.error("刪除編輯檔案時發生錯誤:", error);
+      toast.error("檔案刪除失敗");
+    }
+  }, []);
 
   // 處理來自編輯用 RichTextEditor 的檔案上傳回調
   const handleEditEditorFileUpload = useCallback((file: FileForUpload) => {
@@ -705,7 +720,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     const yearMonth = urlParts[urlParts.length - 2]; // 倒數第二個是 YYYYMM
     const filename = urlParts[urlParts.length - 1]; // 最後一個是檔名
     if (yearMonth && filename) {
-      setEditPendingUploadFiles((prev) => [...prev, `${yearMonth}/${filename}`]);
+      setEditPendingUploadFiles((prev) => [
+        ...prev,
+        `${yearMonth}/${filename}`,
+      ]);
     }
 
     setEditFiles((prev) => [...prev, file]);
@@ -714,18 +732,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const handleNewRecordUpload = async (filesToUpload: FileList) => {
     if (!filesToUpload || filesToUpload.length === 0 || !authFetch) return;
     setIsUploadingNewFile(true);
-    const uploadDocDate = selectedDate?.replace(/-/g, '') || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const uploadDocDate =
+      selectedDate?.replace(/-/g, "") ||
+      new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
     const uploadPromises = Array.from(filesToUpload).map(async (file) => {
-      const formData = new FormData();
-      formData.append("file", file);
       try {
-        const response = await authFetch(`/api/records/upload?doc_date=${uploadDocDate}`, {
-          method: "POST",
-          body: formData,
-        });
-        if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
-        const uploadedFile: FileAttachment = await response.json();
+        const uploadedFile: FileAttachment = await RecordsApi.uploadFile(
+          file,
+          uploadDocDate,
+          authFetch
+        );
         const newFile: FileForUpload = {
           name: uploadedFile.name,
           type: uploadedFile.type,
@@ -782,9 +799,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           throw new Error("無法從路徑中解析年月或檔案名稱");
         }
 
-        await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
-          method: "DELETE",
-        });
+        await RecordsApi.deleteFile(yearMonth, filename, authFetch);
 
         setNewRecord((prev) => ({
           ...prev,
@@ -825,9 +840,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         const filename = pathParts[pathParts.length - 1];
 
         if (yearMonth && filename) {
-          await authFetch(`/api/records/delete/${yearMonth}/${filename}`, {
-            method: "DELETE",
-          });
+          await RecordsApi.deleteFile(yearMonth, filename, authFetch);
         }
       } catch (error) {
         console.error("Failed to delete temp file:", fileUrl, error);
@@ -956,8 +969,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
       // 如果沒有找到現有的 daily_no，才取得新的
       if (!daily_no) {
-        const dailyNoResponse = await authFetch("/api/legacy/next-daily-no");
-        const { daily_no: newDailyNo } = await dailyNoResponse.json();
+        const dailyNoResponse = await authFetch("/api/dates/next-daily-no");
+        const { next_daily_no: newDailyNo } = await dailyNoResponse.json();
         daily_no = newDailyNo;
       }
 
@@ -1199,65 +1212,64 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               {/* --- Card 1: Original Report --- */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 w-full flex flex-col h-full">
                 <div className="mb-4">
-                  {/* 第一行：工作計畫 + 按鈕 */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`inline-flex items-center px-3 py-1 text-base font-medium rounded-md ${
-                          getProjectColors(report.project.plan_subj_c).tag
-                        }`}
-                      >
-                        {report.project.plan_subj_c}
-                      </div>
-                      {report.total_execution_time_minutes !== undefined &&
-                        report.total_execution_time_minutes > 0 && (
-                          <span className="text-base text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
-                            {formatMinutesToHours(
-                              report.total_execution_time_minutes
-                            )}
+                  {/* 第一行：工作計畫與操作按鈕 */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between gap-4 mb-2">
+                      {/* 左側：工作計畫標題 */}
+                      <div className="flex-1 min-w-0">
+                        <div className="inline-flex items-center px-3 py-1.5 text-base font-medium rounded-md bg-green-100 text-green-800 border border-green-200 max-w-full">
+                          <span className="truncate">
+                            {report.project.plan_subj_c}
                           </span>
-                        )}
-                    </div>
-                    {editingSopno !== report.sopno && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEnhanceOne(report.sopno!)}
-                          disabled={
-                            generatingAiFor.size > 0 ||
-                            isGeneratingAllAi ||
-                            editingSopno !== null
-                          }
-                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
-                        >
-                          {generatingAiFor.has(
-                            `${report.daily_no}-${report.sopno}`
-                          ) ? (
-                            <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
-                          ) : (
-                            <Wand2 className="w-4 h-4 mr-2" />
-                          )}
-                          <span className="whitespace-nowrap">潤飾</span>
-                        </button>
-                        <button
-                          onClick={() => startEdit(report)}
-                          disabled={
-                            generatingAiFor.size > 0 || isGeneratingAllAi
-                          }
-                          className={`inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg ${
-                            getProjectColors(report.project.plan_subj_c).button
-                          } disabled:bg-gray-300 disabled:cursor-not-allowed`}
-                        >
-                          <Edit className="w-4 h-4 mr-2" /> 編輯
-                        </button>
+                        </div>
                       </div>
-                    )}
+
+                      {/* 右側：按鈕組 */}
+                      {editingSopno !== report.sopno && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleEnhanceOne(report.sopno!)}
+                            disabled={
+                              generatingAiFor.size > 0 ||
+                              isGeneratingAllAi ||
+                              editingSopno !== null
+                            }
+                            className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
+                          >
+                            {generatingAiFor.has(
+                              `${report.daily_no}-${report.sopno}`
+                            ) ? (
+                              <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
+                            ) : (
+                              <Wand2 className="w-4 h-4 mr-2" />
+                            )}
+                            <span className="hidden sm:inline whitespace-nowrap">
+                              潤飾
+                            </span>
+                            <span className="sm:hidden">AI</span>
+                          </button>
+                          <button
+                            onClick={() => startEdit(report)}
+                            disabled={
+                              generatingAiFor.size > 0 || isGeneratingAllAi
+                            }
+                            className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 border border-green-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                          >
+                            <Edit className="w-4 h-4 sm:mr-2" />
+                            <span className="hidden sm:inline">編輯</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* 第二行：執行工作 */}
                   {report.execution_work_name && (
                     <div className="mb-2">
-                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-800">
-                        {report.execution_work_name}
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-gray-100 text-gray-700 border border-gray-300 max-w-full">
+                        <span className="truncate">
+                          {report.execution_work_name}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -1265,8 +1277,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   {/* 第三行：工作項目 */}
                   {report.work_item_name && (
                     <div>
-                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-purple-100 text-purple-800">
-                        {report.work_item_name}
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-orange-50 text-orange-700 border border-orange-200 max-w-full">
+                        <span className="truncate">
+                          {report.work_item_name}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -1275,46 +1289,82 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <div className="flex-grow">
                   {editingSopno === report.sopno ? (
                     <div className="space-y-4">
-                      {/* 級聯工作選擇器 */}
-                      <CascadingWorkSelector
-                        selectedProjectId={editProjectId?.toString()}
-                        selectedExecutionWorkId={editExecutionWorkId?.toString()}
-                        selectedWorkItemId={editWorkItemIds.map(id => id.toString())}
-                        onProjectChange={(projectId) => setEditProjectId(projectId ? parseInt(projectId) : undefined)}
-                        onExecutionWorkChange={(executionWorkId) => setEditExecutionWorkId(executionWorkId ? parseInt(executionWorkId) : undefined)}
-                        onWorkItemChange={(workItemIds) => setEditWorkItemIds(workItemIds?.map(id => parseInt(id)) || [])}
-                        onServiceDataLoaded={handleServiceDataLoaded}
-                        required={false}
-                      />
+                      {/* 其他欄位折疊按鈕 */}
 
-                      {/* 服務選擇器 */}
-                      <ServiceSelector
-                        selectedCompanyId={editServiceCocode}
-                        selectedTargetId={editServiceEmpno}
-                        onCompanyChange={(cocode, company) => {
-                          setEditServiceCocode(cocode);
-                        }}
-                        onTargetChange={(empno, target) => {
-                          setEditServiceEmpno(empno);
-                          if (target) {
-                            setEditServiceTargetCocode(target.cocode);
-                            setEditServiceDeptno(target.deptno);
-                            setEditServiceEmpnamec(target.empnamec);
+                      {/* 級聯工作選擇器 - 預設隱藏 */}
+                      {!isFocusMode && (
+                        <CascadingWorkSelector
+                          selectedProjectId={editProjectId?.toString()}
+                          selectedExecutionWorkId={editExecutionWorkId?.toString()}
+                          selectedWorkItemId={editWorkItemIds.map((id) =>
+                            id.toString()
+                          )}
+                          onProjectChange={(projectId) =>
+                            setEditProjectId(
+                              projectId ? parseInt(projectId) : undefined
+                            )
                           }
-                        }}
-                        serviceCompanies={serviceCompanies}
-                        serviceTargets={serviceTargets}
-                        required={false}
-                      />
+                          onExecutionWorkChange={(executionWorkId) =>
+                            setEditExecutionWorkId(
+                              executionWorkId
+                                ? parseInt(executionWorkId)
+                                : undefined
+                            )
+                          }
+                          onWorkItemChange={(workItemIds) =>
+                            setEditWorkItemIds(
+                              workItemIds?.map((id) => parseInt(id)) || []
+                            )
+                          }
+                          onServiceDataLoaded={handleServiceDataLoaded}
+                          required={false}
+                        />
+                      )}
 
-                      {/* 執行時間選擇器 */}
-                      <ExecutionTimeSelector
-                        totalMinutes={editExecutionTimeMinutes}
-                        onChange={(minutes) => setEditExecutionTimeMinutes(minutes)}
-                        required
-                      />
+                      {/* 服務選擇器 - 預設隱藏 */}
+                      {!isFocusMode && (
+                        <ServiceSelector
+                          selectedCompanyId={editServiceCocode}
+                          selectedTargetId={editServiceEmpno}
+                          onCompanyChange={(cocode, company) => {
+                            setEditServiceCocode(cocode);
+                          }}
+                          onTargetChange={(empno, target) => {
+                            setEditServiceEmpno(empno);
+                            if (target) {
+                              setEditServiceTargetCocode(target.cocode);
+                              setEditServiceDeptno(target.deptno);
+                              setEditServiceEmpnamec(target.empnamec);
+                            }
+                          }}
+                          serviceCompanies={serviceCompanies}
+                          serviceTargets={serviceTargets}
+                          required={false}
+                        />
+                      )}
 
-                      {/* 內容編輯器 */}
+                      {/* 執行時間選擇器 - 預設隱藏 */}
+                      {!isFocusMode && (
+                        <ExecutionTimeSelector
+                          totalMinutes={editExecutionTimeMinutes}
+                          onChange={(minutes) =>
+                            setEditExecutionTimeMinutes(minutes)
+                          }
+                          required
+                        />
+                      )}
+                      <button
+                        onClick={() => setIsFocusMode(!isFocusMode)}
+                        // Key change: justify-center will center the content horizontally.
+                        className="w-full flex items-center justify-center py-0.5 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+                      >
+                        {/* The icon now directly represents the action to be taken */}
+                        <span className="text-xl font-semibold text-gray-500">
+                          {isFocusMode ? "+" : "-"}
+                        </span>
+                      </button>
+
+                      {/* 內容編輯器 - 永遠顯示 */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           內容
@@ -1326,7 +1376,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           onFileRemove={handleRemoveEditFile}
                           files={editFiles}
                           placeholder="編輯記錄內容... (可直接貼上圖片)"
-                          docDate={selectedDate?.replace(/-/g, '') || undefined}
+                          docDate={selectedDate?.replace(/-/g, "") || undefined}
                         />
                       </div>
 
@@ -1515,7 +1565,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                     }
                     onFileUpload={handleNewRecordEditorFileUpload}
                     onFileRemove={handleRemoveNewRecordFile}
-                    docDate={selectedDate?.replace(/-/g, '') || undefined}
+                    docDate={selectedDate?.replace(/-/g, "") || undefined}
                     files={newRecord.files || []}
                     placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
                   />

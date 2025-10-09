@@ -59,11 +59,17 @@ export const WorkDataProvider: React.FC<{ children: ReactNode }> = ({ children }
   const { user, authFetch } = useAuth();
 
   const fetchWorkData = useCallback(async () => {
-    if (!user?.employee?.empno) return;
+    console.log('[WorkDataContext] fetchWorkData called, user empno:', user?.employee?.empno);
+    if (!user?.employee?.empno) {
+      console.log('[WorkDataContext] No empno, skipping fetch');
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const data = await LegacyApi.getAllWorkData(user.employee.empno);
+      console.log('[WorkDataContext] Calling LegacyApi.getAllWorkData...');
+      const data = await LegacyApi.getAllWorkData(user.employee.empno, authFetch);
+      console.log('[WorkDataContext] Received data:', data);
       setWorkData({
         work_plans: data.work_plans || [],
         basic_execution_works: data.basic_execution_works || [],
@@ -79,7 +85,7 @@ export const WorkDataProvider: React.FC<{ children: ReactNode }> = ({ children }
     } finally {
       setIsLoading(false);
     }
-  }, [user?.employee?.empno]);
+  }, [user?.employee?.empno, authFetch]);
 
   useEffect(() => {
     if (user?.employee?.empno) {

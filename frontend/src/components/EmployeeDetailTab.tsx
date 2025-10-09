@@ -59,7 +59,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
         // Fetch the detailed approval status for this specific report
         const approvalResponse = await authFetch(
-          `/api/supervisor/reports/${reportId}/approvals`
+          `/api/supervisor/${reportId}/approvals`
         );
         if (approvalResponse.ok) {
           const approvals = await approvalResponse.json();

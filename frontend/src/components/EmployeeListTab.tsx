@@ -76,20 +76,25 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   const checkDateEditable = async (docDate: string) => {
     // ✅ 檢查快取
     if (editableStatusCache.current[docDate] !== undefined) {
-      console.log(`[EmployeeListTab] 使用快取: ${docDate} = ${editableStatusCache.current[docDate]}`);
+      console.log(
+        `[EmployeeListTab] 使用快取: ${docDate} = ${editableStatusCache.current[docDate]}`
+      );
       return editableStatusCache.current[docDate];
     }
 
     try {
-      const response = await authFetch(
-        `/api/records/writing-status?doc_date=${docDate}`
-      );
+      // 改用 dates/range 來檢查可編輯狀態
+      const response = await authFetch("/api/dates/range");
       if (response.ok) {
         const data = await response.json();
-        const isEditable = data.allowed === true;
+
+        // 從日期列表中找到對應日期
+        const dateInfo = data.data?.find((d: any) => d.value === docDate);
+        const isEditable = dateInfo?.can_write === true;
+
         // ✅ 存入快取
         editableStatusCache.current[docDate] = isEditable;
-        console.log(`[EmployeeListTab] API 查詢: ${docDate} = ${isEditable}`);
+        console.log(`[EmployeeListTab] API 查詢 (daily-date-range): ${docDate} = ${isEditable}`);
         return isEditable;
       }
       return false;
@@ -322,9 +327,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     <div className="p-6">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">日報首頁</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          顯示您有權限查看的所有日報，預設顯示前一天的日報
-        </p>
+
         <SupervisorDateBar
           selectedDate={selectedDate}
           onChange={handleDateChange}

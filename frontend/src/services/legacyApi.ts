@@ -505,7 +505,10 @@ export class LegacyApi {
   /**
    * 取得所有工作相關資料（統一API）
    */
-  static async getAllWorkData(empno: string): Promise<{
+  static async getAllWorkData(
+    empno: string,
+    authFetch?: (url: string, options?: RequestInit) => Promise<Response>
+  ): Promise<{
     work_plans: any[];
     basic_execution_works: any[];
     project_execution_works: { [key: string]: any[] };
@@ -523,12 +526,18 @@ export class LegacyApi {
       empnamec: string;
     }>;
   }> {
-    const url = buildApiUrl(
-      `${apiConfig.endpoints.legacy.workData}?empno=${empno}`
-    );
+    // 使用新的 API 端點（需要身份驗證）
+    // 注意：如果使用 authFetch，不要先呼叫 buildApiUrl，因為 authFetch 會自己處理
+    const endpoint = apiConfig.endpoints.workData.all || '/api/work-data';
+    const url = authFetch ? endpoint : buildApiUrl(endpoint);
+    console.log('[LegacyApi] getAllWorkData called:', { empno, endpoint, url, hasAuthFetch: !!authFetch });
 
     try {
-      const response = await fetch(url);
+      // 如果提供了 authFetch，使用它（推薦）
+      const fetchFn = authFetch || fetch.bind(window);
+      console.log('[LegacyApi] Fetching work data from:', url);
+      const response = await fetchFn(url);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         throw new Error(
@@ -536,7 +545,24 @@ export class LegacyApi {
         );
       }
 
-      return await response.json();
+      const result = await response.json();
+
+      // 新 API 返回格式：{ success: true, data: {...} }
+      const data = result.data || result;
+
+      // 如果是新 API 格式（有 projects 和 execution_works），轉換為舊格式
+      if (data.projects && data.execution_works) {
+        return {
+          work_plans: data.projects || [],
+          basic_execution_works: data.execution_works || [],
+          project_execution_works: {}, // 新 API 不區分，統一在 execution_works
+          service_companies: data.service_companies || [],
+          service_targets: data.service_targets || []
+        };
+      }
+
+      // 舊 API 格式直接返回
+      return data;
     } catch (error) {
       console.error("取得工作資料失敗:", error);
       throw error;

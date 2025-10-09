@@ -19,25 +19,23 @@ class SSOHeaders:
         獲取員工編號 (empno)
         優先順序: Headers > Cookies
         """
-        print("[SSO_HEADERS] Getting empno...")
-        print(f"[SSO_HEADERS] Available headers: {dict(self.headers)}")
-        print(f"[SSO_HEADERS] Available cookies: {dict(self.cookies)}")
+        
 
         # 從 Header 獲取
         empno = self.headers.get("wwwuser.empno")
         if empno:
-            print(f"[SSO_HEADERS] Got empno from header: {empno}")
+            
             logger.info(f"Got empno from header: {empno}")
             return empno.strip()
 
         # 從 Cookie 獲取 (如果 Header 沒有)
         empno = self.cookies.get("empno")
         if empno:
-            print(f"[SSO_HEADERS] Got empno from cookie: {empno}")
+            
             logger.info(f"Got empno from cookie: {empno}")
             return empno.strip()
 
-        print("[SSO_HEADERS] No empno found in headers or cookies")
+        
         return None
 
     def get_cocode(self) -> Optional[str]:
@@ -45,24 +43,24 @@ class SSOHeaders:
         獲取公司代碼 (cocode)
         優先順序: Headers > Cookies > 默認值 'A'
         """
-        print("[SSO_HEADERS] Getting cocode...")
+        
 
         # 從 Header 獲取
         cocode = self.headers.get("wwwuser.cocode")
         if cocode:
-            print(f"[SSO_HEADERS] Got cocode from header: {cocode}")
+            
             logger.info(f"Got cocode from header: {cocode}")
             return cocode.strip()
 
         # 從 Cookie 獲取
         cocode = self.cookies.get("CoCode")
         if cocode:
-            print(f"[SSO_HEADERS] Got cocode from cookie: {cocode}")
+            
             logger.info(f"Got cocode from cookie: {cocode}")
             return cocode.strip()
 
         # 默認值
-        print("[SSO_HEADERS] Using default cocode: A")
+        
         logger.info("Using default cocode: A")
         return "A"
 
@@ -107,23 +105,23 @@ class SSOHeaders:
         """
         驗證 SSO Headers 的完整性
         """
-        print("[SSO_HEADERS] Validating SSO headers...")
+        
         empno = self.get_empno()
         cocode = self.get_cocode()
 
-        print(f"[SSO_HEADERS] Validation check: empno={empno}, cocode={cocode}")
+        
 
         if not empno:
-            print("[SSO_HEADERS] SSO validation failed: missing empno")
+           
             logger.warning("SSO validation failed: missing empno")
             return False
 
         if not cocode:
-            print("[SSO_HEADERS] SSO validation failed: missing cocode")
+            
             logger.warning("SSO validation failed: missing cocode")
             return False
 
-        print(f"[SSO_HEADERS] SSO validation passed: empno={empno}, cocode={cocode}")
+        
         logger.info(f"SSO validation passed: empno={empno}, cocode={cocode}")
         return True
 
@@ -186,27 +184,25 @@ def get_sso_headers_with_mock(request: Request, enable_mock: bool = False) -> SS
     """
     獲取 SSO Headers，支援開發環境 Mock
     """
-    print("[SSO_FACTORY] Creating SSO headers instance...")
-    print(f"[SSO_FACTORY] enable_mock parameter: {enable_mock}")
+    
 
     # 導入配置
     from app.core.config import settings
-    print(f"[SSO_FACTORY] SSO_MOCK_ENABLED from settings: {getattr(settings, 'SSO_MOCK_ENABLED', 'NOT_SET')}")
+    
 
     # 根據配置決定是否啟用 Mock
     should_use_mock = enable_mock or getattr(settings, 'SSO_MOCK_ENABLED', False)
-    print(f"[SSO_FACTORY] should_use_mock: {should_use_mock}")
-
+   
     if should_use_mock:
-        print("[SSO_FACTORY] Using MockSSOHeaders")
+        
         mock_empno = getattr(settings, 'SSO_MOCK_EMPNO', 'TEST001')
         mock_cocode = getattr(settings, 'SSO_MOCK_COCODE', 'A')
-        print(f"[SSO_FACTORY] Mock settings: empno={mock_empno}, cocode={mock_cocode}")
+       
         return MockSSOHeaders(
             request,
             mock_empno=mock_empno,
             mock_cocode=mock_cocode
         )
     else:
-        print("[SSO_FACTORY] Using standard SSOHeaders")
+        
         return SSOHeaders(request)

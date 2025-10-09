@@ -55,7 +55,10 @@
       "Bash(cat:*)",
       "Bash(npm show:*)",
       "Bash(npm uninstall:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(for file in app/api/*.py)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

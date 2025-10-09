@@ -10,7 +10,7 @@ import time
 from fastapi.staticfiles import StaticFiles
 
 # --- 引入所有需要的 API 路由 ---
-from app.api import supervisor, auth, legacy_reports, reviews, users, reports, drafts, ai
+from app.api import supervisor, auth, legacy_reports, reviews, users, reports, drafts, ai, work_data, dates, records
 
 app = FastAPI(
     title="TSC 業務日誌 API",
@@ -85,13 +85,15 @@ app.include_router(auth.router, prefix="/api/auth")
 app.include_router(users.router, prefix="/api/users")
 app.include_router(reports.router, prefix="/api/reports")
 app.include_router(drafts.router, prefix="/api/drafts")
+app.include_router(records.router, prefix="/api")  # prefix 已在 router 中定義為 /records
 app.include_router(ai.router, prefix="/api/ai")
+app.include_router(work_data.router, prefix="/api")  # prefix 已在 router 中定義為 /work-data
+app.include_router(dates.router, prefix="/api")  # prefix 已在 router 中定義為 /dates
 
 # === 現有的 API 路由（保持向後兼容）===
 app.include_router(supervisor.router, prefix="/api/supervisor")
 app.include_router(legacy_reports.router, prefix="/api")
-app.include_router(legacy_reports.records_router, prefix="/api")
-# app.include_router(legacy_reports.reports_router, prefix="/api")  # 已被新的 reports API 取代
+# app.include_router(legacy_reports.records_router, prefix="/api")  # 已移至 records.py
 app.include_router(legacy_reports.projects_router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 

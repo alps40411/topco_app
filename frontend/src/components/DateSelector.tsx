@@ -80,7 +80,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
           setDateCache({ isLoading: true } as any);
         }
 
-        const response = await authFetch("/api/legacy/daily-date-range");
+        const response = await authFetch("/api/dates/range");
 
         if (response.ok) {
           const data = await response.json();

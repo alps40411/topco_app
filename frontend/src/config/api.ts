@@ -12,34 +12,73 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 export const apiConfig = {
   baseURL: API_BASE_URL,
   endpoints: {
+    // === 新的組織化 API ===
     auth: {
       token: "/api/auth/token",
       me: "/api/auth/me",
     },
+    users: {
+      profile: "/api/users/profile",
+      permissions: "/api/users/permissions",
+      subordinates: "/api/users/subordinates",
+    },
+    drafts: {
+      base: "/api/drafts",
+      save: "/api/drafts",
+      get: (empno: string) => `/api/drafts/${empno}`,
+      update: (dailyNo: string, planno: string, sopno: string) =>
+        `/api/drafts/by-daily-planno-sopno/${dailyNo}/${planno}/${sopno}`,
+      delete: (id: string) => `/api/drafts/${id}`,
+      ai: "/api/drafts/ai",
+    },
     records: {
       base: "/api/records",
-      upload: "/api/records/upload",
-      writingStatus: "/api/records/writing-status",
       today: "/api/records/today",
-      consolidated: "/api/records/consolidated/today",
+      consolidatedToday: "/api/records/consolidated/today",
+      consolidatedByProject: (projectId: string) => `/api/records/consolidated/${projectId}`,
+      upload: "/api/records/upload",
+      deleteFile: (yearMonth: string, filename: string) => `/api/records/files/${yearMonth}/${filename}`,
+      submit: "/api/records/submit",
     },
+    reports: {
+      base: "/api/reports",
+      get: (reportId: string) => `/api/reports/${reportId}`,
+      comments: (reportId: string) => `/api/reports/${reportId}/comments`,
+      approvals: (reportId: string) => `/api/reports/${reportId}/approvals`,
+      delete: (reportId: string) => `/api/reports/${reportId}`,
+    },
+    workData: {
+      base: "/api/work-data",
+      all: "/api/work-data",
+    },
+    dates: {
+      range: "/api/dates/range",
+      nextDailyNo: "/api/dates/next-daily-no",
+    },
+    supervisor: {
+      base: "/api/supervisor",
+      dailyHomepage: "/api/supervisor/daily-homepage",
+      forwardCandidates: "/api/supervisor/forward/candidates",
+      aiSuggestions: (reportId: string) => `/api/supervisor/reports/${reportId}/ai-suggestions`,
+    },
+
+    // === 保留用於向後兼容 ===
     projects: "/api/projects",
-    supervisor: "/api/supervisor",
     comments: "/api/reports",
     legacy: {
       reports: "/api/legacy/reports",
       reportContent: "/api/legacy/reports",
       workPlans: "/api/legacy/work-plans",
       companies: "/api/legacy/companies",
-      nextDailyNo: "/api/legacy/next-daily-no",
-      drafts: "/api/drafts",
+      drafts: "/api/drafts",                          // 已遷移
       attachments: "/api/legacy/attachments",
-      submit: "/api/legacy/submit",
-      executionWorks: "/api/legacy/execution-works",
+      submit: "/api/records/submit",                  // 已遷移到 records.submit
       workItems: "/api/legacy/work-items",
       serviceCompanies: "/api/legacy/service-companies",
-      serviceTargets: "/api/legacy/service-targets",
-      workData: "/api/legacy/work-data",
+      nextDailyNo: "/api/dates/next-daily-no",        // 已遷移到 dates.nextDailyNo
+      executionWorks: "/api/work-data",               // 已遷移到 workData
+      serviceTargets: "/api/work-data",               // 已遷移到 workData
+      workData: "/api/work-data",                     // 已遷移到 workData
     },
   },
 };
