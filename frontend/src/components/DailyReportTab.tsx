@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Trash2,
 } from "lucide-react";
 import type {
   ConsolidatedReport,
@@ -73,6 +74,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeletingDraft, setIsDeletingDraft] = useState(false);
   const [editingSopno, setEditingSopno] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
@@ -481,6 +483,70 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     } catch (error) {
       console.error("取消編輯時發生錯誤:", error);
       toast.error("取消編輯失敗");
+    }
+  };
+
+  const deleteDraft = async () => {
+    if (!authFetch) return;
+
+    // 確認刪除
+    if (!window.confirm("確定要刪除這筆記錄嗎？此操作無法復原。")) {
+      return;
+    }
+
+    // 取得當前編輯的報告
+    const reportToDelete = reports.find((r) => r.sopno === editingSopno);
+    if (!reportToDelete?.daily_no || !reportToDelete?.sopno) {
+      toast.error("無法找到記錄資訊");
+      return;
+    }
+
+    // 取得 planno，如果沒有則使用 "NULL"
+    const planno = reportToDelete.project?.id?.toString() || "NULL";
+
+    setIsDeletingDraft(true);
+    try {
+      const response = await authFetch(
+        `/api/drafts/${reportToDelete.daily_no}/${planno}/${reportToDelete.sopno}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("刪除記錄失敗");
+      }
+
+      toast.success("記錄已刪除");
+
+      // 清空所有編輯狀態
+      setEditingSopno(null);
+      setEditContent("");
+      setEditFiles([]);
+      setEditProjectId(undefined);
+      setEditExecutionWorkId(undefined);
+      setEditWorkItemIds([]);
+      setEditServiceCocode(undefined);
+      setEditServiceEmpno(undefined);
+      setEditExecutionTimeMinutes(0);
+      setEditOriginalContent("");
+      setEditOriginalFiles([]);
+      setEditPendingDeleteFiles([]);
+      setEditPendingUploadFiles([]);
+
+      // 重新獲取資料
+      const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
+      await fetchReports(docDate);
+
+      // 刷新日期選擇器（如果有的話）
+      if (dateRefreshRef.current) {
+        await dateRefreshRef.current();
+      }
+    } catch (error) {
+      console.error("刪除記錄失敗:", error);
+      toast.error("刪除記錄失敗");
+    } finally {
+      setIsDeletingDraft(false);
     }
   };
 
@@ -1290,6 +1356,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   {editingSopno === report.sopno ? (
                     <div className="space-y-4">
                       {/* 其他欄位折疊按鈕 */}
+                      <button
+                        onClick={() => setIsFocusMode(!isFocusMode)}
+                        // Key change: justify-center will center the content horizontally.
+                        className="w-full flex items-center justify-center py-0.5 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+                      >
+                        {/* The icon now directly represents the action to be taken */}
+                        <span className="text-xl font-semibold text-gray-500">
+                          {isFocusMode ? "展開細項" : "收起細項"}
+                        </span>
+                      </button>
 
                       {/* 級聯工作選擇器 - 預設隱藏 */}
                       {!isFocusMode && (
@@ -1359,16 +1435,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           required
                         />
                       )}
-                      <button
-                        onClick={() => setIsFocusMode(!isFocusMode)}
-                        // Key change: justify-center will center the content horizontally.
-                        className="w-full flex items-center justify-center py-0.5 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
-                      >
-                        {/* The icon now directly represents the action to be taken */}
-                        <span className="text-xl font-semibold text-gray-500">
-                          {isFocusMode ? "+" : "-"}
-                        </span>
-                      </button>
 
                       {/* 內容編輯器 - 永遠顯示 */}
                       <div>
@@ -1404,8 +1470,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           {isSaving ? "儲存中..." : "儲存草稿"}
                         </button>
                         <button
+                          onClick={deleteDraft}
+                          disabled={isDeletingDraft}
+                          className="px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-400 order-2 inline-flex items-center justify-center"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          {isDeletingDraft ? "刪除中..." : "刪除記錄"}
+                        </button>
+                        <button
                           onClick={cancelEdit}
-                          className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 order-2"
+                          className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 order-3"
                         >
                           取消
                         </button>

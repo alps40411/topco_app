@@ -450,10 +450,10 @@ class DraftService:
                 WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
             """)
             existing_record = db.execute(check_sql, {"daily_no": daily_no, "planno": planno, "sopno": sopno}).fetchone()
-            
+
             if not existing_record:
                 raise ValueError("找不到指定的暫存記錄")
-            
+
             content = update_data.get('content', '')
             files = update_data.get('files', [])
             new_planno = update_data.get('planno', '')
@@ -517,4 +517,95 @@ class DraftService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating draft in service: {str(e)}")
+            raise
+
+    @staticmethod
+    def delete_draft_record(db: Session, daily_no: str, planno: str, sopno: str) -> None:
+        """刪除指定的單筆草稿記錄及其相關檔案"""
+        import os
+        from pathlib import Path
+
+        try:
+            if planno == "NULL":
+                planno = ""
+
+            # 1. 先查詢該記錄的檔案資訊
+            query_sql = text("""
+                SELECT FILES FROM jps.tdr_draft
+                WHERE DAILY_NO = :daily_no
+                AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
+                AND SOPNO = :sopno
+            """)
+
+            result = db.execute(query_sql, {
+                "daily_no": daily_no,
+                "planno": planno,
+                "sopno": sopno
+            }).fetchone()
+
+            if not result:
+                raise ValueError(f"找不到指定的草稿記錄 (daily_no: {daily_no}, planno: {planno}, sopno: {sopno})")
+
+            # 2. 收集需要刪除的檔案路徑
+            files_to_delete = []
+            if result[0]:
+                try:
+                    files = json.loads(result[0])
+                    for file_info in files:
+                        if isinstance(file_info, dict):
+                            file_url = file_info.get('url', '')
+                            if file_url:
+                                # 從 URL 提取檔案路徑 (假設 URL 格式為 /uploads/xxx)
+                                if file_url.startswith('/uploads/'):
+                                    file_path = file_url.replace('/uploads/', '')
+                                    files_to_delete.append(file_path)
+                except:
+                    logger.warning(f"無法解析檔案 JSON: {result[0]}")
+
+            # 3. 刪除資料庫記錄
+            delete_sql = text("""
+                DELETE FROM jps.tdr_draft
+                WHERE DAILY_NO = :daily_no
+                AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
+                AND SOPNO = :sopno
+            """)
+
+            db.execute(delete_sql, {
+                "daily_no": daily_no,
+                "planno": planno,
+                "sopno": sopno
+            })
+
+            db.commit()
+
+            logger.info(f"已從資料庫刪除草稿記錄 (daily_no: {daily_no}, planno: {planno}, sopno: {sopno})")
+
+            # 4. 刪除實體檔案
+            upload_base_dir = Path("uploads")
+            deleted_files = 0
+            failed_files = []
+
+            for file_path in files_to_delete:
+                try:
+                    full_path = upload_base_dir / file_path
+                    if full_path.exists() and full_path.is_file():
+                        os.remove(full_path)
+                        deleted_files += 1
+                        logger.info(f"已刪除檔案: {full_path}")
+                    else:
+                        logger.warning(f"檔案不存在: {full_path}")
+                except Exception as e:
+                    logger.error(f"刪除檔案失敗 {full_path}: {str(e)}")
+                    failed_files.append(file_path)
+
+            if failed_files:
+                logger.warning(f"有 {len(failed_files)} 個檔案刪除失敗")
+
+            logger.info(f"草稿記錄刪除完成 - 檔案: {deleted_files} 個")
+
+        except ValueError:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting draft record: {str(e)}")
             raise

@@ -107,3 +107,36 @@ async def get_drafts(
     except Exception as e:
         logger.error(f"Error getting drafts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"取得暫存資料失敗: {str(e)}")
+
+@router.delete("/{daily_no}/{planno}/{sopno}")
+async def delete_draft_record(
+    daily_no: str,
+    planno: str,
+    sopno: str,
+    db: Session = Depends(get_legacy_db)
+):
+    """刪除指定的單筆草稿記錄及其相關檔案"""
+    try:
+        logger.info(f"🔥 DELETE DRAFT API - 開始刪除草稿記錄: daily_no={daily_no}, planno={planno}, sopno={sopno}")
+
+        # Refactored to use DraftService
+        DraftService.delete_draft_record(
+            db=db,
+            daily_no=daily_no,
+            planno=planno,
+            sopno=sopno
+        )
+
+        logger.info(f"🔥 DELETE DRAFT API - 刪除完成: daily_no={daily_no}, planno={planno}, sopno={sopno}")
+
+        return {
+            "message": "草稿記錄刪除成功",
+            "daily_no": daily_no,
+            "planno": planno,
+            "sopno": sopno
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting draft record: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"刪除草稿記錄失敗: {str(e)}")
