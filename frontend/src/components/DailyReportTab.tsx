@@ -1299,18 +1299,24 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           selectedWorkItemId={editWorkItemIds.map((id) =>
                             id.toString()
                           )}
-                          onProjectChange={(projectId) =>
+                          onProjectChange={(projectId) => {
                             setEditProjectId(
                               projectId ? parseInt(projectId) : undefined
-                            )
-                          }
-                          onExecutionWorkChange={(executionWorkId) =>
+                            );
+                            // 當工作計畫改變時，清空執行工作和工作項目選擇
+                            // 因為不同工作計畫對應的執行工作不同
+                            setEditExecutionWorkId(undefined);
+                            setEditWorkItemIds([]);
+                          }}
+                          onExecutionWorkChange={(executionWorkId) => {
                             setEditExecutionWorkId(
                               executionWorkId
                                 ? parseInt(executionWorkId)
                                 : undefined
-                            )
-                          }
+                            );
+                            // 當執行工作改變時，清空工作項目選擇
+                            setEditWorkItemIds([]);
+                          }}
                           onWorkItemChange={(workItemIds) =>
                             setEditWorkItemIds(
                               workItemIds?.map((id) => parseInt(id)) || []

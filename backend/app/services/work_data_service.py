@@ -48,9 +48,8 @@ class WorkDataService:
                 for p in projects
             ]
 
-            # 2. 查詢基本執行工作（與舊 API 相同的複雜查詢）
-            # 這個查詢包含工作項目，需要分組處理
-            exec_works_sql = text("""
+            # 2. 查詢基本執行工作（沒有專案關聯的執行工作）
+            basic_exec_works_sql = text("""
                 SELECT A.sopno, A.sop_desc_c, B.seq, B.name
                 FROM (
                     SELECT sopno, sop_desc_c
@@ -59,34 +58,25 @@ class WorkDataService:
                     AND xstatus = '1'
                     AND (deptno IS NULL OR deptno = '00253')
                     AND (sop_role IS NULL OR sop_role = '技術同仁')
-                    UNION
-                    SELECT sopno, sop_desc_c
-                    FROM jps.tpm_sop
-                    WHERE sopno IN (
-                        SELECT sopno FROM jps.TJP_MASTER WHERE empno = :empno
-                        UNION ALL
-                        SELECT b.sopno FROM jps.tjp_partner a, jps.TJP_MASTER b
-                        WHERE A.PLANNO = b.planno AND a.part_empno = :empno
-                    )
                 ) A
                 LEFT JOIN jps.tpm_sop_detail B ON A.sopno = B.sopno
                 ORDER BY A.sopno, B.seq
             """)
 
-            exec_result = db.execute(exec_works_sql, {"empno": empno}).fetchall()
+            basic_exec_result = db.execute(basic_exec_works_sql).fetchall()
 
-            # 將結果組織成包含 work_items 的結構
-            execution_works = []
+            # 將基本執行工作組織成包含 work_items 的結構
+            basic_execution_works = []
             current_sop = None
 
-            for row in exec_result:
+            for row in basic_exec_result:
                 sopno = row[0]
                 sop_desc_c = row[1]
                 seq = row[2] if len(row) > 2 else None
                 work_item_name = row[3] if len(row) > 3 else None
 
                 if current_sop != sopno:
-                    execution_works.append({
+                    basic_execution_works.append({
                         "sopno": str(sopno),
                         "sop_desc_c": sop_desc_c or f"執行工作 {sopno}",
                         "work_items": []
@@ -94,13 +84,65 @@ class WorkDataService:
                     current_sop = sopno
 
                 if seq is not None and work_item_name:
-                    execution_works[-1]["work_items"].append({
+                    basic_execution_works[-1]["work_items"].append({
                         "seq": str(seq),
                         "name": work_item_name,
                         "unique_id": f"{sopno}_{seq}"
                     })
 
-            result["execution_works"] = execution_works
+            result["basic_execution_works"] = basic_execution_works
+            result["execution_works"] = basic_execution_works  # 向後兼容
+
+            # 2.5 查詢專案與執行工作的關聯
+            project_exec_works_sql = text("""
+                SELECT t.planno, s.sopno, s.sop_desc_c, d.seq, d.name
+                FROM jps.tjp_master t
+                JOIN jps.tpm_sop s ON t.sopno = s.sopno
+                LEFT JOIN jps.tpm_sop_detail d ON s.sopno = d.sopno
+                WHERE t.empno = :empno OR t.pm_empno = :empno
+                   OR t.planno IN (
+                       SELECT planno FROM jps.tjp_partner WHERE part_empno = :empno
+                   )
+                ORDER BY t.planno, s.sopno, d.seq
+            """)
+
+            project_exec_result = db.execute(project_exec_works_sql, {"empno": empno}).fetchall()
+
+            # 組織專案執行工作關聯: { planno: [execution_works] }
+            project_execution_works = {}
+            current_planno = None
+            current_sop = None
+
+            for row in project_exec_result:
+                planno = str(row[0])
+                sopno = row[1]
+                sop_desc_c = row[2]
+                seq = row[3] if len(row) > 3 else None
+                work_item_name = row[4] if len(row) > 4 else None
+
+                # 初始化專案的執行工作列表
+                if planno not in project_execution_works:
+                    project_execution_works[planno] = []
+
+                # 如果是新的執行工作,添加到列表
+                if current_planno != planno or current_sop != sopno:
+                    project_execution_works[planno].append({
+                        "sopno": str(sopno),
+                        "sop_desc_c": sop_desc_c or f"執行工作 {sopno}",
+                        "work_items": []
+                    })
+                    current_planno = planno
+                    current_sop = sopno
+
+                # 添加工作項目
+                if seq is not None and work_item_name:
+                    project_execution_works[planno][-1]["work_items"].append({
+                        "seq": str(seq),
+                        "name": work_item_name,
+                        "unique_id": f"{sopno}_{seq}"
+                    })
+
+            result["project_execution_works"] = project_execution_works
 
             # 3. 查詢服務公司列表（與舊 API 完全相同）
             service_companies_sql = text("SELECT cocode, coabbv FROM jps.dcd001$master WHERE eip_active = 'Y' order by cocode")
@@ -142,7 +184,8 @@ class WorkDataService:
             logger.info(
                 f"工作資料查詢成功: empno={empno}, "
                 f"專案={len(result['projects'])}, "
-                f"執行工作={len(result['execution_works'])}, "
+                f"基本執行工作={len(result['basic_execution_works'])}, "
+                f"專案執行工作關聯={len(result['project_execution_works'])} 個專案, "
                 f"服務公司={len(result['service_companies'])}, "
                 f"服務對象={len(result['service_targets'])}"
             )

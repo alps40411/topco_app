@@ -1,144 +1,314 @@
 # 正式機環境檔案上傳與預覽路徑配置指南
 
-本文檔旨在說明將應用程式部署到正式環境時，如何正確配置檔案上傳及圖片預覽功能所需的路徑。
+本文檔說明將應用程式部署到正式環境時,如何正確配置檔案上傳及圖片預覽功能所需的路徑。
 
 ## 摘要
 
 - **開發環境路徑**: `backend/uploads/`
 - **正式環境路徑**: `D:\Websites\MyReport\MyReport\upimages`
+- **正式環境 URL 前綴**: `/MyReportAI` (如果部署在子路徑下)
 
-為了使功能在正式環境正常運作，需要對後端和前端的相關設定進行修改。
+系統已經進行架構改進,使用環境變數和工具函數來自動處理開發/正式環境的差異。
 
 ---
 
-## 1. 後端修改步驟
+## 架構說明
 
-後端主要負責處理檔案儲存的實體路徑和提供檔案的網路存取路徑。
+### 當前架構的改進
 
-### 1.1. 修改實體儲存路徑
+1. **環境變數驅動**: 使用 `.env` 檔案統一管理所有環境相關設定
+2. **自動路徑處理**: 前端使用 `getFullFileUrl()` 工具函數自動判斷環境
+3. **URL 前綴支援**: 新增 `STATIC_URL_PREFIX` 支援部署在子路徑 (如 `/MyReportAI`)
 
-此設定決定了上傳的檔案要儲存在伺服器上的哪個位置。
+---
 
-- **檔案**: `backend/app/core/config.py`
-- **說明**: 修改 `UPLOAD_DIR` 變數，指向正式環境的絕對路徑。
+## 1. 後端配置步驟
 
-**修改前**:
-```python
-# backend/app/core/config.py
+### 1.1. 環境變數設定 (`.env` 檔案)
 
-# ...
-UPLOAD_DIR: str = "uploads"
-# ...
+後端的所有路徑設定都透過 `.env` 檔案管理。
+
+**檔案位置**: `backend/.env`
+
+**必要設定**:
+```bash
+# 檔案上傳設定
+UPLOAD_DIR=D:\Websites\MyReport\MyReport\upimages  # 正式機絕對路徑
+STATIC_URL_PREFIX=/MyReportAI                       # URL 前綴 (如果部署在子路徑)
+MAX_FILE_SIZE=10485760                              # 10MB (可選)
 ```
 
-**修改後**:
-```python
-# backend/app/core/config.py
+**說明**:
+- `UPLOAD_DIR`: 檔案實際儲存的物理路徑
+  - 開發環境: `uploads` (相對路徑)
+  - 正式環境: `D:\Websites\MyReport\MyReport\upimages` (絕對路徑)
+  - ⚠️ Windows 路徑可使用單斜線 `/` 或雙反斜線 `\\`
 
-# ...
-# 注意：在 Windows 路徑中，建議使用雙反斜線 `\` 或單斜線 `/` 以避免轉義字元問題。
-UPLOAD_DIR: str = "D:\\Websites\\MyReport\\MyReport\\upimages"
-# 或
-# UPLOAD_DIR: str = "D:/Websites/MyReport/MyReport/upimages"
-# ...
-```
+- `STATIC_URL_PREFIX`: URL 路徑前綴
+  - 如果應用部署在 `https://domain.com/MyReportAI/`,則設為 `/MyReportAI`
+  - 如果部署在根路徑 `https://domain.com/`,則設為空字串 ``
+  - 此設定會影響檔案 URL 的生成,例如: `/MyReportAI/uploads/202510/file.png`
 
-### 1.2. 修改靜態檔案掛載點
+### 1.2. 檔案掛載點 (`backend/app/main.py`)
 
-此設定將實體儲存路徑映射到一個 URL，讓前端可以透過這個 URL 存取圖片。
-
-- **檔案**: `backend/app/main.py`
-- **說明**: 更新 `app.mount()` 的 `directory` 參數，並建議將 URL 路徑從 `/uploads` 改為 `/upimages` 以保持一致性。
-
-**修改前**:
+**當前設定** (無需修改):
 ```python
 # backend/app/main.py
 
-# ...
-# --- 掛載 uploads 資料夾為靜態檔案目錄 ---
+# 掛載 uploads 資料夾為靜態檔案目錄
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-# ...
 ```
 
-**修改後**:
+**注意**:
+- 這個掛載點目前寫死為 `"uploads"`,在正式機需要改為 `settings.UPLOAD_DIR`
+- ⚠️ **建議修改**: 改為 `StaticFiles(directory=settings.UPLOAD_DIR)` 以保持一致性
+
+**建議修改**:
 ```python
 # backend/app/main.py
 from app.core.config import settings
 
-# ...
-# --- 掛載 upimages 資料夾為靜態檔案目錄 ---
-app.mount("/upimages", StaticFiles(directory=settings.UPLOAD_DIR), name="upimages")
-# ...
+# 掛載 uploads 資料夾為靜態檔案目錄
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 ```
-**注意**: 這裡我們直接從 `settings` 匯入 `UPLOAD_DIR`，這樣可以確保路徑設定的一致性，未來若有變動只需修改 `config.py` 即可。
 
-### 1.3. 修改程式碼中寫死的 URL
+### 1.3. 檢查程式碼中的路徑處理
 
-在程式碼的其他地方，可能存在直接使用 `/uploads/` 路徑的情況，需要一併修改。
+**已處理的檔案**:
+- ✅ `backend/app/services/record_service.py`: 使用 `settings.STATIC_URL_PREFIX` 生成檔案 URL
+- ✅ `backend/app/services/azure_ai_service.py`: 使用 `settings.STATIC_URL_PREFIX` 處理路徑
 
-- **檔案**: `backend/app/api/ai.py`
-- **修改前**:
+**需要注意的檔案**:
+- ⚠️ `backend/app/api/ai.py`: 第 94-96 行仍使用 `/uploads/` 路徑
   ```python
+  # 目前的程式碼
   if url_path.startswith('/uploads/'):
       file_path = settings.UPLOAD_DIR + url_path.replace('/uploads/', '/')
   ```
-- **修改後**:
-  ```python
-  if url_path.startswith('/upimages/'):
-      file_path = settings.UPLOAD_DIR + url_path.replace('/upimages/', '/')
-  ```
 
-- **檔案**: `backend/app/api/legacy_reports.py`
-- **修改前**:
-  ```python
-  "url": f"/uploads/{safe_filename}",
-  ```
-- **修改後**:
-  ```python
-  "url": f"/upimages/{safe_filename}",
-  ```
+  **建議**: 這段程式碼可能需要更新以支援不同的 URL 前綴
 
 ---
 
-## 2. 前端修改步驟
+## 2. 前端配置步驟
 
-前端主要負責在使用者介面上顯示圖片，它需要知道後端服務的位址和圖片的正確 URL。
+### 2.1. 自動環境偵測
 
-### 2.1. 確認 API 服務位址
+**前端已經實現自動環境偵測** (`frontend/src/utils/urlUtils.ts`):
 
-在開發環境中，前端呼叫的 API 位址可能是 `http://localhost:8000`。在正式環境中，這需要改為您正式的域名或 IP 位址。
+```typescript
+export const getFullFileUrl = (url: string): string => {
+  // 如果 URL 已經是完整的，直接返回
+  if (url.startsWith("http")) {
+    return url;
+  }
 
-- **檢查點**: 查找前端專案中設定 API 基礎 URL 的地方，通常在環境變數檔案（如 `.env.production`）或設定檔（如 `src/config/index.ts`）中。
-- **修改範例** (`frontend/.env.production`):
-  ```
-  VITE_API_URL=https://your-production-domain.com
-  ```
+  // 檢查是否為開發環境
+  const isDevelopment =
+    window.location.port === "5173" ||
+    window.location.port === "5174" ||
+    window.location.port === "3000" ||
+    window.location.hostname === "localhost";
 
-### 2.2. 更新圖片 URL 路徑
+  // 建立後端 URL
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
 
-前端在顯示圖片時，會組合 API 位址和圖片路徑。請確保程式碼中使用的是新的 `/upimages/` 路徑。
+  // 開發環境: http://localhost:8000
+  // 正式環境: 與前端相同的 domain
+  const backendUrl = isDevelopment
+    ? `${protocol}//${hostname}:8000`
+    : `${protocol}//${hostname}`;
 
-- **檢查點**: 搜尋前端專案中所有 `/uploads/` 的字串。
-- **修改範例** (可能在 `AttachedFilesDisplay.tsx` 或類似的元件中):
-  
-  **修改前**:
-  ```typescript
-  const imageUrl = `${import.meta.env.VITE_API_URL}/uploads/${fileName}`;
-  ```
+  const fullUrl = url.startsWith("/")
+    ? `${backendUrl}${url}`
+    : `${backendUrl}/${url}`;
 
-  **修改後**:
-  ```typescript
-  const imageUrl = `${import.meta.env.VITE_API_URL}/upimages/${fileName}`;
-  ```
+  return fullUrl;
+};
+```
+
+**優點**:
+- ✅ 無需修改前端程式碼
+- ✅ 自動判斷開發/正式環境
+- ✅ 自動組合完整 URL
+
+**使用範例**:
+```typescript
+// 後端返回: /uploads/202510/image.png
+// 開發環境自動轉換為: http://localhost:8000/uploads/202510/image.png
+// 正式環境自動轉換為: https://your-domain.com/uploads/202510/image.png
+
+const fileUrl = getFullFileUrl(file.url);
+```
+
+### 2.2. URL 前綴處理
+
+如果正式環境部署在子路徑 (例如 `/MyReportAI/`),前端會自動處理:
+
+**情境 1: 部署在根路徑**
+- 前端位置: `https://domain.com/`
+- 後端 API: `https://domain.com/api/`
+- 檔案 URL: `https://domain.com/uploads/202510/file.png`
+- `.env` 設定: `STATIC_URL_PREFIX=`
+
+**情境 2: 部署在子路徑**
+- 前端位置: `https://domain.com/MyReportAI/`
+- 後端 API: `https://domain.com/MyReportAI/api/`
+- 檔案 URL: `https://domain.com/MyReportAI/uploads/202510/file.png`
+- `.env` 設定: `STATIC_URL_PREFIX=/MyReportAI`
 
 ---
 
-## 總結檢查清單
+## 3. IIS 部署設定
 
-- [ ] `backend/app/core/config.py` 中的 `UPLOAD_DIR` 已更新為正式機絕對路徑。
-- [ ] `backend/app/main.py` 中的 `app.mount` 已更新為新的 URL `/upimages` 和正確的目錄。
-- [ ] 後端程式碼中所有寫死的 `/uploads/` 都已改為 `/upimages/`。
-- [ ] 前端設定了正確的正式環境 API 位址。
-- [ ] 前端獲取圖片的 URL 已從 `/uploads/` 改為 `/upimages/`。
-- [ ] 確認正式機目錄 `D:\Websites\MyReport\MyReport\upimages` 的 IIS 使用者或應用程式集區身分具有讀寫權限。
-- [ ] 重新建置並部署前端與後端應用程式。
+### 3.1. 目錄權限
+
+確保 IIS 應用程式集區身分對上傳目錄有讀寫權限:
+
+```
+目錄: D:\Websites\MyReport\MyReport\upimages
+權限: IIS AppPool\YourAppPoolName (修改)
+```
+
+### 3.2. URL Rewrite (如果使用子路徑)
+
+如果部署在子路徑 (例如 `/MyReportAI/`),需要設定 IIS URL Rewrite:
+
+**web.config 範例**:
+```xml
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <!-- 靜態檔案直接提供 -->
+        <rule name="Uploads" stopProcessing="true">
+          <match url="^MyReportAI/uploads/(.*)$" />
+          <action type="Rewrite" url="upimages/{R:1}" />
+        </rule>
+
+        <!-- API 請求轉發到後端 -->
+        <rule name="API" stopProcessing="true">
+          <match url="^MyReportAI/api/(.*)$" />
+          <action type="Rewrite" url="http://localhost:8000/api/{R:1}" />
+        </rule>
+
+        <!-- 前端 SPA 路由 -->
+        <rule name="SPA" stopProcessing="true">
+          <match url="^MyReportAI/(.*)$" />
+          <conditions>
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+          </conditions>
+          <action type="Rewrite" url="MyReportAI/index.html" />
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>
+```
+
+---
+
+## 4. 部署檢查清單
+
+### 後端檢查
+
+- [ ] `backend/.env` 中 `UPLOAD_DIR` 已設為正式機絕對路徑
+- [ ] `backend/.env` 中 `STATIC_URL_PREFIX` 已正確設定 (如需要)
+- [ ] `backend/app/main.py` 的 `app.mount()` 已改用 `settings.UPLOAD_DIR`
+- [ ] 後端程式碼中使用 `/uploads/` 的地方已檢查並更新
+- [ ] 正式機目錄 `D:\Websites\MyReport\MyReport\upimages` 已建立
+- [ ] IIS 應用程式集區對上傳目錄有讀寫權限
+
+### 前端檢查
+
+- [ ] 前端使用 `getFullFileUrl()` 處理所有檔案 URL
+- [ ] 前端建置時無硬編碼的 API 位址
+- [ ] 如部署在子路徑,IIS URL Rewrite 規則已設定
+
+### 測試驗證
+
+- [ ] 可正常上傳檔案
+- [ ] 上傳的檔案儲存在正確的物理路徑
+- [ ] 可正常預覽上傳的圖片/檔案
+- [ ] AI 功能可正常讀取檔案 (如有使用)
+- [ ] 跨日期的檔案都能正常存取
+
+---
+
+## 5. 常見問題排查
+
+### 問題 1: 檔案上傳成功但無法預覽
+
+**可能原因**:
+- 物理路徑與 URL 掛載點不一致
+- IIS 目錄權限不足
+- URL 前綴設定錯誤
+
+**檢查步驟**:
+1. 確認檔案已實際儲存在 `UPLOAD_DIR` 指定的路徑
+2. 檢查 IIS 應用程式集區對該目錄的權限
+3. 檢查 `STATIC_URL_PREFIX` 設定是否與 IIS URL Rewrite 一致
+
+### 問題 2: AI 功能無法讀取檔案
+
+**可能原因**:
+- Azure AI Service 中的路徑轉換邏輯錯誤
+- `STATIC_URL_PREFIX` 未正確處理
+
+**檢查**:
+查看 `backend/app/services/azure_ai_service.py` 的路徑處理邏輯
+
+### 問題 3: 開發環境正常,正式環境失敗
+
+**可能原因**:
+- `.env` 檔案未正確部署到正式機
+- 環境變數未正確載入
+
+**檢查**:
+1. 確認正式機有 `backend/.env` 檔案
+2. 檢查後端啟動日誌,確認環境變數已載入
+
+---
+
+## 6. 升級建議
+
+### 建議修改 1: main.py 使用動態路徑
+
+```python
+# backend/app/main.py
+from app.core.config import settings
+
+# 將寫死的 "uploads" 改為使用設定
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+```
+
+### 建議修改 2: 統一 URL 前綴處理
+
+考慮在所有檔案路徑處理中統一使用 `STATIC_URL_PREFIX`,避免硬編碼 `/uploads/`。
+
+**需要檢查的檔案**:
+- `backend/app/api/ai.py`
+- 其他可能有檔案路徑處理的 API
+
+---
+
+## 附錄: 範例設定
+
+### 開發環境 `.env`
+```bash
+UPLOAD_DIR=uploads
+STATIC_URL_PREFIX=
+```
+
+### 正式環境 `.env` (根路徑部署)
+```bash
+UPLOAD_DIR=D:\Websites\MyReport\MyReport\upimages
+STATIC_URL_PREFIX=
+```
+
+### 正式環境 `.env` (子路徑部署)
+```bash
+UPLOAD_DIR=D:\Websites\MyReport\MyReport\upimages
+STATIC_URL_PREFIX=/MyReportAI
+```

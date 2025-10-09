@@ -554,8 +554,8 @@ export class LegacyApi {
       if (data.projects && data.execution_works) {
         return {
           work_plans: data.projects || [],
-          basic_execution_works: data.execution_works || [],
-          project_execution_works: {}, // 新 API 不區分，統一在 execution_works
+          basic_execution_works: data.basic_execution_works || data.execution_works || [],
+          project_execution_works: data.project_execution_works || {},
           service_companies: data.service_companies || [],
           service_targets: data.service_targets || []
         };
