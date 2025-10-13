@@ -3,6 +3,7 @@
 import React from "react";
 import { FileText, Trash2, CheckSquare, Square } from "lucide-react";
 import type { FileForUpload } from "../App";
+import { getFullFileUrl } from "../utils/urlUtils";
 
 interface AttachedFilesManagerProps {
   files: FileForUpload[];
@@ -45,7 +46,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
                 }`}
               />
               <a
-                href={file.url}
+                href={getFullFileUrl(file.url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ml-2 text-sm font-medium text-gray-800 truncate hover:underline"
