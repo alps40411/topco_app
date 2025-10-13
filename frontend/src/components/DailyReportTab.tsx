@@ -40,7 +40,8 @@ import { formatMinutesToHours } from "../utils/timeUtils";
 import { RecordsApi } from "../services/recordsApi";
 
 interface DailyRecordCreate
-  extends Omit<WorkRecordCreate, "service_company_id" | "service_target_id"> {
+  extends Omit<WorkRecordCreate, "service_company_id" | "service_target_id" | "work_item_id"> {
+  work_item_ids?: number[]; // 支援多選工作項目
   service_cocode?: string;
   service_empno?: string;
   service_empnamec?: string;
@@ -127,7 +128,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     content: "",
     project_id: undefined,
     execution_work_id: undefined,
-    work_item_id: undefined,
+    work_item_ids: [], // 支援多選工作項目
     service_cocode: undefined,
     service_empno: undefined,
     service_empnamec: undefined,
@@ -163,7 +164,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       ...prev,
       project_id: projectId ? parseInt(projectId) : undefined,
       execution_work_id: undefined,
-      work_item_id: undefined,
+      work_item_ids: undefined,
     }));
   }, []);
 
@@ -173,17 +174,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       execution_work_id: executionWorkId
         ? parseInt(executionWorkId)
         : undefined,
-      work_item_id: undefined,
+      work_item_ids: undefined,
     }));
   }, []);
 
   const handleWorkItemChange = useCallback((workItemId?: string[]) => {
     setNewRecord((prev) => ({
       ...prev,
-      work_item_id:
-        workItemId && workItemId.length > 0
-          ? parseInt(workItemId[0])
-          : undefined,
+      work_item_ids: workItemId?.map((id) => parseInt(id)),
     }));
   }, []);
 
@@ -938,7 +936,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       content: "",
       project_id: undefined,
       execution_work_id: undefined,
-      work_item_id: undefined,
+      work_item_ids: [],
       service_cocode: undefined,
       service_empno: undefined,
       service_empnamec: undefined,
@@ -1055,9 +1053,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           plan_subj_c: undefined,
           sopno: newRecord.execution_work_id?.toString(),
           sop_desc_c: undefined,
-          work_item_seq: newRecord.work_item_id
-            ? [newRecord.work_item_id.toString()]
-            : [],
+          work_item_seq: newRecord.work_item_ids?.map((id) => id.toString()) || [],
           work_item_name: undefined,
           service_cocode: newRecord.service_cocode,
           service_empno: newRecord.service_empno,
@@ -1090,7 +1086,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         content: "",
         project_id: undefined,
         execution_work_id: undefined,
-        work_item_id: undefined,
+        work_item_ids: [],
         service_cocode: undefined,
         service_empno: undefined,
         service_empnamec: undefined,
@@ -1589,11 +1585,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <CascadingWorkSelector
                   selectedProjectId={newRecord.project_id?.toString()}
                   selectedExecutionWorkId={newRecord.execution_work_id?.toString()}
-                  selectedWorkItemId={
-                    newRecord.work_item_id
-                      ? [newRecord.work_item_id.toString()]
-                      : undefined
-                  }
+                  selectedWorkItemId={newRecord.work_item_ids?.map((id) => id.toString())}
                   onProjectChange={handleProjectChange}
                   onExecutionWorkChange={handleExecutionWorkChange}
                   onWorkItemChange={handleWorkItemChange}
