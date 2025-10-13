@@ -157,7 +157,14 @@ export interface User {
   employee?: EmployeeForUser;
 }
 function App() {
-  const { user, logout, authFetch, hasSubordinates, writingStatus, refreshWritingStatus } = useAuth(); // ✅ 從 AuthContext 獲取全域狀態
+  const {
+    user,
+    logout,
+    authFetch,
+    hasSubordinates,
+    writingStatus,
+    refreshWritingStatus,
+  } = useAuth(); // ✅ 從 AuthContext 獲取全域狀態
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -214,7 +221,9 @@ function App() {
 
     // 保留當前的日期參數（如果有的話）
     const dateParam = searchParams.get("date");
-    const url = dateParam ? `?tab=supervisor&date=${dateParam}` : "?tab=supervisor";
+    const url = dateParam
+      ? `?tab=supervisor&date=${dateParam}`
+      : "?tab=supervisor";
 
     // 使用 navigate 返回列表頁 (相對於 basename)
     navigate(url, { replace: false });
@@ -228,13 +237,17 @@ function App() {
 
     // 保留當前的日期參數（如果有的話）
     const dateParam = searchParams.get("date");
-    const url = dateParam ? `?tab=supervisor&date=${dateParam}` : "?tab=supervisor";
+    const url = dateParam
+      ? `?tab=supervisor&date=${dateParam}`
+      : "?tab=supervisor";
 
     // 使用 navigate 返回列表頁 (相對於 basename)
     navigate(url, { replace: false });
     // ✅ 刷新寫入狀態，因為主管審閱會影響員工的編輯權限
     if (refreshWritingStatus) {
-      const docDate = globalSelectedDate ? globalSelectedDate.replace(/-/g, "") : undefined;
+      const docDate = globalSelectedDate
+        ? globalSelectedDate.replace(/-/g, "")
+        : undefined;
       refreshWritingStatus(docDate);
     }
   };
@@ -242,17 +255,12 @@ function App() {
   // 處理上傳完成後的跳轉
   const handleUploadComplete = useCallback(
     (uploadedDate: string) => {
-      // 立即跳轉到日報首頁（daily tab）
-      setActiveTab("daily");
+      // 立即跳轉到日報首頁（supervisor tab）
+      setActiveTab("supervisor");
       // 設定顯示上傳的那天日報
       setGlobalSelectedDate(uploadedDate);
       // 使用 navigate 更新 URL (相對於 basename)
-      navigate(`?tab=daily&date=${uploadedDate}`, { replace: false });
-
-      // 延遲顯示成功訊息，確保跳轉完成
-      setTimeout(() => {
-        toast.success("已跳轉到日報首頁查看上傳的日報");
-      }, 100);
+      navigate(`?tab=supervisor&date=${uploadedDate}`, { replace: false });
     },
     [navigate]
   );

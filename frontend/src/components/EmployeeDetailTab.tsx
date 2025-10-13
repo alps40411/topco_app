@@ -256,7 +256,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                   className={TypographyClasses.richTextDisplay}
                   dangerouslySetInnerHTML={{ __html: projectReport.content }}
                 />
-                <AttachedFilesDisplay files={projectReport.files} />
+                <AttachedFilesDisplay files={projectReport.files} content={projectReport.content} />
               </div>
             )
           )}

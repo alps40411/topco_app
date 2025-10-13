@@ -40,7 +40,7 @@ class RecordService:
                 FROM jps.tdr_draft d
                 WHERE d.EMPNO = :empno
                 AND d.DOC_DATE = :doc_date
-                ORDER BY d.CREATED_DATE DESC
+                ORDER BY d.RECORD_ID
             """)
 
             draft_result = db.execute(draft_sql, {

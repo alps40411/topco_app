@@ -572,7 +572,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                     className={TypographyClasses.richTextDisplay}
                     dangerouslySetInnerHTML={{ __html: report.content }}
                   />
-                  <AttachedFilesDisplay files={report.files} />
+                  <AttachedFilesDisplay files={report.files} content={report.content} />
                 </div>
               ))
             )}

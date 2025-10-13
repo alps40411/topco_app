@@ -663,17 +663,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       const result = await RecordsApi.submit(docDate, authFetch);
       toast.success(`日報已成功上傳！日報編號: ${result.daily_no}`);
 
-      // 立即跳轉到日報首頁
-      if (onSwitchToDaily) {
-        onSwitchToDaily();
-      }
-
       // 重新獲取日期範圍（因為補教只會補教一次，當天就會從可用日期中移除）
       if (dateRefreshRef.current) {
         await dateRefreshRef.current();
       }
 
-      // 用戶將跳轉到日報首頁，不需要重新獲取狀態
+      // 立即跳轉到日報首頁（使用 supervisor tab）
+      if (onUploadComplete) {
+        // 將 YYYYMMDD 轉換為 YYYY-MM-DD 格式
+        const formattedDate = docDate.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
+        onUploadComplete(formattedDate);
+      }
     } catch (error: any) {
       console.error(error);
       toast.error(`上傳日報時發生錯誤: ${error.message}`);
@@ -1499,7 +1499,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                             />
                           )} */}
                         </div>
-                        <AttachedFilesDisplay files={report.files} />
+                        <AttachedFilesDisplay files={report.files} content={report.content} />
                       </div>
                     </div>
                   )}

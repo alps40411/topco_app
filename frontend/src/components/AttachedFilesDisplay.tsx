@@ -8,17 +8,28 @@ import { getFullFileUrl } from "../utils/urlUtils";
 interface AttachedFilesDisplayProps {
   // 保持 props 名稱與 DataInputTab.tsx 中傳遞的一致
   files?: FileForUpload[];
+  content?: string; // 編輯器內容，用於判斷圖片是否已在編輯器中
 }
 
 const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
   files,
+  content = "",
 }) => {
-  // 智慧過濾：只顯示非圖片的檔案
-  const nonImageFiles = files?.filter(
-    (file) => !file.type?.startsWith("image/")
-  );
+  // 智慧過濾：顯示非圖片檔案，以及未插入編輯器的圖片檔案
+  const displayFiles = files?.filter((file) => {
+    // 非圖片檔案總是顯示
+    if (!file.type?.startsWith("image/")) {
+      return true;
+    }
 
-  if (!nonImageFiles || nonImageFiles.length === 0) {
+    // 對於圖片檔案，檢查是否在編輯器內容中
+    // 如果圖片在編輯器中，則不在附加檔案區顯示（避免重複）
+    const fullUrl = getFullFileUrl(file.url);
+    const isInEditor = content.includes(fullUrl) || content.includes(file.url);
+    return !isInEditor;
+  });
+
+  if (!displayFiles || displayFiles.length === 0) {
     return null;
   }
 
@@ -26,7 +37,7 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
     <div className="mt-4 border-t pt-3">
       <h4 className="text-sm font-semibold text-gray-600 mb-2">附加檔案</h4>
       <div className="space-y-2">
-        {nonImageFiles.map((file) => (
+        {displayFiles.map((file) => (
           <div
             key={file.url}
             className={`flex items-center justify-between p-2 rounded-lg border transition-colors duration-200 ${
