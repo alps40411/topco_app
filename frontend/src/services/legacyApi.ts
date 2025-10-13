@@ -281,26 +281,11 @@ export class LegacyApi {
   }
 
   /**
-   * 取得新的日報編號
+   * 已廢棄: 取得新的日報編號
+   * 原因: save_draft API 會自動處理 daily_no 的生成
+   * 使用方式: 呼叫 saveDraft 時傳入 daily_no: null 即可
    */
-  static async getNextDailyNo(): Promise<{ daily_no: string }> {
-    const url = buildApiUrl(apiConfig.endpoints.legacy.nextDailyNo);
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.detail || `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("取得日報編號失敗:", error);
-      throw error;
-    }
-  }
+  // static async getNextDailyNo() - 已移除
 
   /**
    * 格式化日期為 YYYYMMDD 格式

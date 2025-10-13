@@ -17,18 +17,25 @@ async def save_draft(
     draft_data: Dict[str, Any],
     db: Session = Depends(get_legacy_db)
 ):
-    """保存日報暫存，使用前端傳入的doc_date"""
+    """
+    保存日報暫存
+    - daily_no: 可選，如果不提供則自動生成或使用當天現有的編號
+    - empno: 必填
+    - doc_date: 必填 (YYYYMMDD)
+    """
     try:
         logger.info(f"🔥 DRAFTS API - 收到暫存數據: {draft_data}")
-        
-        daily_no = draft_data.get("daily_no")
+
+        daily_no = draft_data.get("daily_no")  # 可選，可以是 None
         empno = draft_data.get("empno")
         doc_date = draft_data.get("doc_date")
-        
-        if not all([daily_no, empno, doc_date]):
-            raise HTTPException(status_code=400, detail="缺少必要欄位: daily_no, empno, doc_date")
-        
+
+        # 只檢查必填欄位 empno 和 doc_date
+        if not empno or not doc_date:
+            raise HTTPException(status_code=400, detail="缺少必要欄位: empno, doc_date")
+
         # Refactored to use DraftService
+        # daily_no 可以是 None，DraftService 會自動處理
         result_daily_no = DraftService.save_draft(
             db=db,
             empno=empno,
@@ -36,11 +43,11 @@ async def save_draft(
             doc_date=doc_date,
             draft_type=draft_data.get("draft_type", "TEMP"),
             draft_content=draft_data.get("draft_content", {}),
-            daily_no=daily_no
+            daily_no=daily_no  # 傳入 None 時會自動生成
         )
-        
+
         logger.info(f"🔥 DRAFTS API - save_draft 成功，返回 daily_no: {result_daily_no}")
-        
+
         return {
             "draft_id": result_daily_no,
             "daily_no": result_daily_no,

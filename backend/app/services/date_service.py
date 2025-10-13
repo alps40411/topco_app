@@ -159,28 +159,4 @@ class DateService:
             logger.error(f"Error getting date range: {str(e)}")
             raise
 
-    @staticmethod
-    def get_next_daily_no(
-        db: Session,
-        empno: str,
-        cocode: str
-    ) -> str:
-        """取得下一個可用的日報編號"""
-        try:
-            sql = text("""
-                SELECT MAX(CAST(daily_no AS BIGINT)) as max_daily_no
-                FROM jps.tdr_draft
-                WHERE empno = :empno AND cocode = :cocode
-            """)
 
-            result = db.execute(sql, {"empno": empno, "cocode": cocode}).fetchone()
-            max_daily_no = result[0] if result and result[0] else 0
-
-            next_daily_no = str(max_daily_no + 1)
-            logger.info(f"生成下一個日報編號: empno={empno}, next_daily_no={next_daily_no}")
-
-            return next_daily_no
-
-        except Exception as e:
-            logger.error(f"Error getting next daily no: {str(e)}")
-            raise

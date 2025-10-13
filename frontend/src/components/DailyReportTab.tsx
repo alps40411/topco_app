@@ -1013,8 +1013,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         return;
       }
 
-      // 檢查今天是否已經有暫存記錄
-      let daily_no;
+      // 檢查今天是否已經有暫存記錄（取得現有的 daily_no）
+      let daily_no = null;
       try {
         const docDate = selectedDate
           ? selectedDate.replace(/-/g, "")
@@ -1025,19 +1025,19 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
           if (existingDrafts.length > 0) {
-            // 使用現有記錄的daily_no
+            // 使用現有記錄的 daily_no
             daily_no = existingDrafts[0].daily_no;
+            console.log("使用現有的 daily_no:", daily_no);
           }
         }
       } catch (error) {
         console.warn("檢查現有暫存失敗:", error);
       }
 
-      // 如果沒有找到現有的 daily_no，才取得新的
+      // 如果沒有找到現有的 daily_no，傳入 null
+      // 後端 save_draft API 會自動生成新的 daily_no
       if (!daily_no) {
-        const dailyNoResponse = await authFetch("/api/dates/next-daily-no");
-        const { next_daily_no: newDailyNo } = await dailyNoResponse.json();
-        daily_no = newDailyNo;
+        console.log("沒有現有 daily_no，將由後端自動生成");
       }
 
       // 準備暫存數據

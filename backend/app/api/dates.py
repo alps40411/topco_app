@@ -56,33 +56,4 @@ async def get_date_range(
         raise HTTPException(status_code=500, detail=f"取得日期範圍失敗: {str(e)}")
 
 
-@router.get("/next-daily-no")
-async def get_next_daily_no(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """取得下一個可用的日報編號"""
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
 
-        empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or 'A'
-
-        # 使用 DateService 獲取下一個編號
-        next_daily_no = DateService.get_next_daily_no(
-            db=db,
-            empno=empno,
-            cocode=cocode
-        )
-
-        return {
-            "success": True,
-            "next_daily_no": next_daily_no,
-            "empno": empno,
-            "cocode": cocode
-        }
-
-    except Exception as e:
-        logger.error(f"Error getting next daily no: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"取得下一個日報編號失敗: {str(e)}")

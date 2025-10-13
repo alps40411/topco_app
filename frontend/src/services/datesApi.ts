@@ -19,14 +19,11 @@ export class DatesApi {
   }
 
   /**
-   * 取得下一個日報編號
+   * 已廢棄: 取得下一個日報編號
+   * 原因: save_draft API 會自動處理 daily_no 的生成
+   * 使用方式: 呼叫 save_draft 時傳入 daily_no: null 即可
    */
-  static async getNextDailyNo(
-    authFetch?: (url: string, options?: RequestInit) => Promise<Response>
-  ): Promise<NextDailyNoResponse> {
-    const client = authFetch ? createAuthApiClient(authFetch) : apiClient;
-    return client.get<NextDailyNoResponse>('/api/dates/next-daily-no');
-  }
+  // static async getNextDailyNo() - 已移除
 
   /**
    * 格式化日期為 YYYYMMDD 格式
