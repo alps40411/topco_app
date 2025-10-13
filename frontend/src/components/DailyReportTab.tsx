@@ -1283,7 +1283,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                     <div className="flex items-center justify-between gap-4 mb-2">
                       {/* 左側：工作計畫標題 */}
                       <div className="flex-1 min-w-0">
-                        <div className="inline-flex items-center px-3 py-1.5 text-base font-medium rounded-md bg-green-100 text-green-800 border border-green-200 max-w-full">
+                        <div className="inline-flex items-center px-2 py-1 text-base font-medium rounded-md bg-indigo-100 text-indigo-800 max-w-full">
                           <span className="truncate">
                             {report.project.plan_subj_c}
                           </span>
@@ -1332,7 +1332,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   {/* 第二行：執行工作 */}
                   {report.execution_work_name && (
                     <div className="mb-2">
-                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-gray-100 text-gray-700 border border-gray-300 max-w-full">
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-800 max-w-full">
                         <span className="truncate">
                           {report.execution_work_name}
                         </span>
@@ -1343,7 +1343,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   {/* 第三行：工作項目 */}
                   {report.work_item_name && (
                     <div>
-                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-orange-50 text-orange-700 border border-orange-200 max-w-full">
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-purple-100 text-purple-800 max-w-full">
                         <span className="truncate">
                           {report.work_item_name}
                         </span>

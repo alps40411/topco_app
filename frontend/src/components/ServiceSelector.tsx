@@ -45,9 +45,15 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     name: company.coabbv || company.cocode,
   }));
 
+  // 將完整資料傳遞給 SearchableDropdown，支援多欄位搜尋和顯示
   const targetOptions = serviceTargets.map((target, index) => ({
     id: target.empno || `target-${index}`,
     name: target.empnamec || target.empno,
+    // 新增額外資料以支援多欄位搜尋和顯示
+    empno: target.empno,
+    empnamec: target.empnamec,
+    coabbv: target.coabbv,
+    deptabbv: target.deptabbv,
   }));
 
   const handleCompanyChange = (companyId?: string | number) => {
@@ -64,7 +70,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* 服務公司選擇 */}
+      {/* 服務公司選擇 - 顯示 12 筆 */}
       <SimpleDropdown
         label="服務公司"
         placeholder="請選擇服務公司"
@@ -73,9 +79,10 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         onSelectionChange={handleCompanyChange}
         isLoading={false}
         required={required}
+        maxVisibleItems={12}
       />
 
-      {/* 服務對象選擇 */}
+      {/* 服務對象選擇 - 啟用多欄位搜尋和顯示，顯示 8 筆 */}
       <SearchableDropdown
         label="服務對象"
         placeholder="請選擇服務對象"
@@ -84,6 +91,10 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         onSelectionChange={handleTargetChange}
         isLoading={false}
         required={required}
+        enableMultiFieldSearch={true}
+        searchFields={['empno', 'empnamec', 'coabbv', 'deptabbv']}
+        displayTemplate="table"
+        maxVisibleItems={8}
       />
     </div>
   );

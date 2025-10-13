@@ -50,7 +50,7 @@ const ExecutionTimeSelector: React.FC<ExecutionTimeSelectorProps> = ({
             onChange={(e) => handleHoursChange(parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           >
-            {Array.from({ length: 9 }, (_, i) => (
+            {Array.from({ length: 13 }, (_, i) => (
               <option key={i} value={i}>
                 {i} 小時
               </option>

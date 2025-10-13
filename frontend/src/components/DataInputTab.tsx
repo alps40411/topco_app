@@ -14,7 +14,10 @@ import AttachedFilesManager from "./AttachedFilesManager";
 import ExecutionTimeSelector from "./ExecutionTimeSelector";
 import CascadingWorkSelector from "./CascadingWorkSelector";
 import { getFullFileUrl } from "../utils/urlUtils";
-import ServiceSelector, { ServiceCompany, ServiceTarget } from "./ServiceSelector";
+import ServiceSelector, {
+  ServiceCompany,
+  ServiceTarget,
+} from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
 import { toast } from "react-hot-toast";
@@ -493,7 +496,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                 onFileRemove={handleRemoveFile}
                 files={currentRecord.files || []}
                 placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
-                docDate={selectedDate?.replace(/-/g, '') || undefined}
+                docDate={selectedDate?.replace(/-/g, "") || undefined}
               />
             </div>
 
@@ -541,11 +544,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-2 space-y-2 sm:space-y-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div
-                        className={`inline-flex items-center px-2 py-1 text-xs sm:text-base font-medium rounded-md ${
-                          getProjectColors(report.project.plan_subj_c).tag
-                        }`}
-                      >
+                      <div className="inline-flex items-center px-2 py-1 text-xs sm:text-base font-medium rounded-md bg-indigo-100 text-indigo-800">
                         {report.project.plan_subj_c}
                       </div>
                       {report.execution_work_name && (

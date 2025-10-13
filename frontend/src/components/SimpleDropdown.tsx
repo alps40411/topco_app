@@ -18,6 +18,7 @@ interface SimpleDropdownProps {
   required?: boolean;
   className?: string;
   disabled?: boolean;
+  maxVisibleItems?: number; // 最多顯示幾筆（控制下拉選單高度）
 }
 
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
@@ -30,6 +31,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   required = false,
   className = "",
   disabled = false,
+  maxVisibleItems = 12, // 預設顯示 12 筆
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -104,10 +106,15 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+        <div
+          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto"
+          style={{ maxHeight: `${maxVisibleItems * 32}px` }}
+        >
           {options.length === 0 ? (
             <div className="px-3 py-3 text-gray-500 text-center">
-              <div className="text-xs font-medium">沒有可選項目</div>
+              <div className="font-medium" style={{ fontSize: "15px" }}>
+                沒有可選項目
+              </div>
             </div>
           ) : (
             options.map((option) => (
@@ -115,13 +122,14 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                 key={option.id}
                 onClick={() => handleOptionSelect(option)}
                 className={`
-                  px-3 py-1 cursor-pointer hover:bg-blue-50 text-xs transition-colors
+                  px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors
                   ${
                     selectedValue === option.id
                       ? "bg-blue-100 text-blue-800 font-medium"
                       : "text-gray-900"
                   }
                 `}
+                style={{ fontSize: "15px" }}
               >
                 {option.name}
               </div>
@@ -134,5 +142,3 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
 };
 
 export default SimpleDropdown;
-
-
