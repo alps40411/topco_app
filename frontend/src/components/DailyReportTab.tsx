@@ -76,7 +76,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeletingDraft, setIsDeletingDraft] = useState(false);
-  const [editingSopno, setEditingSopno] = useState<string | null>(null);
+  const [editingRecordKey, setEditingRecordKey] = useState<string | null>(null); // 格式: daily_no-planno-sopno
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
   const [editProjectId, setEditProjectId] = useState<number | undefined>(
@@ -268,17 +268,12 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     onDateChange(newDate);
   };
 
-  const handleEnhanceOne = async (sopno: string) => {
+  const handleEnhanceOne = async (report: ConsolidatedReport) => {
     if (!authFetch || !user?.employee?.empno) return;
 
-    // 找到對應的報告 - 使用 sopno 精確識別
-    const report = reports.find((r) => r.sopno === sopno);
-    if (!report) {
-      throw new Error("找不到對應的報告");
-    }
-
-    // 使用 daily_no + sopno 作為唯一識別符
-    const reportKey = `${report.daily_no}-${report.sopno}`;
+    // 使用 daily_no + planno + sopno 作為唯一識別符
+    const planno = report.project?.planno || "NULL";
+    const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
     setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
 
     try {
@@ -310,13 +305,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
       const enhancedReport = await response.json();
 
-      // 更新報告內容 - 使用 daily_no + sopno 精確識別
+      // 更新報告內容 - 使用 daily_no + planno + sopno 精確識別
       setReports((prev) =>
-        prev.map((r) =>
-          r.daily_no === report.daily_no && r.sopno === report.sopno
+        prev.map((r) => {
+          const rPlanno = r.project?.planno || "NULL";
+          return r.daily_no === report.daily_no &&
+                 rPlanno === planno &&
+                 r.sopno === report.sopno
             ? { ...r, ai_content: enhancedReport.ai_content }
-            : r
-        )
+            : r;
+        })
       );
 
       if (!isAiViewActive) setIsAiViewActive(true);
@@ -353,8 +351,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         // 檢查 planno 是否存在，如果不存在則使用 "NULL" 作為佔位符
         const planno = report.project?.planno || "NULL";
 
-        // 使用 daily_no + sopno 作為唯一識別符
-        const reportKey = `${report.daily_no}-${report.sopno}`;
+        // 使用 daily_no + planno + sopno 作為唯一識別符
+        const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
 
         try {
           // 設置該專案為生成中狀態
@@ -373,13 +371,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           if (response.ok) {
             const enhancedReport = await response.json();
 
-            // 更新該專案的AI內容 - 使用 daily_no + sopno 精確識別
+            // 更新該專案的AI內容 - 使用 daily_no + planno + sopno 精確識別
             setReports((prev) =>
-              prev.map((r) =>
-                r.daily_no === report.daily_no && r.sopno === report.sopno
+              prev.map((r) => {
+                const rPlanno = r.project?.planno || "NULL";
+                return r.daily_no === report.daily_no &&
+                       rPlanno === planno &&
+                       r.sopno === report.sopno
                   ? { ...r, ai_content: enhancedReport.ai_content }
-                  : r
-              )
+                  : r;
+              })
             );
           } else {
             console.error(`專案 ${report.project.plan_subj_c} AI增強失敗`);
@@ -417,7 +418,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       toast.error("無法編輯：缺少執行工作編號");
       return;
     }
-    setEditingSopno(report.sopno);
+    // 使用 daily_no + planno + sopno 組合作為唯一識別
+    const planno = report.project?.planno || "NULL";
+    const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+    setEditingRecordKey(recordKey);
     const content = report.content;
     const files = report.files.map((f) => ({
       ...f,
@@ -463,7 +467,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       }
 
       // 清空所有編輯狀態
-      setEditingSopno(null);
+      setEditingRecordKey(null);
       setEditContent("");
       setEditFiles([]);
       setEditProjectId(undefined);
@@ -485,27 +489,30 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   };
 
   const deleteDraft = async () => {
-    if (!authFetch) return;
+    if (!authFetch || !editingRecordKey) return;
 
     // 確認刪除
     if (!window.confirm("確定要刪除這筆記錄嗎？此操作無法復原。")) {
       return;
     }
 
-    // 取得當前編輯的報告
-    const reportToDelete = reports.find((r) => r.sopno === editingSopno);
-    if (!reportToDelete?.daily_no || !reportToDelete?.sopno) {
+    // 從 editingRecordKey 解析出 daily_no, planno, sopno
+    const [daily_no, planno, sopno] = editingRecordKey.split("-");
+
+    const reportToDelete = reports.find(
+      (r) => r.daily_no === daily_no &&
+             (r.project?.planno || "NULL") === planno &&
+             r.sopno === sopno
+    );
+    if (!reportToDelete) {
       toast.error("無法找到記錄資訊");
       return;
     }
 
-    // 取得 planno，如果沒有則使用 "NULL"
-    const planno = reportToDelete.project?.id?.toString() || "NULL";
-
     setIsDeletingDraft(true);
     try {
       const response = await authFetch(
-        `/api/drafts/${reportToDelete.daily_no}/${planno}/${reportToDelete.sopno}`,
+        `/api/drafts/${daily_no}/${planno}/${sopno}`,
         {
           method: "DELETE",
         }
@@ -518,7 +525,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       toast.success("記錄已刪除");
 
       // 清空所有編輯狀態
-      setEditingSopno(null);
+      setEditingRecordKey(null);
       setEditContent("");
       setEditFiles([]);
       setEditProjectId(undefined);
@@ -549,7 +556,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   };
 
   const saveEdit = async () => {
-    if (editingSopno === null || !authFetch) return;
+    if (editingRecordKey === null || !authFetch) return;
 
     // 驗證必填欄位
     if (!editExecutionWorkId) {
@@ -563,19 +570,18 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
     setIsSaving(true);
     try {
-      const reportToUpdate = reports.find((r) => r.sopno === editingSopno);
+      // 從 editingRecordKey 解析出 daily_no, planno, sopno
+      const [daily_no, planno, sopno] = editingRecordKey.split("-");
+
+      const reportToUpdate = reports.find(
+        (r) => r.daily_no === daily_no &&
+               (r.project?.planno || "NULL") === planno &&
+               r.sopno === sopno
+      );
       if (!reportToUpdate) throw new Error("找不到原始報告");
 
-      // 使用sopno來精確識別要更新的記錄
-      if (!reportToUpdate.sopno) {
-        throw new Error("找不到執行工作編號，無法更新記錄");
-      }
-
-      // 檢查 planno 是否存在，如果不存在則使用 "NULL" 作為佔位符
-      const planno = reportToUpdate.project?.planno || "NULL";
-
       const response = await authFetch(
-        `/api/drafts/by-daily-planno-sopno/${reportToUpdate.daily_no}/${planno}/${reportToUpdate.sopno}`,
+        `/api/drafts/by-daily-planno-sopno/${daily_no}/${planno}/${sopno}`,
         {
           method: "PUT",
           headers: {
@@ -616,7 +622,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       toast.success("報告草稿更新成功！");
 
       // 清空所有編輯狀態
-      setEditingSopno(null);
+      setEditingRecordKey(null);
       setEditContent("");
       setEditFiles([]);
       setEditProjectId(undefined);
@@ -1214,7 +1220,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           <div className="flex flex-row items-center gap-3">
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
-              disabled={editingSopno !== null || generatingAiFor.size > 0}
+              disabled={editingRecordKey !== null || generatingAiFor.size > 0}
               className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -1226,7 +1232,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               disabled={
                 isGeneratingAllAi ||
                 reports.length === 0 ||
-                editingSopno !== null ||
+                editingRecordKey !== null ||
                 generatingAiFor.size > 0
               }
               className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300 flex-shrink-0"
@@ -1249,7 +1255,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
             </button>
             <button
               onClick={handleSubmitReport}
-              disabled={isSubmitting || editingSopno !== null}
+              disabled={isSubmitting || editingRecordKey !== null}
               className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -1287,20 +1293,26 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       </div>
 
                       {/* 右側：按鈕組 */}
-                      {editingSopno !== report.sopno && (
+                      {(() => {
+                        const planno = report.project?.planno || "NULL";
+                        const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                        return editingRecordKey !== recordKey;
+                      })() && (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button
-                            onClick={() => handleEnhanceOne(report.sopno!)}
+                            onClick={() => handleEnhanceOne(report)}
                             disabled={
                               generatingAiFor.size > 0 ||
                               isGeneratingAllAi ||
-                              editingSopno !== null
+                              editingRecordKey !== null
                             }
                             className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
                           >
-                            {generatingAiFor.has(
-                              `${report.daily_no}-${report.sopno}`
-                            ) ? (
+                            {(() => {
+                              const planno = report.project?.planno || "NULL";
+                              const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                              return generatingAiFor.has(reportKey);
+                            })() ? (
                               <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
                             ) : (
                               <Wand2 className="w-4 h-4 mr-2" />
@@ -1349,7 +1361,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 </div>
 
                 <div className="flex-grow">
-                  {editingSopno === report.sopno ? (
+                  {(() => {
+                    const planno = report.project?.planno || "NULL";
+                    const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                    return editingRecordKey === recordKey;
+                  })() ? (
                     <div className="space-y-4">
                       {/* 其他欄位折疊按鈕 */}
                       <button
@@ -1514,7 +1530,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
                     </div>
                   </div>
-                  {generatingAiFor.has(`${report.daily_no}-${report.sopno}`) ? (
+                  {(() => {
+                    const planno = report.project?.planno || "NULL";
+                    const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                    return generatingAiFor.has(reportKey);
+                  })() ? (
                     <p className="text-base text-gray-500 italic">
                       AI 正在為此專案生成潤飾內容...
                     </p>
@@ -1537,9 +1557,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               )}
 
               {/* --- Apply AI Suggestion Button (FINAL - Corrected Position) --- */}
-              {editingSopno === report.sopno &&
-                isAiViewActive &&
-                report.ai_content && (
+              {(() => {
+                const planno = report.project?.planno || "NULL";
+                const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                return editingRecordKey === recordKey &&
+                  isAiViewActive &&
+                  report.ai_content;
+              })() && (
                   <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                     <button
                       onClick={() =>

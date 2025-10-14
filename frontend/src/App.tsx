@@ -529,6 +529,8 @@ function App() {
           <EmployeeListTab
             key="employee-list"
             onSelectEmployee={handleSelectEmployee}
+            selectedDate={globalSelectedDate}
+            onDateChange={setGlobalSelectedDate}
           />
         )}
         {activeTab === "supervisor" && selectedEmployee && selectedReportId && (

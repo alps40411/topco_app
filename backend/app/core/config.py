@@ -47,8 +47,10 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
     STATIC_URL_PREFIX: str = ""  # 靜態檔案 URL 前綴，例如 /MyReportAI
 
-    # Wfinbox API 配置
+    # CommonAPI 配置
     WFINBOX_API_URL: str = "http://10.129.7.248/CommonApi/EIP/ChangeWFINBOX"
+    MYREPORT_GET_WRITABLE_DATE_URL: str = "http://10.129.7.248/CommonApi/MyReport/GetWritableDate"
+    MYREPORT_GET_FORWARD_LIST_URL: str = "http://10.129.7.248/CommonApi/MyReport/GetForwardList"
 
 
 
