@@ -128,7 +128,7 @@ class DateService:
             # 全局提示訊息
             message = ""
             if not allowed and available_dates:
-                message = "所有日期的日報已被主管審閱，無法編輯，請等待隔天8:30後填寫新的日報"
+                message = "日報已被主管審閱，無法編輯，請等待隔天8:30後填寫新的日報"
             elif not available_dates:
                 message = "目前沒有可填寫的日期範圍"
 

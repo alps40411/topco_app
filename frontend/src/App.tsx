@@ -476,10 +476,12 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
-        {/* 顯示寫入狀態消息 - 只有在完全沒有其他可填寫日期時才顯示 */}
+        {/* 顯示寫入狀態消息 - 只在日報首頁列表顯示 */}
         {writingStatus &&
           !writingStatus.allowed &&
-          !writingStatus.has_other_writable_dates && (
+          !writingStatus.has_other_writable_dates &&
+          activeTab === "supervisor" &&
+          !selectedEmployee && (
             <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
