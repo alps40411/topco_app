@@ -709,3 +709,39 @@ async def get_daily_homepage_reports(
 
 # ✅ REMOVED: 權限檢查輔助函數已遷移到 SupervisorService
 
+@router.get("/resolve-report/{daily_no}")
+async def resolve_report_url(
+    daily_no: str,
+    legacy_db: Session = Depends(get_legacy_db)
+):
+    """
+    根據 daily_no 解析出 employee ID，用於信件連結跳轉
+    從信件URL格式: ?web_type=EIP&cocode=A&daily_no=8855978
+    轉換為應用URL格式: ?tab=supervisor&employee=02975&report=8855978
+    """
+    try:
+        # 查詢日報對應的員工資訊
+        employee_sql = text("""
+            SELECT d.empno, d.empnamec
+            FROM jps.tdr_master d
+            WHERE d.daily_no = :daily_no
+        """)
+
+        emp_result = legacy_db.execute(employee_sql, {"daily_no": daily_no})
+        emp_row = emp_result.fetchone()
+
+        if not emp_row:
+            raise HTTPException(status_code=404, detail="找不到指定的日報")
+
+        return {
+            "daily_no": daily_no,
+            "employee_id": emp_row[0],
+            "employee_name": emp_row[1]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resolving report URL for daily_no={daily_no}: {str(e)}")
+        raise HTTPException(status_code=500, detail="解析日報連結失敗")
+

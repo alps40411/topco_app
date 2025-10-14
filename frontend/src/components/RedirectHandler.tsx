@@ -1,16 +1,17 @@
 // frontend/src/components/RedirectHandler.tsx
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 /**
  * 處理郵件格式 URL 重定向到應用格式
- * 郵件格式: /MyReportAI/viewed.aspx?web_type=EIP&cocode={公司別}&daily_no={日報編號}&status=P
- * 應用格式: /MyReportAI/?tab=supervisor&report={日報編號}&status=P
+ * 郵件格式: /MyReportAI/?web_type=EIP&cocode=A&daily_no=8855978
+ * 應用格式: /MyReportAI/?tab=supervisor&employee=02975&report=8855978
  */
 const RedirectHandler: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const dailyNo = searchParams.get("daily_no");
@@ -18,34 +19,90 @@ const RedirectHandler: React.FC = () => {
     const replyid = searchParams.get("replyid");
 
     if (dailyNo) {
-      // 構建新的 URL 參數
-      const params = new URLSearchParams({
-        tab: "supervisor",
-        report: dailyNo,
-      });
+      // 呼叫後端API解析 daily_no 對應的 employee
+      const resolveAndRedirect = async () => {
+        try {
+          const token = localStorage.getItem("authToken");
+          const response = await fetch(
+            `/api/supervisor/resolve-report/${dailyNo}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
-      if (status) {
-        params.set("status", status);
-      }
+          if (!response.ok) {
+            throw new Error("無法解析日報連結");
+          }
 
-      if (replyid) {
-        params.set("replyid", replyid);
-      }
+          const data = await response.json();
+          const employeeId = data.employee_id;
 
-      // 重定向到新格式（從 /viewed.aspx 跳轉到根路徑，相對於 basename）
-      navigate(`?${params.toString()}`, { replace: true });
+          // 構建新的 URL 參數（包含 employee 和 report）
+          const params = new URLSearchParams({
+            tab: "supervisor",
+            employee: employeeId,
+            report: dailyNo,
+          });
+
+          if (status) {
+            params.set("status", status);
+          }
+
+          if (replyid) {
+            params.set("replyid", replyid);
+          }
+
+          // 重定向到新格式
+          navigate(`?${params.toString()}`, { replace: true });
+        } catch (err) {
+          console.error("解析日報連結失敗:", err);
+          setError("無法載入日報，請稍後再試");
+          // 3秒後跳轉到首頁
+          setTimeout(() => {
+            navigate("?tab=supervisor", { replace: true });
+          }, 3000);
+        }
+      };
+
+      resolveAndRedirect();
     } else {
       // 如果沒有 daily_no，導向首頁
       navigate("?tab=supervisor", { replace: true });
     }
   }, [searchParams, navigate]);
 
-  // 顯示載入中
+  // 顯示載入中或錯誤訊息
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">載入中...</p>
+        {error ? (
+          <>
+            <div className="text-red-600 mb-4">
+              <svg
+                className="w-12 h-12 mx-auto mb-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <p className="text-gray-600">{error}</p>
+            <p className="text-gray-500 text-sm mt-2">即將返回首頁...</p>
+          </>
+        ) : (
+          <>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">載入日報中...</p>
+          </>
+        )}
       </div>
     </div>
   );
