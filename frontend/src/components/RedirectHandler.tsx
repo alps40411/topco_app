@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { buildApiUrl } from "../config/api";
 
 /**
  * 處理郵件格式 URL 重定向到應用格式
@@ -24,7 +25,7 @@ const RedirectHandler: React.FC = () => {
         try {
           const token = localStorage.getItem("authToken");
           const response = await fetch(
-            `/api/supervisor/resolve-report/${dailyNo}`,
+            buildApiUrl(`/api/supervisor/resolve-report/${dailyNo}`),
             {
               headers: {
                 Authorization: `Bearer ${token}`,
