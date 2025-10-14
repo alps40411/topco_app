@@ -30,10 +30,6 @@ class ReviewService:
         """提交主管審閱（包含評分和回復）"""
         
         try:
-            print(f"[EAI DEBUG] === 開始處理審閱 ===")
-            print(f"[EAI DEBUG] daily_no={daily_no}, reviewer_empno={reviewer_empno}")
-            print(f"[EAI DEBUG] to_users={to_users}, forward_users={forward_users}")
-
             # 取得當前日期時間
             now = datetime.now()
             current_date = now.strftime('%Y%m%d')
@@ -191,13 +187,12 @@ class ReviewService:
                 forward_users is not None and len(forward_users) > 0
             )
             
-            # 8. 更新 wfinbox 狀態（透過 C# 調用 MyReport.dll）
+            # 8. 更新 wfinbox 狀態（透過 CommonAPI）
             try:
                 WfinboxService.update_status_to_read(
                     empno=reviewer_empno,
                     serino=daily_no
                 )
-                print(f"[EAI DEBUG] wfinbox 已更新，empno = {reviewer_empno}, daily_no = {daily_no}")
             except Exception as e:
                 # wfinbox 更新失敗不影響主流程
                 logger.warning(f"Wfinbox 更新失敗（不影響主流程）: {str(e)}")
@@ -212,15 +207,11 @@ class ReviewService:
                     if to_user not in ls_total_user:
                         ls_total_user.append(to_user)
 
-            print(f"[EAI DEBUG] 回應目標用戶: {ls_total_user}")
-
             # 加入跨轉寄的用戶(fwUser) - 這些也是要收到通知的用戶
             if forward_users:
                 for fw_user in forward_users:
                     if fw_user not in ls_total_user:
                         ls_total_user.append(fw_user)
-
-            print(f"[EAI DEBUG] 完整通知用戶列表: {ls_total_user}")
 
             # 建立訊息佇列 - 為每個要通知的用戶建立EAI記錄
             ls_mq = []
@@ -234,16 +225,12 @@ class ReviewService:
                     "eai": eai_seq
                 })
 
-            print(f"[EAI DEBUG] 訊息佇列: {ls_mq}")
-
             # 建立工作流通知
             for mq_item in ls_mq:
                 try:
                     subject = f"{reviewer_empname}回應日報({sop_desc_c})"
                     href = f"%2fMyReportAI%2f%3fcocode%3d{report_cocode}%26daily_no%3d{daily_no}%26replyid%3d{reply_nos}%26status%3dP"
                     doc_body = f"Source=JpsReportDailyReply^|Action=toWkf^|cocode=toWkf^|xuser={reviewer_empno}^|doc_date={current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}^|doc_time={current_time}^|touser={reviewer_empno}^|href={href}^|Key={daily_no}^|Subject={subject}"
-
-                    print(f"[EAI DEBUG] 準備插入: touser={mq_item['fwUser']}, eai_seq={mq_item['eai']}")
 
                     eai_sql = text("""
                         INSERT INTO jps.eai_source (
@@ -267,10 +254,8 @@ class ReviewService:
                         "doc_bady": doc_body
                     })
 
-                    print(f"[EAI DEBUG] 成功插入: touser={mq_item['fwUser']}, eai_seq={mq_item['eai']}")
-
                 except Exception as eai_error:
-                    print(f"[EAI DEBUG] 插入失敗: touser={mq_item['fwUser']}, error={str(eai_error)}")
+                    logger.warning(f"EAI 通知插入失敗: touser={mq_item['fwUser']}, error={str(eai_error)}")
                     # 不要因為EAI失敗而中斷整個流程，繼續處理
 
             db.commit()
@@ -405,9 +390,6 @@ class ReviewService:
         """確認已讀日報並更新信箱狀態"""
 
         try:
-            print(f"[ACKNOWLEDGE DEBUG] === 處理日報確認 ===")
-            print(f"[ACKNOWLEDGE DEBUG] daily_no={daily_no}, user_empno={user_empno}")
-
             # 驗證日報是否存在
             report_check_sql = text("""
                 SELECT empno, empnamec, cocode
@@ -419,19 +401,14 @@ class ReviewService:
             if not report_result:
                 raise ValueError(f"日報 {daily_no} 不存在")
 
-            # 更新 wfinbox 狀態（透過 C# 調用 MyReport.dll）
+            # 更新 wfinbox 狀態（透過 CommonAPI）
             try:
-                success = WfinboxService.update_status_to_read(
+                WfinboxService.update_status_to_read(
                     empno=user_empno,
                     serino=daily_no
                 )
-                if success:
-                    print(f"[ACKNOWLEDGE DEBUG] wfinbox 已更新")
-                else:
-                    print(f"[ACKNOWLEDGE DEBUG] wfinbox 更新失敗")
             except Exception as e:
                 logger.warning(f"Wfinbox 更新失敗（不影響主流程）: {str(e)}")
-                print(f"[ACKNOWLEDGE DEBUG] wfinbox 更新異常: {str(e)}")
 
             db.commit()
             logger.info(f"成功確認日報 daily_no={daily_no}, user_empno={user_empno}")

@@ -1,87 +1,74 @@
 # backend/app/services/wfinbox_service.py
 """
 Wfinbox 服務層
-透過 C# WfinboxRecoveryService.exe 更新 Oracle wfinbox 資料表狀態
+透過 CommonAPI 更新 Oracle wfinbox 資料表狀態
 """
-import subprocess
-import json
+import httpx
 import logging
-from pathlib import Path
 from typing import Dict, Any
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class WfinboxService:
     """工作流信箱服務"""
 
-    def __init__(self):
-        # 取得 C# 執行檔路徑
-        backend_dir = Path(__file__).parent.parent.parent
-        self.exe_path = backend_dir / "WfinboxRecoveryService.exe"
-
-        if not self.exe_path.exists():
-            logger.warning(f"找不到 WfinboxRecoveryService.exe: {self.exe_path}")
-
     @staticmethod
     def update_status_to_read(empno: str, serino: str) -> bool:
         """
         更新 wfinbox 狀態為已讀 (xstatus = '3')
-        透過調用 C# 程式直接執行 SQL UPDATE
+        透過調用 CommonAPI 的 ChangeWFINBOX 接口
 
         Args:
-            empno: 員工編號（主管工號）
+            empno: 員工編號（主管/部屬工號）
             serino: 日報編號 (daily_no)
 
         Returns:
             bool: 更新是否成功
         """
         try:
-            backend_dir = Path(__file__).parent.parent.parent
-            exe_path = backend_dir / "WfinboxRecoveryService.exe"
+            logger.info(f"[WFINBOX] 調用 CommonAPI: empno={empno}, serino={serino}")
 
-            if not exe_path.exists():
-                logger.error(f"找不到 WfinboxRecoveryService.exe: {exe_path}")
-                return False
+            # 構造請求參數
+            payload = {
+                "XSTATUS": "3",      # 狀態：3 = 已讀
+                "EMPNO": empno,      # 員工編號
+                "SOURCE": "003",  # 來源系統：003 = 日報系統
+                "SERINO": serino     # 日報編號
+            }
 
-            logger.info(f"[WFINBOX] 調用 WfinboxRecovery: empno={empno}, serino={serino}")
+            # 發送 POST 請求
+            with httpx.Client(timeout=30.0) as client:
+                response = client.post(
+                    settings.WFINBOX_API_URL,
+                    json=payload
+                )
 
-            # 執行 C# 程式
-            # 注意：WfinboxRecoveryService.exe 接收參數順序為 empno, serino
-            # 但內部會調用 MyReport.dll 的 WfinboxRecovery(serino, empno)
-            result = subprocess.run(
-                [str(exe_path), empno, serino],
-                capture_output=True,
-                text=True,
-                timeout=30,  # 30秒超時
-                encoding='utf-8',
-                errors='replace'
-            )
-
-            if result.returncode != 0:
-                logger.error(f"[WFINBOX] C# 程式執行失敗: {result.stderr}")
-                return False
-
-            # 解析 JSON 輸出
-            try:
-                output_data = json.loads(result.stdout.strip())
-
-                if output_data.get("error"):
-                    logger.error(f"[WFINBOX] 執行錯誤: {output_data.get('message')}")
+                # 檢查 HTTP 狀態碼
+                if response.status_code != 200:
+                    logger.error(f"[WFINBOX] API 請求失敗: status_code={response.status_code}, response={response.text}")
                     return False
 
-                if output_data.get("success"):
+                # 解析回應
+                result = response.json()
+                logger.info(f"[WFINBOX] API 回應: {result}")
+
+                # 判斷是否成功
+                # CommonAPI 標準回應格式: ResponseNo = "0000" 表示成功
+                response_no = result.get("ResponseNo", "")
+
+                if response_no == "0000":
                     logger.info(f"[WFINBOX] 更新成功: empno={empno}, serino={serino}")
                     return True
                 else:
-                    logger.warning(f"[WFINBOX] 未知的回應: {output_data}")
+                    logger.warning(f"[WFINBOX] 更新失敗，ResponseNo={response_no}, API 回應: {result}")
                     return False
 
-            except json.JSONDecodeError as e:
-                logger.error(f"[WFINBOX] JSON 解析失敗: {e}, output: {result.stdout}")
-                return False
-
-        except subprocess.TimeoutExpired:
-            logger.error("[WFINBOX] C# 程式執行超時")
+        except httpx.TimeoutException:
+            logger.error("[WFINBOX] API 請求超時")
+            return False
+        except httpx.RequestError as e:
+            logger.error(f"[WFINBOX] 網路請求錯誤: {str(e)}")
             return False
         except Exception as e:
             logger.error(f"[WFINBOX] 更新失敗: {str(e)}")
