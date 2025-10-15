@@ -67,12 +67,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // 使用從後端獲取的最新數據
           login(storedToken, userData.data);
         } else {
-          // Token 無效或過期
-          logout();
+          // Token 無效或過期，清除資料但不設置 manual_logout
+          // 讓 SSO 可以自動重新登入（如果有 SSO Headers）
+          console.log("Token validation failed, clearing auth data");
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("user");
+          setToken(null);
+          setUser(null);
         }
       } catch (error) {
+        // 網路錯誤或其他問題，清除資料但不設置 manual_logout
         console.error("驗證失敗:", error);
-        logout();
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+        setToken(null);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -163,8 +172,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // 設置手動登出標記，避免自動 SSO
     sessionStorage.setItem("manual_logout", "true");
 
-    // 強制重新加載頁面確保完全清除狀態
-    window.location.href = "/MyReportAI/login";
+    // 重新載入到根路徑，讓 ProtectedRoute 處理導航到登入頁
+    // 使用根路徑避免 404 錯誤（SPA 不應該直接訪問 /login）
+    window.location.replace("/MyReportAI/");
   }, []);
 
   const isAuthenticated = !isLoading && !!token;
