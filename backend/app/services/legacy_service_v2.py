@@ -607,57 +607,65 @@ class LegacyReportServiceV2:
         """為特定 daily_sub_nos 處理檔案上傳 (修復版本)"""
         try:
             logger.info(f"為 daily_sub_nos={daily_sub_nos} 處理檔案：daily_no={daily_no}, 檔案數量={len(files)}")
-            
+
             if not files:
                 logger.info(f"daily_sub_nos={daily_sub_nos} 沒有檔案需要處理")
                 return
-            
+
+            # 插入 tdr_upload_file 記錄的時間資訊
+            now = datetime.now()
+            current_date = now.strftime('%Y%m%d')  # xdate: 當前日期 yyyyMMdd
+            current_time = now.strftime('%H:%M:%S')  # xtime: 當前時間 HH:mm:ss
+
             # 處理每個檔案
             file_index = 1
             for file_info in files:
                 file_name = file_info.get('name', '')
-                if not file_name:
+                file_url = file_info.get('url', '')
+
+                if not file_name or not file_url:
+                    logger.warning(f"跳過無效檔案: name={file_name}, url={file_url}")
                     continue
-                
+
                 # 生成檔案ID: dailyNo * 1000000 + dailySubNos * 1000 + index
                 file_id = int(daily_no) * 1000000 + daily_sub_nos * 1000 + file_index
-                
-                # 生成檔名編碼
-                now = datetime.now()
-                # 格式: empNo + "_" + ddHHmmssfffffff (其中fffffff是7位毫秒)
-                microseconds = now.microsecond
-                milliseconds_7digit = f"{microseconds}0"[:7]  # 將6位微秒擴展為7位
-                hash_input = f"{empno}_{now.strftime('%d%H%M%S')}{milliseconds_7digit}"
-                hash_md5 = hashlib.md5(hash_input.encode()).hexdigest()
-                
-                logger.info(f"檔名編碼輸入: {hash_input} -> MD5: {hash_md5}")
-                
-                # 取得原始檔案副檔名
-                original_ext = ""
-                if '.' in file_name:
-                    original_ext = file_name[file_name.rfind('.'):]
-                
-                encoded_filename = f"{hash_md5}{original_ext}"
-                
-                # 生成檔案路徑: yyyyMM(依日報日期取年月) + / + 檔名編碼
-                year_month = doc_date[:6]  # 取日報日期的 yyyyMM
-                file_path = f"{year_month}/{encoded_filename}"
-                
-                # 插入 tdr_upload_file 記錄的時間資訊
-                current_date = now.strftime('%Y%m%d')  # xdate: 當前日期 yyyyMMdd
-                current_time = now.strftime('%H:%M:%S')  # xtime: 當前時間 HH:mm:ss
-                
-                logger.info(f"檔案路徑: {file_path}, docdate: {doc_date}, xdate: {current_date}, xtime: {current_time}")
-                
+
+                # 從 URL 中提取檔案路徑
+                # URL 格式可能是:
+                # - /uploads/202510/20251015090141_58355747_image.png (本地)
+                # - /MyReportAI/upimages/202510/20251015090141_58355747_image.png (正式機)
+                # 我們需要提取 202510/20251015090141_58355747_image.png 部分
+
+                # 移除可能的前綴
+                from ..core.config import settings
+                file_path_relative = file_url
+
+                # 移除 STATIC_URL_PREFIX (如 /MyReportAI)
+                if settings.STATIC_URL_PREFIX and file_path_relative.startswith(settings.STATIC_URL_PREFIX):
+                    file_path_relative = file_path_relative[len(settings.STATIC_URL_PREFIX):]
+
+                # 移除 /upimages/ 或 /uploads/
+                if file_path_relative.startswith('/upimages/'):
+                    file_path_relative = file_path_relative[len('/upimages/'):]
+                elif file_path_relative.startswith('/uploads/'):
+                    file_path_relative = file_path_relative[len('/uploads/'):]
+                elif file_path_relative.startswith('/'):
+                    file_path_relative = file_path_relative[1:]
+
+                # 現在 file_path_relative 應該是: 202510/20251015090141_58355747_image.png
+                file_path = file_path_relative
+
+                logger.info(f"處理檔案: URL={file_url} -> filepath={file_path}")
+
                 # 檢查是否已存在相同ID的記錄
                 check_sql = text("SELECT COUNT(*) FROM jps.tdr_upload_file WHERE id = :id")
                 exists = db.execute(check_sql, {"id": file_id}).scalar() > 0
-                
+
                 if exists:
                     logger.info(f"檔案記錄 {file_id} 已存在，跳過插入")
                     file_index += 1
                     continue
-                
+
                 insert_sql = text("""
                     INSERT INTO jps.tdr_upload_file (
                         id, cocode, empno, docdate, filepath, filename, status, xdate, xtime
@@ -665,20 +673,20 @@ class LegacyReportServiceV2:
                         :id, :cocode, :empno, :docdate, :filepath, :filename, :status, :xdate, :xtime
                     )
                 """)
-                
+
                 try:
                     db.execute(insert_sql, {
                         "id": file_id,                    # id = dailyNo * 1000000 + dailySubNos * 1000 + index
                         "cocode": cocode,                # coCode
                         "empno": empno,                  # empNo
                         "docdate": doc_date,             # docDate(yyyyMMdd) - 日報日期
-                        "filepath": file_path,           # filePath = yyyyMM/ + 檔名編碼
-                        "filename": file_name,           # {原始檔名}
+                        "filepath": file_path,           # filePath = YYYYMM/encoded_filename.ext (從 URL 提取)
+                        "filename": file_name,           # 原始檔名
                         "status": "Online",              # 'Online'
                         "xdate": current_date,           # yyyyMMdd - 當前日期
                         "xtime": current_time            # HH:mm:ss - 當前時間
                     })
-                    
+
                     logger.info(f"檔案記錄插入成功:")
                     logger.info(f"   ID: {file_id} (daily_no={daily_no}, daily_sub_nos={daily_sub_nos}, index={file_index})")
                     logger.info(f"   檔案: {file_name} -> {file_path}")
@@ -686,11 +694,11 @@ class LegacyReportServiceV2:
                 except Exception as insert_error:
                     logger.error(f"插入檔案記錄失敗: id={file_id}, error={str(insert_error)}")
                     raise
-                
+
                 file_index += 1
-            
+
             logger.info(f"成功為 daily_sub_nos={daily_sub_nos} 處理 {len(files)} 個檔案")
-            
+
         except Exception as e:
             logger.error(f"為 daily_sub_nos={daily_sub_nos} 處理檔案失敗: {str(e)}")
             raise

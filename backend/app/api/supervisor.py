@@ -471,19 +471,32 @@ async def get_report_detail_deprecated(
                 file_id = daily_no_int * 1000000 + daily_sub_nos_int * 1000 + file_index
                 # 根據檔案副檔名判斷類型
                 filename = file_row[1] or ""
+                filepath = file_row[0] or ""  # 從資料庫取得的檔案路徑 (格式: YYYYMM/filename.ext)
                 file_ext = filename.lower().split('.')[-1] if '.' in filename else ""
                 if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
                     file_type = f"image/{file_ext}"
                 else:
                     file_type = "application/octet-stream"
-                
+
+                # 構建完整的檔案 URL
+                # 資料庫中的 filepath 格式是: YYYYMM/filename.ext
+                # 需要添加正確的前綴:
+                # - 本地環境: STATIC_URL_PREFIX 為空，使用 /uploads/YYYYMM/filename.ext
+                # - 正式機環境: STATIC_URL_PREFIX 為 /MyReportAI，使用 /MyReportAI/upimages/YYYYMM/filename.ext
+                if settings.STATIC_URL_PREFIX:
+                    # 正式機環境 (有 STATIC_URL_PREFIX，例如 /MyReportAI)
+                    file_url = f"{settings.STATIC_URL_PREFIX}/upimages/{filepath}"
+                else:
+                    # 本地環境 (沒有 STATIC_URL_PREFIX)
+                    file_url = f"/uploads/{filepath}"
+
                 files.append({
                     "id": file_id,
                     "name": filename,
                     "type": file_type,
                     "size": 0,  # 檔案大小暫時設為 0，因為資料庫中沒有這個欄位
-                    "url": f"/api/supervisor/files/download/{file_id}",  # 檔案下載 URL
-                    "filepath": file_row[0]  # 保留原始路徑供後端使用
+                    "url": file_url,  # 完整的檔案 URL
+                    "filepath": filepath  # 保留原始路徑供後端使用
                 })
                 file_index += 1
 
