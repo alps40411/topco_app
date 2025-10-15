@@ -39,8 +39,13 @@ const LoginPage: React.FC = () => {
           const data = await response.json();
 
           login(data.token.access_token, data.user);
-          // 使用完整路徑跳轉
-          window.location.href = "/MyReportAI/?tab=supervisor";
+
+          // ✅ 保留原始 URL 參數，如果沒有則跳轉到首頁
+          const currentSearch = window.location.search;
+          const redirectUrl = currentSearch
+            ? `/MyReportAI/${currentSearch}`
+            : "/MyReportAI/?tab=supervisor";
+          window.location.href = redirectUrl;
         } else {
           // SSO 失敗，顯示傳統登入界面
           setIsCheckingSSO(false);
@@ -77,8 +82,13 @@ const LoginPage: React.FC = () => {
 
       const data = await response.json();
       login(data.token.access_token, data.user);
-      // 使用完整路徑跳轉
-      window.location.href = "/MyReportAI/?tab=supervisor";
+
+      // ✅ 保留原始 URL 參數，如果沒有則跳轉到首頁
+      const currentSearch = window.location.search;
+      const redirectUrl = currentSearch
+        ? `/MyReportAI/${currentSearch}`
+        : "/MyReportAI/?tab=supervisor";
+      window.location.href = redirectUrl;
     } catch (err: any) {
       setError(err.message || "發生未知錯誤");
     } finally {
@@ -104,8 +114,13 @@ const LoginPage: React.FC = () => {
 
       const data = await response.json();
       login(data.token.access_token, data.user);
-      // 使用完整路徑跳轉
-      window.location.href = "/MyReportAI/?tab=supervisor";
+
+      // ✅ 保留原始 URL 參數，如果沒有則跳轉到首頁
+      const currentSearch = window.location.search;
+      const redirectUrl = currentSearch
+        ? `/MyReportAI/${currentSearch}`
+        : "/MyReportAI/?tab=supervisor";
+      window.location.href = redirectUrl;
     } catch (err: any) {
       setError(err.message || "SSO 登入失敗");
     } finally {
