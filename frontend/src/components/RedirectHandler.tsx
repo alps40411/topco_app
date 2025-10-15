@@ -18,6 +18,8 @@ const RedirectHandler: React.FC = () => {
     const dailyNo = searchParams.get("daily_no");
     const status = searchParams.get("status");
     const replyid = searchParams.get("replyid");
+    const webType = searchParams.get("web_type"); // ✅ 獲取 web_type
+    const cocode = searchParams.get("cocode"); // ✅ 獲取 cocode
 
     if (dailyNo) {
       // 呼叫後端API解析 daily_no 對應的 employee
@@ -46,6 +48,16 @@ const RedirectHandler: React.FC = () => {
             employee: employeeId,
             report: dailyNo,
           });
+
+          // ✅ 保留 web_type 參數
+          if (webType) {
+            params.set("web_type", webType);
+          }
+
+          // ✅ 保留 cocode 參數
+          if (cocode) {
+            params.set("cocode", cocode);
+          }
 
           if (status) {
             params.set("status", status);

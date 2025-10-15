@@ -299,8 +299,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onForwardUsersChange?.([]); // 清空轉寄選擇
         await fetchComments();
 
-        // 送出回覆後返回上一頁
-        navigate(-1);
+        // ✅ 檢查是否從 EIP 進入，決定跳轉目標
+        const urlParams = new URLSearchParams(window.location.search);
+        const webType = urlParams.get("web_type");
+        if (webType === "EIP") {
+          window.location.href = "../TopcoWebCore/InBox";
+        } else {
+          navigate("?tab=supervisor");
+        }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交回覆失敗");
@@ -364,8 +370,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();
 
-        // 送出審閱後返回上一頁
-        navigate(-1);
+        // ✅ 檢查是否從 EIP 進入，決定跳轉目標
+        const urlParams = new URLSearchParams(window.location.search);
+        const webType = urlParams.get("web_type");
+        if (webType === "EIP") {
+          window.location.href = "../TopcoWebCore/InBox";
+        } else {
+          navigate("?tab=supervisor");
+        }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交審閱失敗");
@@ -391,8 +403,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       });
 
       if (response.ok) {
-        // 返回上一頁
-        navigate(-1);
+        // ✅ 檢查是否從 EIP 進入，決定跳轉目標
+        const urlParams = new URLSearchParams(window.location.search);
+        const webType = urlParams.get("web_type");
+        if (webType === "EIP") {
+          window.location.href = "../TopcoWebCore/InBox";
+        } else {
+          navigate("?tab=supervisor");
+        }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "確認失敗");
