@@ -278,7 +278,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               target &&
               target !== String(user?.employee?.empno).padStart(5, "0")
           ), // 過濾掉空值和自己
-          forward_users: (selectedForwardUsers || []).filter((user) => user), // 過濾掉空值
+          forward_users: (selectedForwardUsers || [])
+            .filter((user) => user) // 過濾掉空值
+            .map((uniqueId) => {
+              // 從 uniqueId 提取 empno
+              // uniqueId 格式: title_05489_title_0 或 dept_category_dept_duty_05489_0
+              const parts = uniqueId.split("_");
+              if (parts[0] === "title" && parts.length >= 2) {
+                return parts[1]; // title_05489_title_0 -> 05489
+              } else if (parts[0] === "dept" && parts.length >= 5) {
+                return parts[parts.length - 2]; // dept_..._05489_0 -> 05489
+              }
+              return uniqueId; // 如果格式不對，直接返回原值
+            }),
         }),
       });
       if (response.ok) {
@@ -322,7 +334,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               target &&
               target !== String(user?.employee?.empno).padStart(5, "0")
           ), // 過濾掉空值和自己
-          forward_users: (selectedForwardUsers || []).filter((user) => user), // 過濾掉空值
+          forward_users: (selectedForwardUsers || [])
+            .filter((user) => user) // 過濾掉空值
+            .map((uniqueId) => {
+              // 從 uniqueId 提取 empno
+              // uniqueId 格式: title_05489_title_0 或 dept_category_dept_duty_05489_0
+              const parts = uniqueId.split("_");
+              if (parts[0] === "title" && parts.length >= 2) {
+                return parts[1]; // title_05489_title_0 -> 05489
+              } else if (parts[0] === "dept" && parts.length >= 5) {
+                return parts[parts.length - 2]; // dept_..._05489_0 -> 05489
+              }
+              return uniqueId; // 如果格式不對，直接返回原值
+            }),
         }),
       });
 
