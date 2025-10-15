@@ -187,7 +187,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (response.status === 401) {
-        logout();
+        // 清除本地儲存的認證資料
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+
+        // 檢查是否為 SSO 使用者切換
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.detail === "SSO user changed, please re-authenticate") {
+          // SSO 使用者已切換，嘗試自動重新登入
+          console.log("SSO user changed, attempting auto re-login");
+          window.location.href = "/MyReportAI/login";
+        } else {
+          // 一般的 session 過期
+          logout();
+        }
         throw new Error("Session expired");
       }
 

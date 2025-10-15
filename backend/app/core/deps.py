@@ -21,8 +21,11 @@ async def get_current_user(
 ):
     """
     獲取當前用戶 - 支援 JWT Token 和 SSO Headers 雙重認證
-    優先順序：JWT Token > SSO Headers
+    正式環境優先順序：SSO Headers > JWT Token
+    開發環境優先順序：JWT Token > SSO Headers
     """
+    from app.core.config import settings
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -30,26 +33,55 @@ async def get_current_user(
     )
 
     empno = None
+    token_empno = None
+    sso_empno = None
 
-    # 方法1：嘗試從 JWT Token 獲取用戶信息
+    # 嘗試從 JWT Token 獲取用戶信息
     if credentials and credentials.credentials:
         try:
             payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-            empno = payload.get("sub")
-            logger.info(f"Authentication via JWT token: empno={empno}")
+            token_empno = payload.get("sub")
+            logger.info(f"JWT token present: empno={token_empno}")
         except JWTError as e:
             logger.warning(f"JWT decode failed: {str(e)}")
 
-    # 方法2：如果 JWT Token 失敗，嘗試從 SSO Headers 獲取 (開發環境後備)
-    if not empno:
-        try:
-            sso_headers = get_sso_headers_with_mock(request, enable_mock=False)
-            sso_empno = sso_headers.get_empno()
-            if sso_empno:
-                empno = sso_empno
-                logger.info(f"Authentication via SSO headers: empno={empno}")
-        except Exception as e:
-            logger.warning(f"SSO headers fallback failed: {str(e)}")
+    # 嘗試從 SSO Headers 獲取用戶信息
+    try:
+        sso_headers = get_sso_headers_with_mock(request, enable_mock=False)
+        sso_empno = sso_headers.get_empno()
+        if sso_empno:
+            logger.info(f"SSO headers present: empno={sso_empno}")
+    except Exception as e:
+        logger.warning(f"SSO headers check failed: {str(e)}")
+
+    # 正式環境：SSO Headers 優先（確保 EIP 帳號切換即時生效）
+    # 開發環境：JWT Token 優先（保持開發便利性）
+    if settings.SSO_ENABLED and not settings.SSO_MOCK_ENABLED:
+        # 正式機環境：優先使用 SSO Headers
+        if sso_empno:
+            empno = sso_empno
+            logger.info(f"Authentication via SSO headers (production): empno={empno}")
+
+            # 一致性檢查：如果同時有 JWT Token 但與 SSO 不符，強制重新認證
+            if token_empno and token_empno != sso_empno:
+                logger.warning(f"SSO user changed: token={token_empno}, sso={sso_empno}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="SSO user changed, please re-authenticate",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        elif token_empno:
+            # SSO Headers 不存在時，使用 JWT Token 作為後備
+            empno = token_empno
+            logger.info(f"Authentication via JWT token (fallback): empno={empno}")
+    else:
+        # 開發環境：優先使用 JWT Token
+        if token_empno:
+            empno = token_empno
+            logger.info(f"Authentication via JWT token (development): empno={empno}")
+        elif sso_empno:
+            empno = sso_empno
+            logger.info(f"Authentication via SSO headers (development fallback): empno={empno}")
 
     # 如果兩種方法都失敗，拋出異常
     if not empno:

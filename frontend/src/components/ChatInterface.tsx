@@ -133,6 +133,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )
       : false;
 
+  // 檢查當前用戶是否為此報告的作者（使用 empno 比對）
+  const isReportAuthor =
+    user?.employee?.empno && reportOwnerEmpno
+      ? user.employee.empno === reportOwnerEmpno
+      : false;
+
   // ✅ 移除 fetchReportAuthor 函數，直接使用傳入的 reportAuthor
 
   // 建構回應目標列表
@@ -672,7 +678,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               } else if (
                 isReportSupervisor &&
                 !hasSubmittedReview &&
-                user.employee?.id !== reportOwnerId
+                !isReportAuthor
               ) {
                 // 只有主管尚未評分時才用評分功能
                 handleSubmitReview(true);
@@ -692,7 +698,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
           {isReportSupervisor &&
             !hasSubmittedReview &&
-            user.employee?.id !== reportOwnerId && (
+            !isReportAuthor && (
               <div className="mb-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -906,7 +912,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           {/* 已評分提示 */}
           {isReportSupervisor &&
             hasSubmittedReview &&
-            user.employee?.id !== reportOwnerId && (
+            !isReportAuthor && (
               <div className="mb-4">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <p className="text-sm text-green-800">
@@ -917,15 +923,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             )}
           {(!isReportSupervisor ||
             hasSubmittedReview ||
-            user.employee?.id === reportOwnerId) && (
+            isReportAuthor) && (
             <div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-medium text-slate-900 flex items-center">
                     <User className="w-4 h-4 mr-2" />
-                    {isReportSupervisor && user.employee?.id !== reportOwnerId
-                      ? "追加留言"
-                      : "員工回覆"}
+                    {/* 作者本人顯示「員工回覆」，其他所有人（主管已評分、第三方用戶）都顯示「追加留言」 */}
+                    {isReportAuthor
+                      ? "員工回覆"
+                      : "追加留言"}
                   </h4>
                   {/* 回應目標選擇器 - 放在標題右側 */}
                   {replyTargets.length > 0 && (
@@ -967,11 +974,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <div className="mb-3">
                   <p className="text-xs text-slate-700 mb-2">快速回覆建議：</p>
                   <div className="flex flex-wrap gap-2">
-                    {(isReportSupervisor &&
-                    hasSubmittedReview &&
-                    user.employee?.id !== reportOwnerId
-                      ? supervisorSuggestedReplies
-                      : suggestedReplies
+                    {/* 只有作者本人顯示員工回覆建議，其他所有人都顯示主管回覆建議 */}
+                    {(isReportAuthor
+                      ? suggestedReplies
+                      : supervisorSuggestedReplies
                     ).map((reply, index) => (
                       <button
                         key={index}
@@ -988,9 +994,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder={
-                    user?.is_supervisor && user.employee?.id !== reportOwnerId
-                      ? "輸入追加留言..."
-                      : "輸入您的回覆..."
+                    isReportAuthor
+                      ? "輸入您的回覆..."
+                      : "輸入追加留言..."
                   }
                   className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3"
                   rows={4}
