@@ -44,6 +44,12 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
   // 檢查是否真的需要跳轉到登入頁面
   if (!isAuthenticated) {
+    // ✅ 在跳轉到登入頁前，保存原始 URL 參數到 sessionStorage
+    const currentSearch = window.location.search;
+    if (currentSearch && currentSearch !== "?tab=supervisor") {
+      sessionStorage.setItem("redirect_after_login", currentSearch);
+    }
+
     // 確保清理本地存儲
     if (!token) {
       localStorage.removeItem("authToken");

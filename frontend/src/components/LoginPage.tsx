@@ -40,11 +40,18 @@ const LoginPage: React.FC = () => {
 
           login(data.token.access_token, data.user);
 
-          // ✅ 保留原始 URL 參數，如果沒有則跳轉到首頁
+          // ✅ 優先使用保存的重定向參數，否則使用當前 URL 參數，最後才是預設首頁
+          const savedRedirect = sessionStorage.getItem("redirect_after_login");
           const currentSearch = window.location.search;
-          const redirectUrl = currentSearch
-            ? `/MyReportAI/${currentSearch}`
-            : "/MyReportAI/?tab=supervisor";
+
+          let redirectUrl = "/MyReportAI/?tab=supervisor";
+          if (savedRedirect) {
+            redirectUrl = `/MyReportAI/${savedRedirect}`;
+            sessionStorage.removeItem("redirect_after_login");
+          } else if (currentSearch) {
+            redirectUrl = `/MyReportAI/${currentSearch}`;
+          }
+
           window.location.href = redirectUrl;
         } else {
           // SSO 失敗，顯示傳統登入界面
@@ -83,11 +90,18 @@ const LoginPage: React.FC = () => {
       const data = await response.json();
       login(data.token.access_token, data.user);
 
-      // ✅ 保留原始 URL 參數，如果沒有則跳轉到首頁
+      // ✅ 優先使用保存的重定向參數，否則使用當前 URL 參數，最後才是預設首頁
+      const savedRedirect = sessionStorage.getItem("redirect_after_login");
       const currentSearch = window.location.search;
-      const redirectUrl = currentSearch
-        ? `/MyReportAI/${currentSearch}`
-        : "/MyReportAI/?tab=supervisor";
+
+      let redirectUrl = "/MyReportAI/?tab=supervisor";
+      if (savedRedirect) {
+        redirectUrl = `/MyReportAI/${savedRedirect}`;
+        sessionStorage.removeItem("redirect_after_login");
+      } else if (currentSearch) {
+        redirectUrl = `/MyReportAI/${currentSearch}`;
+      }
+
       window.location.href = redirectUrl;
     } catch (err: any) {
       setError(err.message || "發生未知錯誤");
@@ -115,11 +129,18 @@ const LoginPage: React.FC = () => {
       const data = await response.json();
       login(data.token.access_token, data.user);
 
-      // ✅ 保留原始 URL 參數，如果沒有則跳轉到首頁
+      // ✅ 優先使用保存的重定向參數，否則使用當前 URL 參數，最後才是預設首頁
+      const savedRedirect = sessionStorage.getItem("redirect_after_login");
       const currentSearch = window.location.search;
-      const redirectUrl = currentSearch
-        ? `/MyReportAI/${currentSearch}`
-        : "/MyReportAI/?tab=supervisor";
+
+      let redirectUrl = "/MyReportAI/?tab=supervisor";
+      if (savedRedirect) {
+        redirectUrl = `/MyReportAI/${savedRedirect}`;
+        sessionStorage.removeItem("redirect_after_login");
+      } else if (currentSearch) {
+        redirectUrl = `/MyReportAI/${currentSearch}`;
+      }
+
       window.location.href = redirectUrl;
     } catch (err: any) {
       setError(err.message || "SSO 登入失敗");
