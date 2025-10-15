@@ -194,9 +194,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // 檢查是否為 SSO 使用者切換
         const errorData = await response.json().catch(() => ({}));
         if (errorData.detail === "SSO user changed, please re-authenticate") {
-          // SSO 使用者已切換，嘗試自動重新登入
-          console.log("SSO user changed, attempting auto re-login");
-          window.location.href = "/MyReportAI/login";
+          // SSO 使用者已切換，清除狀態並重新載入頁面
+          // 不設置 manual_logout 標記，讓登入頁自動觸發 SSO 登入
+          console.log("SSO user changed, reloading for new user SSO login");
+          setToken(null);
+          setUser(null);
+          // 使用 replace 導航到登入頁，避免 404
+          window.location.replace("/MyReportAI/");
         } else {
           // 一般的 session 過期
           logout();

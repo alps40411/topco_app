@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { buildApiUrl } from "../config/api";
+import { useAuth } from "../hooks/useAuth";
 
 /**
  * 處理郵件格式 URL 重定向到應用格式
@@ -13,8 +13,14 @@ const RedirectHandler: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const { authFetch, isAuthenticated } = useAuth();
 
   useEffect(() => {
+    // 如果尚未認證，等待認證完成
+    if (!isAuthenticated) {
+      return;
+    }
+
     const dailyNo = searchParams.get("daily_no");
     const status = searchParams.get("status");
     const replyid = searchParams.get("replyid");
@@ -25,14 +31,8 @@ const RedirectHandler: React.FC = () => {
       // 呼叫後端API解析 daily_no 對應的 employee
       const resolveAndRedirect = async () => {
         try {
-          const token = localStorage.getItem("authToken");
-          const response = await fetch(
-            buildApiUrl(`/api/supervisor/resolve-report/${dailyNo}`),
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
+          const response = await authFetch(
+            `/api/supervisor/resolve-report/${dailyNo}`
           );
 
           if (!response.ok) {
@@ -84,7 +84,7 @@ const RedirectHandler: React.FC = () => {
       // 如果沒有 daily_no，導向首頁
       navigate("?tab=supervisor", { replace: true });
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, authFetch, isAuthenticated]);
 
   // 顯示載入中或錯誤訊息
   return (
