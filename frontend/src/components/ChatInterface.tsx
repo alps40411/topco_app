@@ -526,7 +526,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     { value: 2, label: "差" },
     { value: 3, label: "普通" },
     { value: 4, label: "好" },
-    { value: 5, label: "很好" },
+    { value: 5, label: "非常好" },
   ];
 
   const getRatingText = (rating: number) => {

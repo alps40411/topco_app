@@ -51,7 +51,7 @@ async def get_daily_report_approvals(
             SELECT DISTINCT g.supervisor, e.empnamec
             FROM jps.groupfoodchn g
             LEFT JOIN jps.dcd003$master e ON g.supervisor = e.empno
-            WHERE g.empno = :empno AND g.cocode = 'A'
+            WHERE g.empno = :empno AND g.cocode = 'A' and g.cocode = e.cocode
               AND e.quitdate IS NULL
         """)
         
