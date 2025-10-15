@@ -3,7 +3,6 @@
 import json
 import logging
 import os
-import uuid
 import aiofiles
 from datetime import datetime
 from pathlib import Path
@@ -212,15 +211,12 @@ class RecordService:
             upload_dir = Path(settings.UPLOAD_DIR) / year_month
             upload_dir.mkdir(parents=True, exist_ok=True)
 
-            # 生成唯一檔案名（時間戳記 + 短 hash）
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            short_hash = uuid.uuid4().hex[:8]
+            # 生成唯一檔案名（yyyymmddhhmmssfffff 格式）
+            now = datetime.now()
+            # 格式：年月日時分秒毫秒 (20位數字)
+            timestamp_with_ms = now.strftime('%Y%m%d%H%M%S') + f"{now.microsecond:06d}"
             file_ext = Path(file.filename or "").suffix
-            # 限制原檔名長度，避免過長
-            original_name = Path(file.filename or "file").stem
-            if len(original_name) > 50:
-                original_name = original_name[:50]
-            safe_filename = f"{timestamp}_{short_hash}_{original_name}{file_ext}"
+            safe_filename = f"{timestamp_with_ms}{file_ext}"
             file_path = upload_dir / safe_filename
 
             # 保存檔案
@@ -233,14 +229,14 @@ class RecordService:
             final_url = f"{settings.STATIC_URL_PREFIX}/{relative_path.as_posix()}"
 
             return {
-                "id": f"{timestamp}_{short_hash}",
+                "id": timestamp_with_ms,
                 "name": file.filename,
                 "type": file.content_type or "application/octet-stream",
                 "size": len(content),
                 "url": final_url,
                 "path": str(file_path),
-                "upload_date": datetime.now().strftime('%Y%m%d'),
-                "upload_time": datetime.now().strftime('%H%M%S'),
+                "upload_date": now.strftime('%Y%m%d'),
+                "upload_time": now.strftime('%H%M%S'),
                 "status": "success"
             }
 

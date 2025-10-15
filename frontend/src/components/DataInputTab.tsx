@@ -177,36 +177,8 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         return;
       }
 
-      // 檢查今天是否已經有暫存記錄
-      let daily_no;
-      try {
-        const docDate = selectedDate
-          ? selectedDate.replace(/-/g, "")
-          : new Date().toISOString().slice(0, 10).replace(/-/g, "");
-        const existingDraftsResponse = await authFetch(
-          `/api/drafts/${user.employee.empno}?doc_date=${docDate}&draft_type=TEMP`
-        );
-        if (existingDraftsResponse.ok) {
-          const existingDrafts = await existingDraftsResponse.json();
-          if (existingDrafts.length > 0) {
-            // 使用現有記錄的daily_no
-            daily_no = existingDrafts[0].daily_no;
-          }
-        }
-      } catch (error) {
-        console.warn("檢查現有暫存失敗:", error);
-      }
-
-      // 如果沒有找到現有的 daily_no，才取得新的
-      if (!daily_no) {
-        const dailyNoResponse = await authFetch("/api/dates/next-daily-no");
-        const { next_daily_no: newDailyNo } = await dailyNoResponse.json();
-        daily_no = newDailyNo;
-      }
-
-      // 準備暫存數據
+      // 準備暫存數據（daily_no 由後端自動生成）
       const draftData = {
-        daily_no,
         empno: user.employee.empno,
         cocode: user.employee.cocode || "001", // 預設公司代碼
         doc_date:

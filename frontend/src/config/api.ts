@@ -53,7 +53,7 @@ export const apiConfig = {
     },
     dates: {
       range: "/api/dates/range",
-      nextDailyNo: "/api/dates/next-daily-no",
+      // nextDailyNo 已棄用 - daily_no 現在由後端 /api/drafts 自動生成
     },
     supervisor: {
       base: "/api/supervisor",
@@ -75,7 +75,7 @@ export const apiConfig = {
       submit: "/api/records/submit",                  // 已遷移到 records.submit
       workItems: "/api/legacy/work-items",
       serviceCompanies: "/api/legacy/service-companies",
-      nextDailyNo: "/api/dates/next-daily-no",        // 已遷移到 dates.nextDailyNo
+      // nextDailyNo 已棄用 - daily_no 現在由後端 /api/drafts 自動生成
       executionWorks: "/api/work-data",               // 已遷移到 workData
       serviceTargets: "/api/work-data",               // 已遷移到 workData
       workData: "/api/work-data",                     // 已遷移到 workData
