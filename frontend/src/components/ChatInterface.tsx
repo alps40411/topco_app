@@ -10,7 +10,7 @@ import {
   ChevronRight,
   ChevronLeft,
 } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 
@@ -111,7 +111,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   );
 
   const { authFetch, user } = useAuth();
-  const [searchParams] = useSearchParams();
 
   // This effect now correctly determines if the current user has reviewed
   useEffect(() => {
@@ -288,20 +287,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onForwardUsersChange?.([]); // 清空轉寄選擇
         await fetchComments();
 
-        // 檢查是否從信箱進入
-        const fromMail = searchParams.get("from_mail");
-        if (fromMail === "true") {
-          // 從信箱進入，使用瀏覽器返回到郵件客戶端
-          navigate(-1);
-        } else {
-          // 正常流程：返回日報首頁，如果有日期參數則保留
-          const dateParam = searchParams.get("date");
-          if (dateParam) {
-            navigate(`?tab=supervisor&date=${dateParam}`);
-          } else {
-            navigate("?tab=supervisor");
-          }
-        }
+        // 送出回覆後返回上一頁
+        navigate(-1);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交回覆失敗");
@@ -353,20 +340,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (onReviewSubmitted) onReviewSubmitted();
         await fetchComments();
 
-        // 檢查是否從信箱進入
-        const fromMail = searchParams.get("from_mail");
-        if (fromMail === "true") {
-          // 從信箱進入，使用瀏覽器返回到郵件客戶端
-          navigate(-1);
-        } else {
-          // 正常流程：返回日報首頁，如果有日期參數則保留
-          const dateParam = searchParams.get("date");
-          if (dateParam) {
-            navigate(`?tab=supervisor&date=${dateParam}`);
-          } else {
-            navigate("?tab=supervisor");
-          }
-        }
+        // 送出審閱後返回上一頁
+        navigate(-1);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "提交審閱失敗");
@@ -392,20 +367,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       });
 
       if (response.ok) {
-        // 檢查是否從信箱進入
-        const fromMail = searchParams.get("from_mail");
-        if (fromMail === "true") {
-          // 從信箱進入，使用瀏覽器返回到郵件客戶端
-          navigate(-1);
-        } else {
-          // 正常流程：返回日報首頁，如果有日期參數則保留
-          const dateParam = searchParams.get("date");
-          if (dateParam) {
-            navigate(`?tab=supervisor&date=${dateParam}`);
-          } else {
-            navigate("?tab=supervisor");
-          }
-        }
+        // 返回上一頁
+        navigate(-1);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.detail || "確認失敗");
@@ -579,7 +542,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div className="bg-white border border-gray-300 rounded p-4 min-h-[120px] flex flex-col">
           <div className="flex justify-between items-center mb-3 border-b border-gray-200 pb-2">
             <div className="flex items-center space-x-2">
-              <span className="text-base font-medium text-gray-900">
+              <span className="text-sm font-medium text-gray-900">
                 {comment.author?.name || `用戶 ${comment.user_id}`}
               </span>
               {isAuthorSupervisor && (
@@ -640,7 +603,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
             <div className="flex items-center space-x-2">
               <MessageCircle className="w-5 h-5 text-gray-600" />
-              <h3 className="text-sm text-gray-900">回應內容</h3>
+              <h3 className="font-medium text-gray-900">回應內容</h3>
               <span className="text-sm text-gray-500">
                 ({comments.length} 則留言)
               </span>

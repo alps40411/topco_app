@@ -47,9 +47,6 @@ const RedirectHandler: React.FC = () => {
             report: dailyNo,
           });
 
-          // 添加 from_mail 標記，表示從信箱進入
-          params.set("from_mail", "true");
-
           if (status) {
             params.set("status", status);
           }

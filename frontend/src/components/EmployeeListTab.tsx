@@ -38,14 +38,10 @@ interface HomepageReport {
 
 interface EmployeeListTabProps {
   onSelectEmployee: (employee: EmployeeInList, reportId: number) => void;
-  selectedDate?: string | null; // YYYY-MM-DD 格式的日期
-  onDateChange?: (date: string) => void; // 日期变更回调
 }
 
 const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   onSelectEmployee,
-  selectedDate: propSelectedDate,
-  onDateChange: propOnDateChange,
 }) => {
   const [reports, setReports] = useState<HomepageReport[]>([]);
   const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
@@ -54,31 +50,21 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     {}
   );
   const navigate = useNavigate();
+  // 日報首頁預設顯示前一天的日報，因為當天的日報通常隔天才審閱
+  // const getDefaultDate = () => {
+  //   const yesterday = new Date();
+  //   yesterday.setDate(yesterday.getDate() - 1);
+  //   return yesterday;
+  // };
 
-  // 将 prop 传入的 YYYY-MM-DD 格式转换为 Date 对象
-  // 使用中午 12:00 避免时区转换问题
-  const parseDate = (dateStr: string | null): Date => {
-    if (!dateStr) return new Date();
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day, 12, 0, 0);
-  };
-
-  // 使用 prop 传入的日期，如果没有则使用当天
   const [selectedDate, setSelectedDate] = useState<Date | null>(
-    propSelectedDate ? parseDate(propSelectedDate) : new Date()
+    // getDefaultDate()
+    new Date()
   );
   const { authFetch, user } = useAuth();
 
   // ✅ 使用 useRef 建立編輯狀態快取
   const editableStatusCache = useRef<Record<string, boolean>>({});
-
-  // 同步 prop 传入的日期变化
-  useEffect(() => {
-    if (propSelectedDate) {
-      const newDate = parseDate(propSelectedDate);
-      setSelectedDate(newDate);
-    }
-  }, [propSelectedDate]);
 
   useEffect(() => {
     if (user?.employee?.empno) {
@@ -108,7 +94,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
         // ✅ 存入快取
         editableStatusCache.current[docDate] = isEditable;
-        console.log(`[EmployeeListTab] API 查詢 (daily-date-range): ${docDate} = ${isEditable}`);
+        console.log(
+          `[EmployeeListTab] API 查詢 (daily-date-range): ${docDate} = ${isEditable}`
+        );
         return isEditable;
       }
       return false;
@@ -181,15 +169,6 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
-
-    // 同步到 App 的全局状态
-    if (propOnDateChange) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const dateString = `${year}-${month}-${day}`;
-      propOnDateChange(dateString);
-    }
   };
 
   // 處理刪除日報
