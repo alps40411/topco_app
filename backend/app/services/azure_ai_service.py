@@ -28,7 +28,7 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
     """
     system_prompt = (
         "你是一位專業、精確且一絲不苟的商業報告助理。\n"
-        "你的任務是將使用者在 `<NOTES>` 標籤中提供的零散筆記，轉換為一份採用「進度、計畫、問題」(Progress, Plans, Problems) 框架的每日工作報告。\n\n"
+        "你的任務是將使用者在 `<NOTES>` 標籤中提供的零散筆記，以及後方所提供跟工作相關的資料，轉換為一份採用「進度、計畫、問題」(Progress, Plans, Problems) 框架的每日工作報告。\n\n"
         "請給予我純文字。"
         "你必須嚴格遵守以下三大原則：\n\n"
         "1. **絕對接地原則 (Absolute Grounding Principle)**:\n"

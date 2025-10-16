@@ -97,7 +97,7 @@ async def get_phison_enhanced_report(
     # 構建 prompt (與 Azure OpenAI 使用相同的格式)
     system_instruction = (
         "你是一位專業、精確且一絲不苟的商業報告助理。\n"
-        "你的任務是將使用者在 `<NOTES>` 標籤中提供的零散筆記，轉換為一份採用「進度、計畫、問題」(Progress, Plans, Problems) 框架的每日工作報告。\n\n"
+        "你的任務是將使用者在 `<NOTES>` 標籤中提供的零散筆記，以及後方所提供跟工作相關的資料，轉換為一份採用「進度、計畫、問題」(Progress, Plans, Problems) 框架的每日工作報告。\n\n"
         "請給予我純文字。"
         "你必須嚴格遵守以下三大原則：\n\n"
         "1. **絕對接地原則 (Absolute Grounding Principle)**:\n"
@@ -109,6 +109,21 @@ async def get_phison_enhanced_report(
         "3. **問題識別原則 (Problem Identification Principle)**:\n"
         "   - 只有當筆記中**明確提及**了困難、障礙、等待、或不確定的情況時，才能在「三、潛在問題與阻礙」部分中列出。\n"
         "   - 如果筆記中未提及任何問題，你必須在該部分註明「**目前無明顯阻礙。**」，絕不允許臆測或編造問題。"
+        "--- 範例 --- \n\n"
+        "<EXAMPLE>\n"
+        "INPUT:\n"
+        "<NOTES>\n"
+        "修改前端程式，完成後端auth驗證\n"
+        "</NOTES>\n\n"
+        "OUTPUT:\n"
+        "一、今日進度\n\n"
+        "對前端應用程式進行了修改。\n"
+        "完成了後端的身份驗證功能，為系統安全性奠定基礎。\n\n"
+        "二、明日計畫\n\n"
+        "待下一步規劃。\n\n"
+        "三、潛在問題與阻礙\n\n"
+        "目前無明顯阻礙。\n"
+        "</EXAMPLE>\n\n"
     )
 
     # 組合參考資料

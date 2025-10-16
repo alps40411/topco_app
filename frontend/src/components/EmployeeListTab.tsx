@@ -222,6 +222,22 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     navigate(`?tab=daily&date=${formattedDate}`);
   };
 
+  const renderFowardedStatus = (report: HomepageReport) => {
+    const isForwarded = report.is_forwarded;
+
+    return (
+      <div className="flex items-center justify-center gap-0.5">
+        {isForwarded && (
+          <img
+            src="/MyReportAI/forward.png"
+            alt="轉寄"
+            className="w-4 h-4 flex-shrink-0"
+          />
+        )}
+      </div>
+    );
+  };
+
   // 渲染回應狀態圖片 - 基於 reply_count 和 replier_count 判斷
   const renderResponseStatus = (report: HomepageReport) => {
     const replyCount = report.reply_count || 0;
@@ -361,8 +377,11 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {reports.map((report) => (
               <tr key={report.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-center">
-                  {renderResponseStatus(report)}
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-center gap-1">
+                    {renderFowardedStatus(report)}
+                    {renderResponseStatus(report)}
+                  </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="text-base font-medium text-gray-900">
@@ -415,21 +434,6 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                     const hasDate = !!report.date;
                     const isEditable =
                       report.date && editableStatus[report.date] === true;
-
-                    console.log(`Report ${report.id} check:`, {
-                      currentUserEmpno,
-                      employeeId: report.employee.id,
-                      isOwnReport,
-                      hasNoReply,
-                      replyCount: report.reply_count,
-                      hasDate,
-                      date: report.date,
-                      isEditable,
-                      editableStatusValue: report.date
-                        ? editableStatus[report.date]
-                        : undefined,
-                    });
-
                     return (
                       isOwnReport &&
                       hasNoReply &&
