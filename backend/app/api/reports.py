@@ -161,10 +161,18 @@ async def get_report_comments(
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
         
-        # 查詢回應記錄
+        # 查詢回應記錄（包含轉寄資訊）
         comments_sql = text("""
             SELECT r.reply_nos, r.empno, r.xuser, r.memo, r.xdate, r.xtime,
-                   s.score
+                   s.score,
+                   (SELECT LISTAGG(g.empnamec, ', ') WITHIN GROUP (ORDER BY g.empnamec)
+                    FROM (
+                        SELECT DISTINCT m.to_empno
+                        FROM jps.tdr_msg_send_log m
+                        WHERE m.daily_no = r.daily_no AND m.reply_nos = r.reply_nos
+                    ) m
+                    JOIN jps.groupmember g ON m.to_empno = g.empno
+                   ) as forwarded_to_names
             FROM jps.tdr_reply r
             LEFT JOIN jps.tdr_score s ON r.daily_no = s.daily_no AND r.reply_nos = s.reply_nos
             WHERE r.daily_no = :daily_no
@@ -185,6 +193,7 @@ async def get_report_comments(
                     "name": row[2] or row[1],  # xuser 或 empno
                 },
                 "rating": row[6],  # score
+                "forwarded_to": row[7],  # 轉寄給誰的姓名列表
                 "replies": []
             })
         

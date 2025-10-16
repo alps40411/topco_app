@@ -36,6 +36,7 @@ export interface Comment {
   };
   parent_comment_id?: number;
   rating?: number; // 評分（如果是審閱留言）
+  forwarded_to?: string; // 轉寄給誰的姓名列表（逗號分隔）
   replies: Comment[];
 }
 
@@ -589,13 +590,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div key={comment.id} className="mb-4">
         <div className="bg-white border border-gray-300 rounded p-4 min-h-[120px] flex flex-col">
           <div className="flex justify-between items-center mb-3 border-b border-gray-200 pb-2">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-wrap">
               <span className="text-sm font-medium text-gray-900">
                 {comment.author?.name || `用戶 ${comment.user_id}`}
               </span>
               {isAuthorSupervisor && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
                   主管
+                </span>
+              )}
+              {comment.forwarded_to && (
+                <span className="font-size:14px bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                  轉寄給:{" "}
+                  {comment.forwarded_to
+                    .split(", ")
+                    .map((name) => `${name}`)
+                    .join(" ")}
                 </span>
               )}
             </div>
@@ -696,67 +706,65 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
       {!isReadOnly && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
-          {isReportSupervisor &&
-            !hasSubmittedReview &&
-            !isReportAuthor && (
-              <div className="mb-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-medium text-blue-900 flex items-center">
-                      <Crown className="w-4 h-4 mr-2" />
-                      主管評分與回饋
-                    </h4>
-                    {/* 回應目標選擇器 - 放在標題右側 */}
-                    {replyTargets.length > 0 && (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-blue-700">回應給：</span>
-                        <select
-                          value={
-                            selectedReplyTargets.length === replyTargets.length
-                              ? "all"
-                              : selectedReplyTargets[0] || ""
+          {isReportSupervisor && !hasSubmittedReview && !isReportAuthor && (
+            <div className="mb-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-blue-900 flex items-center">
+                    <Crown className="w-4 h-4 mr-2" />
+                    主管評分與回饋
+                  </h4>
+                  {/* 回應目標選擇器 - 放在標題右側 */}
+                  {replyTargets.length > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-blue-700">回應給：</span>
+                      <select
+                        value={
+                          selectedReplyTargets.length === replyTargets.length
+                            ? "all"
+                            : selectedReplyTargets[0] || ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "all") {
+                            setSelectedReplyTargets(
+                              replyTargets
+                                .map((t) => t.empno)
+                                .filter((empno) => empno)
+                            );
+                          } else if (value) {
+                            setSelectedReplyTargets([value]);
                           }
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === "all") {
-                              setSelectedReplyTargets(
-                                replyTargets
-                                  .map((t) => t.empno)
-                                  .filter((empno) => empno)
-                              );
-                            } else if (value) {
-                              setSelectedReplyTargets([value]);
-                            }
-                          }}
-                          className="text-xs border border-blue-300 rounded px-2 py-1 bg-white text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          {replyTargets.map((target) => (
-                            <option key={target.empno} value={target.empno}>
-                              {target.empname}
-                              {/* {target.is_author ? " (作者)" : ""} */}
-                            </option>
-                          ))}
-                          {replyTargets.length > 1 && (
-                            <option value="all">全部</option>
-                          )}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mb-4">
-                    <span className="text-sm font-medium text-gray-700 mr-4">
-                      評分:
-                    </span>
-                    <div
-                      className="inline-flex rounded-md shadow-sm"
-                      role="group"
-                    >
-                      {ratingOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setSelectedRating(option.value)}
-                          className={`px-4 py-2 text-sm font-medium border transition-colors
+                        }}
+                        className="text-xs border border-blue-300 rounded px-2 py-1 bg-white text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {replyTargets.map((target) => (
+                          <option key={target.empno} value={target.empno}>
+                            {target.empname}
+                            {/* {target.is_author ? " (作者)" : ""} */}
+                          </option>
+                        ))}
+                        {replyTargets.length > 1 && (
+                          <option value="all">全部</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="mb-4">
+                  <span className="text-sm font-medium text-gray-700 mr-4">
+                    評分:
+                  </span>
+                  <div
+                    className="inline-flex rounded-md shadow-sm"
+                    role="group"
+                  >
+                    {ratingOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setSelectedRating(option.value)}
+                        className={`px-4 py-2 text-sm font-medium border transition-colors
                             ${
                               selectedRating === option.value
                                 ? "bg-blue-500 text-white border-blue-500 z-10"
@@ -765,174 +773,166 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             ${option.value === 1 ? "rounded-l-lg" : ""}
                             ${option.value === 5 ? "rounded-r-lg" : ""}
                           `}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 建議回復區塊 */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-blue-700">快速回覆建議：</p>
+                    <button
+                      onClick={handleGetAISuggestions}
+                      disabled={isLoadingAI}
+                      className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs rounded-full hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      {isLoadingAI ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          生成中...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          AI 產生建議
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* AI 建議 (垂直排列, Tag 樣式) */}
+                  {showAISuggestions && aiSuggestions.length > 0 && (
+                    <div className="flex flex-col items-start gap-2 mb-3">
+                      {aiSuggestions.map((suggestion, index) => (
+                        <button
+                          key={`ai-${index}`}
+                          onClick={() => handleSelectAISuggestion(suggestion)}
+                          className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 text-left max-w-full break-words whitespace-normal leading-snug"
                         >
-                          {option.label}
+                          <span className="inline-flex items-start">
+                            <span className="mr-1 flex-shrink-0">✨</span>
+                            <span className="flex-1">{suggestion.content}</span>
+                          </span>
                         </button>
                       ))}
                     </div>
-                  </div>
+                  )}
 
-                  {/* 建議回復區塊 */}
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-blue-700">快速回覆建議：</p>
-                      <button
-                        onClick={handleGetAISuggestions}
-                        disabled={isLoadingAI}
-                        className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs rounded-full hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
-                      >
-                        {isLoadingAI ? (
-                          <>
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            生成中...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3 h-3 mr-1" />
-                            AI 產生建議
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* AI 建議 (垂直排列, Tag 樣式) */}
-                    {showAISuggestions && aiSuggestions.length > 0 && (
-                      <div className="flex flex-col items-start gap-2 mb-3">
-                        {aiSuggestions.map((suggestion, index) => (
+                  {/* 主管常用回覆 (水平展開/收合) - NEW ANIMATION */}
+                  <div
+                    className="relative flex items-center"
+                    style={{ minHeight: "32px" }}
+                  >
+                    {/* The expanded content, positioned to appear when active */}
+                    <div
+                      className={`flex items-center transition-all duration-300 ease-in-out ${
+                        isSupervisorRepliesExpanded
+                          ? "opacity-100 transform scale-100"
+                          : "opacity-0 transform scale-95 pointer-events-none"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {supervisorSuggestedReplies.map((reply, index) => (
                           <button
-                            key={`ai-${index}`}
-                            onClick={() => handleSelectAISuggestion(suggestion)}
-                            className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 text-left max-w-full break-words whitespace-normal leading-snug"
+                            key={`default-${index}`}
+                            onClick={() => setReviewComment(reply)}
+                            className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200 whitespace-nowrap"
                           >
-                            <span className="inline-flex items-start">
-                              <span className="mr-1 flex-shrink-0">✨</span>
-                              <span className="flex-1">
-                                {suggestion.content}
-                              </span>
-                            </span>
+                            {reply}
                           </button>
                         ))}
                       </div>
-                    )}
 
-                    {/* 主管常用回覆 (水平展開/收合) - NEW ANIMATION */}
-                    <div
-                      className="relative flex items-center"
-                      style={{ minHeight: "32px" }}
-                    >
-                      {/* The expanded content, positioned to appear when active */}
-                      <div
-                        className={`flex items-center transition-all duration-300 ease-in-out ${
-                          isSupervisorRepliesExpanded
-                            ? "opacity-100 transform scale-100"
-                            : "opacity-0 transform scale-95 pointer-events-none"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {supervisorSuggestedReplies.map((reply, index) => (
-                            <button
-                              key={`default-${index}`}
-                              onClick={() => setReviewComment(reply)}
-                              className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200 whitespace-nowrap"
-                            >
-                              {reply}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Collapse button */}
-                        <button
-                          onClick={() => setIsSupervisorRepliesExpanded(false)}
-                          className="ml-2 flex flex-shrink-0 items-center px-2.5 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-full hover:bg-gray-200 transition-colors border border-gray-200 whitespace-nowrap"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                          <span className="hidden sm:inline ml-1">收起</span>
-                        </button>
-                      </div>
-
-                      {/* The "Expand" button, which disappears when content is shown */}
+                      {/* Collapse button */}
                       <button
-                        onClick={() => setIsSupervisorRepliesExpanded(true)}
-                        className={`absolute top-0 left-0 flex items-center px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-all duration-300 ease-in-out border border-blue-200 ${
-                          isSupervisorRepliesExpanded
-                            ? "opacity-0 scale-95 pointer-events-none"
-                            : "opacity-100 scale-100"
-                        }`}
-                        aria-expanded={isSupervisorRepliesExpanded}
+                        onClick={() => setIsSupervisorRepliesExpanded(false)}
+                        className="ml-2 flex flex-shrink-0 items-center px-2.5 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-full hover:bg-gray-200 transition-colors border border-gray-200 whitespace-nowrap"
                       >
-                        <span>常用回覆</span>
-                        <ChevronRight className="w-4 h-4 ml-1" />
+                        <ChevronLeft className="w-4 h-4" />
+                        <span className="hidden sm:inline ml-1">收起</span>
                       </button>
                     </div>
-                  </div>
 
-                  <textarea
-                    value={reviewComment}
-                    onChange={(e) => setReviewComment(e.target.value)}
-                    placeholder="請輸入您的審閱意見..."
-                    className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
-                    rows={4}
+                    {/* The "Expand" button, which disappears when content is shown */}
+                    <button
+                      onClick={() => setIsSupervisorRepliesExpanded(true)}
+                      className={`absolute top-0 left-0 flex items-center px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-all duration-300 ease-in-out border border-blue-200 ${
+                        isSupervisorRepliesExpanded
+                          ? "opacity-0 scale-95 pointer-events-none"
+                          : "opacity-100 scale-100"
+                      }`}
+                      aria-expanded={isSupervisorRepliesExpanded}
+                    >
+                      <span>常用回覆</span>
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </button>
+                  </div>
+                </div>
+
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="請輸入您的審閱意見..."
+                  className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                  rows={4}
+                  disabled={isSubmitting}
+                />
+
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleSubmitReview(false)}
                     disabled={isSubmitting}
-                  />
-
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleSubmitReview(false)}
-                      disabled={isSubmitting}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {isSubmitting ? "提交中..." : "提交評分"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedRating(3); // Reset to default (普通)
-                        setReviewComment("");
-                        onForwardUsersChange?.([]); // 清空轉寄選擇
-                        // 重置回應目標選擇到預設值
-                        if (replyTargets.length > 0) {
-                          const defaultTarget = replyTargets.find(
-                            (t) => t.is_author
-                          );
-                          if (defaultTarget) {
-                            setSelectedReplyTargets([defaultTarget.empno]);
-                          } else {
-                            setSelectedReplyTargets([replyTargets[0].empno]);
-                          }
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isSubmitting ? "提交中..." : "提交評分"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedRating(3); // Reset to default (普通)
+                      setReviewComment("");
+                      onForwardUsersChange?.([]); // 清空轉寄選擇
+                      // 重置回應目標選擇到預設值
+                      if (replyTargets.length > 0) {
+                        const defaultTarget = replyTargets.find(
+                          (t) => t.is_author
+                        );
+                        if (defaultTarget) {
+                          setSelectedReplyTargets([defaultTarget.empno]);
+                        } else {
+                          setSelectedReplyTargets([replyTargets[0].empno]);
                         }
-                      }}
-                      disabled={isSubmitting}
-                      className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
-                    >
-                      清除重寫
-                    </button>
-                  </div>
+                      }
+                    }}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                  >
+                    清除重寫
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
           {/* 已評分提示 */}
-          {isReportSupervisor &&
-            hasSubmittedReview &&
-            !isReportAuthor && (
-              <div className="mb-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-sm text-green-800">
-                    ✅ 您已完成此日報的審閱
-                  </p>
-                </div>
+          {isReportSupervisor && hasSubmittedReview && !isReportAuthor && (
+            <div className="mb-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-sm text-green-800">
+                  ✅ 您已完成此日報的審閱
+                </p>
               </div>
-            )}
-          {(!isReportSupervisor ||
-            hasSubmittedReview ||
-            isReportAuthor) && (
+            </div>
+          )}
+          {(!isReportSupervisor || hasSubmittedReview || isReportAuthor) && (
             <div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-medium text-slate-900 flex items-center">
                     <User className="w-4 h-4 mr-2" />
                     {/* 作者本人顯示「員工回覆」，其他所有人（主管已評分、第三方用戶）都顯示「追加留言」 */}
-                    {isReportAuthor
-                      ? "員工回覆"
-                      : "追加留言"}
+                    {isReportAuthor ? "員工回覆" : "追加留言"}
                   </h4>
                   {/* 回應目標選擇器 - 放在標題右側 */}
                   {replyTargets.length > 0 && (
@@ -994,9 +994,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder={
-                    isReportAuthor
-                      ? "輸入您的回覆..."
-                      : "輸入追加留言..."
+                    isReportAuthor ? "輸入您的回覆..." : "輸入追加留言..."
                   }
                   className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3"
                   rows={4}
