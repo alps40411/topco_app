@@ -34,6 +34,8 @@ import ServiceSelector, {
 } from "./ServiceSelector";
 import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
+import AiServiceSelector, { AiService } from "./AiServiceSelector";
+import AiEnhanceButton from "./AiEnhanceButton";
 import { toast } from "react-hot-toast";
 import { TypographyClasses } from "../styles/typography";
 import { formatMinutesToHours } from "../utils/timeUtils";
@@ -121,6 +123,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     new Set()
   );
   const [isFocusMode, setIsFocusMode] = useState(true); // 預設隱藏其他欄位（專注模式）
+  const [selectedAiService, setSelectedAiService] = useState<AiService>("aoai"); // AI 服務選擇
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
@@ -290,7 +293,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       const planno = report.project?.planno || "NULL";
 
       const response = await authFetch(
-        `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}`,
+        `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?ai_service=${selectedAiService}`,
         {
           method: "POST",
           headers: {
@@ -359,7 +362,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
 
           const response = await authFetch(
-            `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}`,
+            `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?ai_service=${selectedAiService}`,
             {
               method: "POST",
               headers: {
@@ -1227,32 +1230,19 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               <span className="hidden sm:inline">新增筆記</span>
               <span className="sm:hidden">新增</span>
             </button>
-            <button
-              onClick={handleEnhanceAll}
+            {/* AI 潤飾全部按鈕 (Split Button 設計) */}
+            <AiEnhanceButton
+              selectedService={selectedAiService}
+              onServiceChange={setSelectedAiService}
+              onEnhance={handleEnhanceAll}
               disabled={
                 isGeneratingAllAi ||
                 reports.length === 0 ||
                 editingRecordKey !== null ||
                 generatingAiFor.size > 0
               }
-              className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300 flex-shrink-0"
-            >
-              {isGeneratingAllAi ? (
-                <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
-              ) : (
-                <Wand2 className="w-4 h-4 mr-2" />
-              )}
-              <span className="whitespace-nowrap">
-                {isGeneratingAllAi ? (
-                  "AI 處理中..."
-                ) : (
-                  <>
-                    <span className="hidden sm:inline">✨ AI 潤飾全部</span>
-                    <span className="sm:hidden">AI 潤飾</span>
-                  </>
-                )}
-              </span>
-            </button>
+              isLoading={isGeneratingAllAi}
+            />
             <button
               onClick={handleSubmitReport}
               disabled={isSubmitting || editingRecordKey !== null}

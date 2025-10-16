@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     AZURE_DOC_INTELLIGENCE_KEY: str = ""
     AZURE_DOC_INTELLIGENCE_ENDPOINT: str = ""
 
+    # Phison LLM settings
+    PHISON_API_URL: str = ""
+    PHISON_USERNAME: str = ""
+    PHISON_PASSWORD: str = ""
+
     # JWT settings
     SECRET_KEY: str = ""
 

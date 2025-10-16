@@ -199,7 +199,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
       </div>
 
       {/* 日期信息提示 */}
-      {selectedDate && (
+      {/* {selectedDate && (
         <div className="hidden sm:block text-xs text-gray-500">
           {(() => {
             const selectedOption = availableDates.find(
@@ -218,7 +218,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
             }
           })()}
         </div>
-      )}
+      )} */}
     </div>
   );
 };

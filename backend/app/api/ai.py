@@ -13,6 +13,7 @@ from ..core.deps import get_current_user
 from ..core.config import settings
 from ..schemas.user import User
 from ..services.azure_ai_service import get_ai_enhanced_report, process_attachments_for_ai
+from ..services.phison_ai_service import get_phison_enhanced_report
 
 router = APIRouter(tags=["AI Services"])
 logger = logging.getLogger(__name__)
@@ -24,16 +25,17 @@ async def enhance_record(
     daily_no: str,
     planno: str,
     sopno: str,
+    ai_service: str = "aoai",  # 新增參數: aoai 或 phison
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
-    """AI 增強單個記錄"""
+    """AI 增強單個記錄 (支援多種 AI 服務)"""
     try:
         # 處理空的 planno - 前端傳入 "NULL" 表示空值
         if planno == "NULL":
             planno = ""
 
-        logger.error(f"! [FORCE] 函數被調用: daily_no={daily_no}, planno='{planno}', sopno={sopno}")
+        logger.info(f"AI增強請求: daily_no={daily_no}, planno='{planno}', sopno={sopno}, ai_service={ai_service}")
 
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="User has no employee information")
@@ -110,13 +112,15 @@ async def enhance_record(
         enhanced_content = await _generate_enhanced_content(
             original_content=original_content,
             work_description=record_result[5] or "未指定專案",  # sop_desc_c
-            attachments=attachments
+            attachments=attachments,
+            ai_service=ai_service  # 傳遞 AI 服務類型
         )
         
-        # 更新記錄的 AI 內容
+        # 更新記錄的 AI 內容和使用的 AI 服務
         update_sql = text("""
-            UPDATE jps.tdr_draft 
+            UPDATE jps.tdr_draft
             SET AI_CONTENT = :ai_content,
+                AI_SERVICE = :ai_service,
                 UPDATED_DATE = TO_CHAR(sysdate, 'YYYYMMDD'),
                 UPDATED_TIME = TO_CHAR(sysdate, 'HH24:MI:SS')
             WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
@@ -127,7 +131,8 @@ async def enhance_record(
             "planno": planno,
             "sopno": sopno,
             "empno": empno,
-            "ai_content": enhanced_content
+            "ai_content": enhanced_content,
+            "ai_service": ai_service
         })
         
         db.commit()
@@ -158,8 +163,13 @@ async def enhance_record(
 
 # ✅ REMOVED: /api/ai/enhance_all - Not used by frontend
 
-async def _generate_enhanced_content(original_content: str, work_description: str, attachments: Optional[List[Dict]] = None):
-    """使用 Azure AI Service 生成增強內容，支援附件處理"""
+async def _generate_enhanced_content(
+    original_content: str,
+    work_description: str,
+    attachments: Optional[List[Dict]] = None,
+    ai_service: str = "aoai"
+):
+    """使用指定的 AI Service 生成增強內容，支援附件處理"""
     try:
         logger.info(f"開始生成增強內容，工作描述: {work_description}")
         logger.info(f"原始內容長度: {len(original_content)}")
@@ -179,24 +189,33 @@ async def _generate_enhanced_content(original_content: str, work_description: st
             logger.info(f"沒有文字內容，使用附件內容進行AI增強")
             content_to_enhance = "請基於提供的參考資料生成工作報告。"
         
-        # 調用真正的 AI 服務，包含附件內容
-        logger.info(f"調用 Azure OpenAI 服務進行內容增強...")
+        # 根據 ai_service 選擇對應的 AI 服務
+        logger.info(f"使用 AI 服務: {ai_service}")
         logger.info(f"增強內容: {content_to_enhance[:100]}...")
         logger.info(f"參考資料數量: {len(reference_texts)}")
-        
-        enhanced_content = await get_ai_enhanced_report(
-            original_content=content_to_enhance,
-            project_name=work_description,
-            reference_texts=reference_texts
-        )
-        
-        logger.info(f"AI 內容增強完成，結果長度: {len(enhanced_content)}")
+
+        if ai_service == "phison":
+            logger.info("調用 Phison LLM 服務進行內容增強...")
+            enhanced_content = await get_phison_enhanced_report(
+                original_content=content_to_enhance,
+                project_name=work_description,
+                reference_texts=reference_texts
+            )
+        else:  # aoai (預設)
+            logger.info("調用 Azure OpenAI 服務進行內容增強...")
+            enhanced_content = await get_ai_enhanced_report(
+                original_content=content_to_enhance,
+                project_name=work_description,
+                reference_texts=reference_texts
+            )
+
+        logger.info(f"AI 內容增強完成 (使用 {ai_service})，結果長度: {len(enhanced_content)}")
         return enhanced_content
     except Exception as e:
-        logger.error(f"Azure AI service call failed: {e}")
+        logger.error(f"AI service call failed ({ai_service}): {e}")
         import traceback
         logger.error(f"錯誤詳情: {traceback.format_exc()}")
-        # 在 AI 服務失敗時返回一個有意義的錯誤或備用內容
-        return "AI service temporarily unavailable"
+        # 在 AI 服務失敗時,直接拋出例外 (根據用戶需求)
+        raise
 
 # ✅ REMOVED: /api/ai/status - Not used by frontend, use /api/monitoring/health instead
