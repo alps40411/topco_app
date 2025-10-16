@@ -28,12 +28,19 @@ interface HomepageReport {
   replier_count: number;
   my_ask: boolean;
   other_ask: boolean;
-  is_forwarded: boolean;
+  is_forwarded: boolean; // 自己轉寄出去的 (from_empno = 登入者)
   attachments: string[];
   customers: Array<{ name: string; company: string } | null>;
   last_update: string | null;
   can_view_detail: boolean; // 是否可以查看詳情
   supervision_status: "pending" | "approved" | "no_permission"; // 主管審核狀態
+  is_forwarded_to_me?: boolean; // 別人轉寄給我的 (來自 forwardedReports)
+}
+
+// API 回傳結構 (包含下屬日報與轉寄日報)
+interface HomepageData {
+  subordinate_reports: HomepageReport[];
+  forwarded_reports: HomepageReport[];
 }
 
 interface EmployeeListTabProps {
@@ -43,7 +50,12 @@ interface EmployeeListTabProps {
 const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   onSelectEmployee,
 }) => {
-  const [reports, setReports] = useState<HomepageReport[]>([]);
+  const [subordinateReports, setSubordinateReports] = useState<
+    HomepageReport[]
+  >([]);
+  const [forwardedReports, setForwardedReports] = useState<HomepageReport[]>(
+    []
+  );
   const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [editableStatus, setEditableStatus] = useState<Record<string, boolean>>(
@@ -124,14 +136,26 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         );
 
         if (response.ok) {
-          const homepageReports = await response.json();
+          const data: HomepageData = await response.json();
 
-          setReports(homepageReports);
+          setSubordinateReports(data.subordinate_reports || []);
+          // 為轉寄日報標記 is_forwarded_to_me
+          const markedForwardedReports = (data.forwarded_reports || []).map(
+            (report) => ({
+              ...report,
+              is_forwarded_to_me: true,
+            })
+          );
+          setForwardedReports(markedForwardedReports);
 
-          // 檢查當天所有唯一日期的可編輯狀態
+          // 檢查當天所有唯一日期的可編輯狀態 (合併兩組日報的日期)
+          const allReports = [
+            ...(data.subordinate_reports || []),
+            ...(data.forwarded_reports || []),
+          ];
           const uniqueDates = [
             ...new Set(
-              homepageReports
+              allReports
                 .map((r: HomepageReport) => r.date)
                 .filter((d) => d != null)
             ),
@@ -155,11 +179,13 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
             response.status,
             await response.text()
           );
-          setReports([]);
+          setSubordinateReports([]);
+          setForwardedReports([]);
         }
       } catch (error) {
         console.error("無法獲取日報首頁列表:", error);
-        setReports([]);
+        setSubordinateReports([]);
+        setForwardedReports([]);
       } finally {
         setIsLoading(false);
       }
@@ -194,8 +220,16 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
             `/api/supervisor/daily-homepage?date=${dateString}`
           );
           if (refreshResponse.ok) {
-            const homepageReports = await refreshResponse.json();
-            setReports(homepageReports);
+            const data: HomepageData = await refreshResponse.json();
+            setSubordinateReports(data.subordinate_reports || []);
+            // 為轉寄日報標記 is_forwarded_to_me
+            const markedForwardedReports = (data.forwarded_reports || []).map(
+              (report) => ({
+                ...report,
+                is_forwarded_to_me: true,
+              })
+            );
+            setForwardedReports(markedForwardedReports);
           }
         }
       } else {
@@ -223,19 +257,33 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   };
 
   const renderFowardedStatus = (report: HomepageReport) => {
-    const isForwarded = report.is_forwarded;
+    // 別人轉寄給我的 (is_forwarded_to_me) 使用 forward.gif
+    if (report.is_forwarded_to_me) {
+      return (
+        <div className="flex items-center justify-center gap-0.5">
+          <img
+            src="/MyReportAI/isforward.png"
+            alt="轉寄給我"
+            className="w-6 h-6 flex-shrink-0"
+          />
+        </div>
+      );
+    }
 
-    return (
-      <div className="flex items-center justify-center gap-0.5">
-        {isForwarded && (
+    // 自己轉寄出去的 (is_forwarded) 使用 forward.png
+    if (report.is_forwarded) {
+      return (
+        <div className="flex items-center justify-center gap-0.5">
           <img
             src="/MyReportAI/forward.png"
-            alt="轉寄"
-            className="w-4 h-4 flex-shrink-0"
+            alt="我轉寄的"
+            className="w-6 h-6 flex-shrink-0"
           />
-        )}
-      </div>
-    );
+        </div>
+      );
+    }
+
+    return <div className="flex items-center justify-center gap-0.5"></div>;
   };
 
   // 渲染回應狀態圖片 - 基於 reply_count 和 replier_count 判斷
@@ -341,6 +389,151 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     return <div className="p-6 text-center">載入日報中...</div>;
   }
 
+  // 渲染日報表格區塊 (包含表頭和內容)
+  const renderReportsSection = (
+    reports: HomepageReport[],
+    title: string,
+    bgColorClass: string
+  ) => (
+    <>
+      <thead className={bgColorClass}>
+        <tr>
+          <th
+            className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider"
+            style={{ width: "100px" }}
+          >
+            狀態
+          </th>
+          <th
+            className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
+            style={{ width: "25%" }}
+          >
+            員工資訊
+          </th>
+          <th
+            className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
+            style={{ width: "auto" }}
+          >
+            執行項目
+          </th>
+          <th
+            className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider"
+            style={{ width: "100px" }}
+          >
+            內容
+          </th>
+          <th
+            className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider"
+            style={{ width: "120px" }}
+          >
+            編輯
+          </th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {reports.map((report) => (
+          <tr key={report.id} className="hover:bg-gray-50">
+            <td className="px-4 py-3" style={{ width: "100px" }}>
+              <div className="flex items-center justify-center gap-1">
+                {renderFowardedStatus(report)}
+                {renderResponseStatus(report)}
+              </div>
+            </td>
+            <td
+              className="px-4 py-3 whitespace-nowrap"
+              style={{ width: "25%" }}
+            >
+              <div className="text-base font-medium text-gray-900">
+                {report.employee.name}
+              </div>
+            </td>
+            <td className="px-4 py-3" style={{ width: "auto" }}>
+              {report.can_view_detail ? (
+                <div
+                  onClick={() =>
+                    onSelectEmployee(
+                      {
+                        id: report.employee.id,
+                        name: report.employee.name,
+                        department_name: report.employee.department_name,
+                        department_no: report.employee.department_no,
+                        pending_reports_count: 0,
+                      },
+                      report.id
+                    )
+                  }
+                  className="text-base text-blue-600 hover:text-blue-900 max-w-xs cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
+                >
+                  {report.sop_desc_c || "執行項目"}
+                  {report.emergency && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      緊急
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="text-base text-gray-400 max-w-xs p-2">
+                  {report.sop_desc_c || "執行項目"}
+                  {report.emergency && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      緊急
+                    </span>
+                  )}
+                </div>
+              )}
+            </td>
+            <td className="px-4 py-3 text-center" style={{ width: "100px" }}>
+              {renderContentStatus(report)}
+            </td>
+            <td className="px-4 py-3 text-center" style={{ width: "120px" }}>
+              {(() => {
+                const isOwnReport =
+                  currentUserEmpno === String(report.employee.id);
+                const hasNoReply = report.reply_count === 0;
+                const hasDate = !!report.date;
+                const isEditable =
+                  report.date && editableStatus[report.date] === true;
+                return (
+                  isOwnReport &&
+                  hasNoReply &&
+                  hasDate &&
+                  isEditable && (
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleEditReport(report.date)}
+                        className="hover:opacity-75 transition-opacity"
+                        title="編輯日報"
+                      >
+                        <img
+                          src="/MyReportAI/edit.png"
+                          alt="編輯"
+                          className="w-5 h-5"
+                        />
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleDeleteReport(report.id, report.date)
+                        }
+                        className="hover:opacity-75 transition-opacity"
+                        title="刪除日報"
+                      >
+                        <img
+                          src="/MyReportAI/delete.png"
+                          alt="刪除"
+                          className="w-5 h-5"
+                        />
+                      </button>
+                    </div>
+                  )
+                );
+              })()}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </>
+  );
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -353,132 +546,36 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                狀態
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                員工資訊
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                執行項目
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                內容
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                編輯
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {reports.map((report) => (
-              <tr key={report.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1">
-                    {renderFowardedStatus(report)}
-                    {renderResponseStatus(report)}
-                  </div>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="text-base font-medium text-gray-900">
-                    {report.employee.name}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  {report.can_view_detail ? (
-                    <div
-                      onClick={() =>
-                        onSelectEmployee(
-                          {
-                            id: report.employee.id,
-                            name: report.employee.name,
-                            department_name: report.employee.department_name,
-                            department_no: report.employee.department_no,
-                            pending_reports_count: 0,
-                          },
-                          report.id
-                        )
-                      }
-                      className="text-base text-blue-600 hover:text-blue-900 max-w-xs cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
-                    >
-                      {report.sop_desc_c || "執行項目"}
-                      {report.emergency && (
-                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          緊急
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-base text-gray-400 max-w-xs p-2">
-                      {report.sop_desc_c || "執行項目"}
-                      {report.emergency && (
-                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          緊急
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {renderContentStatus(report)}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {(() => {
-                    const isOwnReport =
-                      currentUserEmpno === String(report.employee.id);
-                    const hasNoReply = report.reply_count === 0;
-                    const hasDate = !!report.date;
-                    const isEditable =
-                      report.date && editableStatus[report.date] === true;
-                    return (
-                      isOwnReport &&
-                      hasNoReply &&
-                      hasDate &&
-                      isEditable && (
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleEditReport(report.date)}
-                            className="hover:opacity-75 transition-opacity"
-                            title="編輯日報"
-                          >
-                            <img
-                              src="/MyReportAI/edit.png"
-                              alt="編輯"
-                              className="w-5 h-5"
-                            />
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDeleteReport(report.id, report.date)
-                            }
-                            className="hover:opacity-75 transition-opacity"
-                            title="刪除日報"
-                          >
-                            <img
-                              src="/MyReportAI/delete.png"
-                              alt="刪除"
-                              className="w-5 h-5"
-                            />
-                          </button>
-                        </div>
-                      )
-                    );
-                  })()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {reports.length === 0 && !isLoading && (
-        <div className="text-center py-16 text-gray-500 bg-white border border-gray-200 rounded-lg">
-          <p>這天沒有任何相關的日報。</p>
+      {/* 區塊1: 轉寄給我的日報 (綠色表頭) */}
+      {forwardedReports.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+            {renderReportsSection(
+              forwardedReports,
+              "轉寄給我的日報",
+              "bg-blue-100"
+            )}
+          </table>
         </div>
       )}
+
+      {/* 區塊2: 日報 (藍色表頭) */}
+      {subordinateReports.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+            {renderReportsSection(subordinateReports, "日報", "bg-gray-100")}
+          </table>
+        </div>
+      )}
+
+      {/* 無資料提示 */}
+      {subordinateReports.length === 0 &&
+        forwardedReports.length === 0 &&
+        !isLoading && (
+          <div className="text-center py-16 text-gray-500 bg-white border border-gray-200 rounded-lg">
+            <p>這天沒有任何相關的日報。</p>
+          </div>
+        )}
     </div>
   );
 };

@@ -670,7 +670,7 @@ async def get_daily_homepage_reports(
     current_user: User = Depends(get_current_user),
     legacy_db: Session = Depends(get_legacy_db)
 ):
-    """新的日報首頁 - 取得登入者可能看到的所有日報列表"""
+    """新的日報首頁 - 取得登入者可能看到的所有日報列表 (包含下屬日報與轉寄日報)"""
     try:
         if not current_user.employee:
             raise HTTPException(status_code=404, detail="該用戶不是員工")
@@ -682,8 +682,8 @@ async def get_daily_homepage_reports(
 
         logger.info(f"Fetching reports for empno={empno}, date={doc_date}, cocode={cocode}, deptno={deptno}")
 
-        # 使用 SupervisorService 取得日報列表
-        reports = SupervisorService.get_daily_homepage_reports(
+        # 1. 取得下屬日報列表 (現有邏輯不變)
+        subordinate_reports = SupervisorService.get_daily_homepage_reports(
             db=legacy_db,
             empno=empno,
             cocode=cocode,
@@ -691,8 +691,8 @@ async def get_daily_homepage_reports(
             doc_date=doc_date
         )
 
-        # 使用 SupervisorService 為每個報告執行權限檢查
-        for report in reports:
+        # 使用 SupervisorService 為每個下屬報告執行權限檢查
+        for report in subordinate_reports:
             report_empno = str(report["employee"]["id"])
             report_cocode = report["employee"]["company_code"]
 
@@ -713,9 +713,21 @@ async def get_daily_homepage_reports(
                 report_cocode=report_cocode
             )
 
-        logger.info(f"Fetched {len(reports)} reports for user {empno} on date {doc_date}")
-        return reports
-        
+        # 2. 取得轉寄日報列表 (新增功能)
+        forwarded_reports = SupervisorService.get_forwarded_reports(
+            db=legacy_db,
+            empno=empno,
+            doc_date=doc_date
+        )
+        # 轉寄日報的 can_view_detail 已在 service 層設為 True，不需要額外檢查
+
+        logger.info(f"Fetched {len(subordinate_reports)} subordinate reports and {len(forwarded_reports)} forwarded reports for user {empno} on date {doc_date}")
+
+        return {
+            "subordinate_reports": subordinate_reports,
+            "forwarded_reports": forwarded_reports
+        }
+
     except Exception as e:
         logger.error(f"Error getting daily homepage reports: {str(e)}")
         raise HTTPException(status_code=500, detail="取得日報首頁失敗")

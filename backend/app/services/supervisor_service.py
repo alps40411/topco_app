@@ -166,6 +166,222 @@ class SupervisorService:
             raise
 
     @staticmethod
+    def get_forwarded_reports(
+        db: Session,
+        empno: str,
+        doc_date: str
+    ) -> List[Dict[str, Any]]:
+        """取得被轉寄給登入者的日報 - 這些日報使用者一定有權限查看"""
+        try:
+            # 查詢被轉寄的日報
+            forwarded_sql = text("""
+                SELECT daily_no
+                     ,reply_nos
+                     ,cocode
+                     ,empno
+                     ,empnamec
+                     ,emergency
+                     ,classify
+                     ,att_file1
+                     ,att_file2
+                     ,att_file3
+                     ,cust_ename1
+                     ,cust_ename2
+                     ,cust_ename3
+                     ,cust_comp_abbv1
+                     ,cust_comp_abbv2
+                     ,cust_comp_abbv3
+                     ,sop_desc_c
+                     ,reply_status
+                     ,memo_status
+                     ,proj_status
+                     ,openpath
+                     ,openwebpage
+                     ,sort_cocode
+                     ,g_deptno
+                     ,deptnamec
+                     ,practice_cocode
+                     ,coabbv
+                     ,my_ask
+                     ,other_ask
+                     ,doc_date
+                     ,reply_count
+                     ,replier_count
+                     ,LASTDATETIME
+                 FROM (
+                        SELECT a.daily_no
+                    ,b.reply_nos
+                    ,a.cocode
+                    ,a.empno
+                    ,a.empnamec
+                    ,a.emergency
+                    ,a.classify
+                    ,a.att_file1
+                    ,a.att_file2
+                    ,a.att_file3
+                    ,a.cust_ename1
+                    ,a.cust_ename2
+                    ,a.cust_ename3
+                    ,a.cust_comp_abbv1
+                    ,a.cust_comp_abbv2
+                    ,a.cust_comp_abbv3
+                    ,a.sop_desc_c
+                    ,a.reply_status
+                    ,a.memo_status
+                    ,a.proj_status
+                    ,a.openpath
+                    ,a.openwebpage
+                    ,d.g_deptno AS gdeptno
+                    ,DECODE(NVL(e.practice_cocode, a.cocode), N'J10', N'J071', N'J17', N'J072', NVL(e.practice_cocode, a.cocode)) AS sort_cocode
+                    ,(
+                        CASE
+                            WHEN e.practice_cocode IS NULL
+                                AND e.practice_deptno IS NULL
+                                THEN d.g_deptno
+                            ELSE (
+                                    SELECT g_deptno
+                                    FROM dcd002$master g
+                                    WHERE g.cocode = e.practice_cocode
+                                        AND g.deptno = e.practice_deptno
+                                    )
+                            END
+                        ) AS g_deptno
+                    ,(
+                        CASE
+                            WHEN e.practice_cocode IS NULL
+                                AND e.practice_deptno IS NULL
+                                THEN DECODE(a.cocode, 'A', d.deptnamec, (
+                                            SELECT c1.coabbv
+                                            FROM dcd001$master c1
+                                            WHERE c1.cocode = a.cocode
+                                            ) || '-' || (
+                                            SELECT c2.deptnamec
+                                            FROM dcd002$master c2
+                                            WHERE c2.cocode = a.cocode
+                                                AND c2.deptno = d.deptno
+                                                AND d.deptno <> '00000'
+                                            ))
+                            ELSE DECODE(e.practice_cocode, 'A', '', (
+                                        SELECT c1.coabbv
+                                        FROM dcd001$master c1
+                                        WHERE c1.cocode = e.practice_cocode
+                                        ) || '-') || (
+                                    SELECT c2.deptnamec
+                                    FROM dcd002$master c2
+                                    WHERE c2.cocode = e.practice_cocode
+                                        AND c2.deptno = e.practice_deptno
+                                    )
+                            END
+                        ) AS deptnamec
+                    ,e.practice_cocode
+                    ,f.coabbv
+                    ,(SELECT case when COUNT(daily_no) > 0 then 'true' else '' end AS cnt FROM tdr_reply WHERE daily_no = a.daily_no AND empno = :empno and memo not like '電子表單%' and memo not in (select memo from TDR_REPLY_GENERAL_COMMENT)) as my_ask
+                    ,(SELECT case when COUNT(daily_no) > 0 then 'true' else '' end AS cnt FROM tdr_reply WHERE daily_no = a.daily_no AND empno <> :empno and memo not like '電子表單%' and memo not in (select memo from TDR_REPLY_GENERAL_COMMENT)) as other_ask
+                    ,a.doc_date
+                    ,(SELECT COUNT(daily_no) FROM tdr_reply WHERE daily_no = a.daily_no) AS reply_count
+                    ,(SELECT COUNT(daily_no) FROM tdr_reply WHERE daily_no = a.daily_no AND empno = :empno) AS replier_count
+                    ,a.LASTDATETIME
+                    FROM tdr_master a
+                    LEFT JOIN dcd003$master e ON a.cocode = e.cocode
+                    AND a.empno = e.empno
+                    LEFT JOIN dcd002$master d ON e.cocode = d.cocode
+                    AND e.deptno = d.deptno
+                    LEFT JOIN dcd001$master f ON e.cocode = f.cocode
+                    JOIN tdr_msg_send_log b ON b.daily_no = a.daily_no
+                    WHERE a.status = 'N'
+                    AND a.cocode IN ( select cocode from dcd001$master where eip_active = 'Y')
+                    AND a.doc_date = :doc_date
+                    AND b.to_empno = :empno
+                    AND (e.RIGHT_STOP_DATE is null or e.RIGHT_STOP_DATE > a.doc_date)
+                  )
+                 GROUP BY daily_no
+                     ,reply_nos
+                     ,cocode
+                     ,empno
+                     ,empnamec
+                     ,emergency
+                     ,classify
+                     ,att_file1
+                     ,att_file2
+                     ,att_file3
+                     ,cust_ename1
+                     ,cust_ename2
+                     ,cust_ename3
+                     ,cust_comp_abbv1
+                     ,cust_comp_abbv2
+                     ,cust_comp_abbv3
+                     ,sop_desc_c
+                     ,reply_status
+                     ,memo_status
+                     ,proj_status
+                     ,openpath
+                     ,openwebpage
+                     ,sort_cocode
+                     ,g_deptno
+                     ,deptnamec
+                     ,gdeptno
+                     ,practice_cocode
+                     ,coabbv
+                     ,my_ask
+                     ,other_ask
+                     ,doc_date
+                     ,reply_count
+                     ,replier_count
+                     ,LASTDATETIME
+                 ORDER BY sort_cocode
+                     ,DECODE(SUBSTR(gdeptno, 1, 2), '00', '99', gdeptno)
+                     ,deptnamec
+                     ,empno
+                     ,daily_no
+            """)
+
+            result = db.execute(forwarded_sql, {
+                "empno": empno,
+                "doc_date": doc_date
+            })
+
+            reports = []
+            for row in result.fetchall():
+                report = {
+                    "id": int(row[0]),
+                    "employee": {
+                        "id": str(row[3] or "").zfill(5),
+                        "empno": str(row[3] or "").zfill(5),
+                        "name": row[4] or "",
+                        "department_no": row[23] or "",
+                        "department_name": row[24] or "",
+                        "company_code": row[2] or "",
+                    },
+                    "date": row[29],
+                    "status": "pending" if row[18] != 'Y' else "reviewed",
+                    "emergency": row[5] or "",
+                    "classify": row[6] or "",
+                    "sop_desc_c": row[16] or "",
+                    "reply_count": row[30] or 0,
+                    "replier_count": row[31] or 0,
+                    "my_ask": row[27] == 'true',
+                    "other_ask": row[28] == 'true',
+                    "is_forwarded": True,  # 轉寄的日報固定為 True
+                    "attachments": [f for f in [row[7], row[8], row[9]] if f],
+                    "has_attachments": any(f for f in [row[7], row[8], row[9]] if f),
+                    "customers": [
+                        {"name": row[10], "company": row[13]} if row[10] else None,
+                        {"name": row[11], "company": row[14]} if row[11] else None,
+                        {"name": row[12], "company": row[15]} if row[12] else None,
+                    ],
+                    "last_update": row[32] if row[32] else None,
+                    "can_view_detail": True,  # 轉寄的日報一定可以查看
+                    "supervision_status": "no_permission"  # 轉寄的日報不需要審核權限
+                }
+                reports.append(report)
+
+            return reports
+
+        except Exception as e:
+            logger.error(f"Error getting forwarded reports: {str(e)}")
+            raise
+
+    @staticmethod
     def check_view_permission_for_detail(
         db: Session,
         viewer_empno: str,
