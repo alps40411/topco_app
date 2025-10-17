@@ -2,7 +2,7 @@
 
 /**
  * 取得完整的檔案 URL
- * 自動處理開發環境和生產環境的 URL
+ * 所有檔案都使用 CommonAPI 格式
  */
 export const getFullFileUrl = (url: string): string => {
   if (!url) {
@@ -15,6 +15,11 @@ export const getFullFileUrl = (url: string): string => {
     return url;
   }
 
+  // ✅ 所有檔案都使用 CommonAPI 格式
+  // CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx.png
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+
   // 檢查是否為開發環境
   const isDevelopment =
     window.location.port === "5173" ||
@@ -22,19 +27,10 @@ export const getFullFileUrl = (url: string): string => {
     window.location.port === "3000" ||
     window.location.hostname === "localhost";
 
-  // 建立後端 URL
-  const protocol = window.location.protocol; // http: 或 https:
-  const hostname = window.location.hostname;
-
-  // 在開發環境中，後端服務在 8000 port；在正式環境中，API 和前端在同一個 domain 下，不需指定 port
+  // 開發環境使用 :8000 port，正式環境使用當前域名
   const backendUrl = isDevelopment
     ? `${protocol}//${hostname}:8000`
     : `${protocol}//${hostname}`;
 
-  // 處理相對路徑
-  const fullUrl = url.startsWith("/")
-    ? `${backendUrl}${url}`
-    : `${backendUrl}/${url}`;
-
-  return fullUrl;
+  return url.startsWith("/") ? `${backendUrl}${url}` : `${backendUrl}/${url}`;
 };

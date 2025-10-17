@@ -118,6 +118,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               type: uploadedFile.type,
               size: uploadedFile.size,
               url: uploadedFile.url,
+              file_path: uploadedFile.file_path, // ✅ 包含相對路徑
               is_selected_for_ai: false,
             });
           }
@@ -193,6 +194,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   type: uploadedFile.type,
                   size: uploadedFile.size,
                   url: uploadedFile.url,
+                  file_path: uploadedFile.file_path, // ✅ 包含相對路徑
                   is_selected_for_ai: false,
                 });
               }
@@ -340,6 +342,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 type: uploadedFile.type,
                 size: uploadedFile.size,
                 url: uploadedFile.url,
+                file_path: uploadedFile.file_path, // ✅ 包含相對路徑
                 is_selected_for_ai: false,
               });
             }

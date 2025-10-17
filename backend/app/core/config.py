@@ -47,12 +47,13 @@ class Settings(BaseSettings):
     # CORS origins (comma-separated). Example: http://localhost:5173,https://your.domain
     CORS_ORIGINS: str = ""
 
-    # File upload settings
-    UPLOAD_DIR: str = "uploads"
+    # File upload settings (使用 CommonAPI)
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
-    STATIC_URL_PREFIX: str = ""  # 靜態檔案 URL 前綴，例如 /MyReportAI
 
     # CommonAPI 配置
+    COMMONAPI_BASE_URL: str = "http://10.129.7.248/CommonApi"
+    COMMONAPI_UPLOAD_URL: str = "http://10.129.7.248/CommonApi/api/SharedFile/upimages"
+    COMMONAPI_DOWNLOAD_URL: str = "http://10.129.7.248/CommonApi/api/SharedFile"
     WFINBOX_API_URL: str = "http://10.129.7.248/CommonApi/EIP/ChangeWFINBOX"
     MYREPORT_GET_WRITABLE_DATE_URL: str = "http://10.129.7.248/CommonApi/MyReport/GetWritableDate"
     MYREPORT_GET_FORWARD_LIST_URL: str = "http://10.129.7.248/CommonApi/MyReport/GetForwardList"

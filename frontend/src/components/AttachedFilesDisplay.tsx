@@ -25,7 +25,18 @@ const AttachedFilesDisplay: React.FC<AttachedFilesDisplayProps> = ({
     // 對於圖片檔案，檢查是否在編輯器內容中
     // 如果圖片在編輯器中，則不在附加檔案區顯示（避免重複）
     const fullUrl = getFullFileUrl(file.url);
-    const isInEditor = content.includes(fullUrl) || content.includes(file.url);
+
+    // ✅ 修正：同時檢查 HTML 編碼和未編碼的 URL
+    // HTML 中的 & 會被編碼為 &amp;
+    const htmlEncodedUrl = fullUrl.replace(/&/g, '&amp;');
+    const htmlEncodedFileUrl = file.url.replace(/&/g, '&amp;');
+
+    const isInEditor =
+      content.includes(fullUrl) ||
+      content.includes(file.url) ||
+      content.includes(htmlEncodedUrl) ||
+      content.includes(htmlEncodedFileUrl);
+
     return !isInEditor;
   });
 

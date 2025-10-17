@@ -91,19 +91,15 @@ async def enhance_record(
         attachments = []
         if has_ai_files:
             for ai_file in ai_files:
-                # 轉換URL為檔案路徑
+                # ✅ 更新: CommonAPI 檔案直接使用 URL
+                # CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx
                 url_path = ai_file.get('url', '')
-                if url_path.startswith('/uploads/'):
-                    # 轉換為實際檔案路徑
-                    file_path = settings.UPLOAD_DIR + url_path.replace('/uploads/', '/')
-                else:
-                    file_path = url_path
 
                 # 創建附件記錄
                 attachments.append({
                     "att_id": f"files_{ai_file.get('name', 'unknown')}",
                     "file_name": ai_file.get('name', 'unknown'),
-                    "file_path": file_path,
+                    "file_path": url_path,  # 直接使用 URL (AI service 會處理)
                     "file_size": ai_file.get('size', 0),
                     "file_type": ai_file.get('type', ''),
                     "is_selected_for_ai": True  # 已經篩選過了

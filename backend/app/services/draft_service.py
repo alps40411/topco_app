@@ -65,20 +65,21 @@ class DraftService:
             
             # 處理檔案 - 支援多檔案，用逗號分隔
             files = draft_content.get('files', [])
-            att_file1_list = []  # 檔案名稱列表
-            att_file2_list = []  # 檔案路徑列表
+            att_file1_list = []  # 檔案名稱列表（原始檔名）
+            att_file2_list = []  # 檔案路徑列表（相對路徑）
             files_json_list = []  # 完整檔案資訊列表
-            
+
             for file_info in files:
                 if isinstance(file_info, dict):
                     file_name = file_info.get('name', '')
-                    file_url = file_info.get('url', '')
+                    # ✅ 優先使用 file_path（相對路徑），如果沒有則使用 url
+                    file_path = file_info.get('file_path') or file_info.get('url', '')
                     if file_name:
                         att_file1_list.append(file_name)
-                    if file_url:
-                        att_file2_list.append(file_url)
+                    if file_path:
+                        att_file2_list.append(file_path)
                     files_json_list.append(file_info)
-            
+
             att_file1 = ','.join(att_file1_list) if att_file1_list else ""
             att_file2 = ','.join(att_file2_list) if att_file2_list else ""
             files_json = json.dumps(files_json_list, ensure_ascii=False) if files_json_list else "[]"
@@ -142,28 +143,57 @@ class DraftService:
             if existing_exact_match:
                 # 完全相同的工作計畫+執行工作+工作項目：合併內容
                 logger.info(f"找到完全相同的 planno({planno})+sopno({sopno})+work_item_seq({work_item_seq_str}) 組合，合併內容")
-                
+
                 # 合併內容
                 existing_content = existing_exact_match[2] or ""
                 merged_content = f"{existing_content}\n{content}".strip() if existing_content else content
-                
+
                 # 累加執行時間
                 existing_time = existing_exact_match[3] or 0
                 total_time = existing_time + draft_content.get('execution_time_minutes', 0)
-                
+
                 # 工作項目序列保持不變（因為完全相同）
                 merged_work_items = work_item_seq_str
-                
+
                 # 計算新的字數
                 merged_word_count = len(merged_content) if merged_content else 0
-                
-                # 檔案處理：使用前端傳來的完整檔案列表（已處理刪除）
-                # 直接替換，而非合併，以支援檔案刪除同步
-                merged_files = files_json  # 使用前端傳來的檔案列表（已反映刪除操作）
-                merged_att_file1 = att_file1  # 使用前端傳來的檔案名稱列表
-                merged_att_file2 = att_file2  # 使用前端傳來的檔案路徑列表
 
-                logger.info(f"檔案列表更新（替換模式）: {len(files)} 個檔案")
+                # ✅ 檔案處理：合併檔案列表（支援多次新增）
+                existing_att_file1 = existing_exact_match[6] or ""
+                existing_att_file2 = existing_exact_match[7] or ""
+                existing_files = existing_exact_match[8] or "[]"
+
+                # 合併檔案名稱（ATT_FILE1）
+                merged_att_file1 = existing_att_file1
+                if att_file1:
+                    merged_att_file1 = f"{merged_att_file1},{att_file1}" if merged_att_file1 else att_file1
+
+                # 合併檔案路徑（ATT_FILE2）
+                merged_att_file2 = existing_att_file2
+                if att_file2:
+                    merged_att_file2 = f"{merged_att_file2},{att_file2}" if merged_att_file2 else att_file2
+
+                # 合併檔案 JSON
+                if files_json and files_json != "[]":
+                    try:
+                        existing_files_list = json.loads(existing_files) if existing_files != "[]" else []
+                        new_files_list = json.loads(files_json)
+
+                        # 去重：根據 URL 去除重複的檔案
+                        existing_urls = {f.get('url') for f in existing_files_list if isinstance(f, dict)}
+                        unique_new_files = [f for f in new_files_list if isinstance(f, dict) and f.get('url') not in existing_urls]
+
+                        merged_files_list = existing_files_list + unique_new_files
+                        merged_files = json.dumps(merged_files_list, ensure_ascii=False)
+
+                        logger.info(f"檔案合併：既有 {len(existing_files_list)} 個 + 新增 {len(unique_new_files)} 個 = 總共 {len(merged_files_list)} 個")
+                    except Exception as e:
+                        logger.error(f"合併檔案 JSON 時發生錯誤: {str(e)}")
+                        merged_files = files_json
+                else:
+                    merged_files = existing_files
+
+                logger.info(f"檔案列表更新（合併模式）: 總共 {len(json.loads(merged_files)) if merged_files != '[]' else 0} 個檔案")
                 
                 # 更新現有記錄
                 update_sql = text("""
@@ -476,8 +506,10 @@ class DraftService:
             service_deptno = update_data.get('service_deptno', '')
             execution_time_minutes = update_data.get('execution_time_minutes', 0)
 
+            # ✅ ATT_FILE1: 原始檔名, ATT_FILE2: 相對路徑
             att_file1_list = [f.get('name', '') for f in files if isinstance(f, dict) and f.get('name')]
-            att_file2_list = [f.get('url', '') for f in files if isinstance(f, dict) and f.get('url')]
+            # ✅ 優先使用 file_path（相對路徑），如果沒有則使用 url
+            att_file2_list = [f.get('file_path') or f.get('url', '') for f in files if isinstance(f, dict) and (f.get('file_path') or f.get('url'))]
             files_json = json.dumps(files, ensure_ascii=False) if files else "[]"
             att_file1 = ','.join(att_file1_list)
             att_file2 = ','.join(att_file2_list)

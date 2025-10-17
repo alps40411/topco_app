@@ -58,17 +58,7 @@ export class RecordsApi {
     return client.uploadFile<UploadFileResponse>('/api/records/upload', file, { doc_date: docDate });
   }
 
-  /**
-   * 刪除檔案
-   */
-  static async deleteFile(
-    yearMonth: string,
-    filename: string,
-    authFetch?: (url: string, options?: RequestInit) => Promise<Response>
-  ): Promise<DeleteFileResponse> {
-    const client = authFetch ? createAuthApiClient(authFetch) : apiClient;
-    return client.delete<DeleteFileResponse>(`/api/records/files/${yearMonth}/${filename}`);
-  }
+  // ✅ REMOVED: deleteFile - CommonAPI 檔案不實體刪除
 
   /**
    * 提交日報

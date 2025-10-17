@@ -37,6 +37,7 @@ export interface FileAttachment {
   type: string;
   size: number;
   url: string;
+  file_path?: string; // ✅ CommonAPI 回傳的相對路徑（用於ATT_FILE2）
   is_selected_for_ai?: boolean;
 }
 export interface WorkRecord {

@@ -109,12 +109,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [editOriginalFiles, setEditOriginalFiles] = useState<FileForUpload[]>(
     []
   );
-  const [editPendingDeleteFiles, setEditPendingDeleteFiles] = useState<
-    string[]
-  >([]);
-  const [editPendingUploadFiles, setEditPendingUploadFiles] = useState<
-    string[]
-  >([]);
+  // ✅ REMOVED: editPendingDeleteFiles, editPendingUploadFiles - CommonAPI 檔案不需要刪除
   const { authFetch, user, writingStatus, refreshWritingStatus } = useAuth(); // ✅ 使用全域狀態
 
   const [isAiViewActive, setIsAiViewActive] = useState(false);
@@ -451,44 +446,26 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setEditServiceDeptno(report.service_deptno);
     setEditExecutionTimeMinutes(report.total_execution_time_minutes || 0);
 
-    // 清空 pending 列表
-    setEditPendingDeleteFiles([]);
-    setEditPendingUploadFiles([]);
+    // ✅ REMOVED: pending 列表清空 - CommonAPI 不需要
   };
 
   const cancelEdit = async () => {
-    try {
-      // 刪除編輯期間新上傳的檔案
-      for (const filePath of editPendingUploadFiles) {
-        try {
-          // filePath 格式: YYYYMM/filename
-          const [yearMonth, filename] = filePath.split("/");
-          await RecordsApi.deleteFile(yearMonth, filename, authFetch);
-        } catch (error) {
-          console.error(`清理檔案 ${filePath} 失敗:`, error);
-        }
-      }
+    // ✅ REMOVED: 檔案刪除邏輯 - CommonAPI 檔案不需要刪除
 
-      // 清空所有編輯狀態
-      setEditingRecordKey(null);
-      setEditContent("");
-      setEditFiles([]);
-      setEditProjectId(undefined);
-      setEditExecutionWorkId(undefined);
-      setEditWorkItemIds([]);
-      setEditServiceCocode(undefined);
-      setEditServiceEmpno(undefined);
-      setEditExecutionTimeMinutes(0);
-      setEditOriginalContent("");
-      setEditOriginalFiles([]);
-      setEditPendingDeleteFiles([]);
-      setEditPendingUploadFiles([]);
+    // 清空所有編輯狀態
+    setEditingRecordKey(null);
+    setEditContent("");
+    setEditFiles([]);
+    setEditProjectId(undefined);
+    setEditExecutionWorkId(undefined);
+    setEditWorkItemIds([]);
+    setEditServiceCocode(undefined);
+    setEditServiceEmpno(undefined);
+    setEditExecutionTimeMinutes(0);
+    setEditOriginalContent("");
+    setEditOriginalFiles([]);
 
-      toast.success("已取消編輯");
-    } catch (error) {
-      console.error("取消編輯時發生錯誤:", error);
-      toast.error("取消編輯失敗");
-    }
+    toast.success("已取消編輯");
   };
 
   const deleteDraft = async () => {
@@ -539,8 +516,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       setEditExecutionTimeMinutes(0);
       setEditOriginalContent("");
       setEditOriginalFiles([]);
-      setEditPendingDeleteFiles([]);
-      setEditPendingUploadFiles([]);
 
       // 重新獲取資料
       const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
@@ -608,16 +583,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
       if (!response.ok) throw new Error("更新報告失敗");
 
-      // 儲存成功後，實際刪除標記為待刪除的檔案
-      for (const filePath of editPendingDeleteFiles) {
-        try {
-          // filePath 格式: YYYYMM/filename
-          const [yearMonth, filename] = filePath.split("/");
-          await RecordsApi.deleteFile(yearMonth, filename, authFetch);
-        } catch (error) {
-          console.error(`刪除檔案 ${filePath} 失敗:`, error);
-        }
-      }
+      // ✅ REMOVED: 儲存後刪除檔案邏輯 - CommonAPI 檔案不需要刪除
 
       // 重新獲取最新內容
       const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
@@ -636,8 +602,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       setEditExecutionTimeMinutes(0);
       setEditOriginalContent("");
       setEditOriginalFiles([]);
-      setEditPendingDeleteFiles([]);
-      setEditPendingUploadFiles([]);
     } catch (error) {
       console.error(error);
       toast.error("更新失敗，請稍後再試。");
@@ -709,19 +673,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           type: uploadedFile.type,
           size: uploadedFile.size,
           url: uploadedFile.url,
+          file_path: uploadedFile.file_path, // ✅ 包含相對路徑
           is_selected_for_ai: false,
         };
 
-        // 追蹤新上傳的檔案 (從 URL 中提取完整的 YYYYMM/filename)
-        const urlParts = uploadedFile.url.split("/");
-        const yearMonth = urlParts[urlParts.length - 2]; // 倒數第二個是 YYYYMM
-        const filename = urlParts[urlParts.length - 1]; // 最後一個是檔名
-        if (yearMonth && filename) {
-          setEditPendingUploadFiles((prev) => [
-            ...prev,
-            `${yearMonth}/${filename}`,
-          ]);
-        }
+        // ✅ REMOVED: 追蹤上傳檔案邏輯 - CommonAPI 不需要
 
         setEditFiles((prev) => [...prev, newFile]);
       } catch (error: any) {
@@ -744,61 +700,59 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   };
 
   const handleRemoveEditFile = useCallback(async (urlOrPath: string) => {
+    // ✅ REMOVED: 檔案刪除邏輯 - CommonAPI 檔案不實體刪除
+    // 僅從 UI 中移除檔案顯示
     try {
-      let fullUrl: string;
-      let relativePath: string;
+      // ✅ 修正：將 HTML 編碼的 &amp; 轉回 &
+      const decodedUrl = urlOrPath.replace(/&amp;/g, '&');
 
-      if (urlOrPath.startsWith("http")) {
-        fullUrl = urlOrPath;
-        // 解碼 URL 編碼的路徑
-        relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
-      } else {
-        relativePath = urlOrPath;
-        fullUrl = getFullFileUrl(urlOrPath);
-      }
+      // ✅ 修正：直接用完整 URL 比對，不要用 pathname（會丟失查詢參數）
+      const targetUrl = decodedUrl.startsWith("http")
+        ? decodedUrl
+        : getFullFileUrl(decodedUrl);
 
-      // 從路徑中提取 YYYYMM/filename (例如: /uploads/202510/xxx.png -> 202510/xxx.png)
-      const pathParts = relativePath.split("/");
-      const yearMonth = pathParts[pathParts.length - 2]; // 倒數第二個是 YYYYMM
-      const filename = pathParts[pathParts.length - 1]; // 最後一個是檔名
+      // 從 UI 移除檔案 - 只比對完整 URL
+      setEditFiles((prev) => prev.filter((file) => {
+        const fileFullUrl = file.url.startsWith("http")
+          ? file.url
+          : getFullFileUrl(file.url);
 
-      if (!yearMonth || !filename) {
-        throw new Error("無法從路徑中解析年月或檔案名稱");
-      }
+        const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
+        return !isMatch;
+      }));
 
-      // 不立即刪除實體檔案,而是標記為待刪除 (包含年月目錄)
-      setEditPendingDeleteFiles((prev) => [
-        ...prev,
-        `${yearMonth}/${filename}`,
-      ]);
+      // 從編輯內容中移除圖片標籤 - 需要處理 HTML 編碼的 &amp;
+      setEditContent((prev) => {
+        let newContent = prev || "";
+        const htmlEncodedUrl = targetUrl.replace(/&/g, '&amp;');
 
-      setEditFiles((prev) => prev.filter((file) => file.url !== relativePath));
-
-      setEditContent((prev) =>
-        (prev || "").replace(
-          new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
+        // 嘗試原始 URL
+        const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        newContent = newContent.replace(
+          new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g"),
           ""
-        )
-      );
+        );
+
+        // 嘗試 HTML 編碼的 URL
+        const escapedHtmlUrl = htmlEncodedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        newContent = newContent.replace(
+          new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g"),
+          ""
+        );
+
+        return newContent;
+      });
+
+      toast.success("檔案已從清單移除");
     } catch (error) {
-      console.error("刪除編輯檔案時發生錯誤:", error);
-      toast.error("檔案刪除失敗");
+      console.error("移除檔案時發生錯誤:", error);
+      toast.error("移除檔案失敗");
     }
   }, []);
 
   // 處理來自編輯用 RichTextEditor 的檔案上傳回調
   const handleEditEditorFileUpload = useCallback((file: FileForUpload) => {
-    // 標記為新上傳的檔案 (從 URL 中提取完整的 YYYYMM/filename)
-    const urlParts = file.url.split("/");
-    const yearMonth = urlParts[urlParts.length - 2]; // 倒數第二個是 YYYYMM
-    const filename = urlParts[urlParts.length - 1]; // 最後一個是檔名
-    if (yearMonth && filename) {
-      setEditPendingUploadFiles((prev) => [
-        ...prev,
-        `${yearMonth}/${filename}`,
-      ]);
-    }
-
+    // ✅ REMOVED: 追蹤檔案邏輯 - CommonAPI 不需要
     setEditFiles((prev) => [...prev, file]);
   }, []);
 
@@ -821,6 +775,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           type: uploadedFile.type,
           size: uploadedFile.size,
           url: uploadedFile.url,
+          file_path: uploadedFile.file_path, // ✅ 包含相對路徑
           is_selected_for_ai: false,
         };
         setNewRecord((prev) => ({
@@ -850,79 +805,77 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   const handleRemoveNewRecordFile = useCallback(
     async (urlOrPath: string) => {
+      // ✅ REMOVED: 檔案刪除邏輯 - CommonAPI 檔案不實體刪除
       try {
-        let fullUrl: string;
-        let relativePath: string;
+        // ✅ 修正：將 HTML 編碼的 &amp; 轉回 &
+        const decodedUrl = urlOrPath.replace(/&amp;/g, '&');
 
-        if (urlOrPath.startsWith("http")) {
-          fullUrl = urlOrPath;
-          // 解碼 URL 編碼的路徑
-          relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
-        } else {
-          relativePath = urlOrPath;
-          fullUrl = getFullFileUrl(urlOrPath);
-        }
+        // ✅ 修正：直接用完整 URL 比對，不要用 pathname（會丟失查詢參數）
+        const targetUrl = decodedUrl.startsWith("http")
+          ? decodedUrl
+          : getFullFileUrl(decodedUrl);
 
-        // 從路徑中提取 YYYYMM/filename
-        const pathParts = relativePath.split("/");
-        const yearMonth = pathParts[pathParts.length - 2];
-        const filename = pathParts[pathParts.length - 1];
+        // 1. 從 newRecord 的 files 列表中移除該檔案
+        setNewRecord((prev) => {
+          const newFiles = (prev.files || []).filter((file) => {
+            // 取得檔案的完整 URL
+            const fileFullUrl = file.url.startsWith("http")
+              ? file.url
+              : getFullFileUrl(file.url);
 
-        if (!yearMonth || !filename) {
-          throw new Error("無法從路徑中解析年月或檔案名稱");
-        }
+            // 只比對完整 URL
+            const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
 
-        await RecordsApi.deleteFile(yearMonth, filename, authFetch);
+            return !isMatch;
+          });
+          return {
+            ...prev,
+            files: newFiles,
+          };
+        });
 
-        setNewRecord((prev) => ({
-          ...prev,
-          files: (prev.files || []).filter((file) => file.url !== relativePath),
-        }));
+        // 2. 從 RichTextEditor 的內容中移除圖片
+        setNewRecord((prev) => {
+          const oldContent = prev.content || "";
+          let newContent = oldContent;
 
-        setNewRecord((prev) => ({
-          ...prev,
-          content: (prev.content || "").replace(
-            new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
+          // HTML 中的 & 會被轉義為 &amp;
+          const htmlEncodedUrl = targetUrl.replace(/&/g, '&amp;');
+
+          // 嘗試原始 URL
+          const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          newContent = newContent.replace(
+            new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g"),
             ""
-          ),
-        }));
+          );
+
+          // 嘗試 HTML 編碼的 URL
+          const escapedHtmlUrl = htmlEncodedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          newContent = newContent.replace(
+            new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g"),
+            ""
+          );
+
+          return {
+            ...prev,
+            content: newContent,
+          };
+        });
+
+        toast.success("檔案已從清單移除");
       } catch (error) {
-        console.error("刪除新記錄檔案時發生錯誤:", error);
-        toast.error("檔案刪除失敗");
+        console.error("移除檔案時發生錯誤:", error);
+        toast.error("移除檔案失敗");
       }
     },
-    [authFetch]
+    []
   );
 
-  // 清理新增筆記中的臨時檔案
+  // ✅ REMOVED: cleanupNewRecordTempFiles - CommonAPI 檔案不需要清理
   const cleanupNewRecordTempFiles = useCallback(async () => {
-    if (!authFetch || newRecordTempFilesRef.current.length === 0) return;
-
-    // 刪除所有臨時檔案
-    for (const fileUrl of newRecordTempFilesRef.current) {
-      try {
-        let relativePath = fileUrl;
-        if (fileUrl.startsWith("http")) {
-          const url = new URL(fileUrl);
-          relativePath = url.pathname;
-        }
-
-        // 從路徑中提取 YYYYMM/filename
-        const pathParts = relativePath.split("/");
-        const yearMonth = pathParts[pathParts.length - 2];
-        const filename = pathParts[pathParts.length - 1];
-
-        if (yearMonth && filename) {
-          await RecordsApi.deleteFile(yearMonth, filename, authFetch);
-        }
-      } catch (error) {
-        console.error("Failed to delete temp file:", fileUrl, error);
-      }
-    }
-
-    // 清空追蹤列表
+    // CommonAPI 檔案不需要刪除，僅清空追蹤列表
     newRecordTempFilesRef.current = [];
-  }, [authFetch]);
+  }, []);
 
   // 組件卸載時清理臨時檔案
   useEffect(() => {

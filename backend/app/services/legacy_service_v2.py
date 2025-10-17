@@ -630,32 +630,10 @@ class LegacyReportServiceV2:
                 # 生成檔案ID: dailyNo * 1000000 + dailySubNos * 1000 + index
                 file_id = int(daily_no) * 1000000 + daily_sub_nos * 1000 + file_index
 
-                # 從 URL 中提取檔案路徑
-                # URL 格式可能是:
-                # - /uploads/202510/20251015090141_58355747_image.png (本地)
-                # - /MyReportAI/upimages/202510/20251015090141_58355747_image.png (正式機)
-                # 我們需要提取 202510/20251015090141_58355747_image.png 部分
-
-                # 移除可能的前綴
-                from ..core.config import settings
-                file_path_relative = file_url
-
-                # 移除 STATIC_URL_PREFIX (如 /MyReportAI)
-                if settings.STATIC_URL_PREFIX and file_path_relative.startswith(settings.STATIC_URL_PREFIX):
-                    file_path_relative = file_path_relative[len(settings.STATIC_URL_PREFIX):]
-
-                # 移除 /upimages/ 或 /uploads/
-                if file_path_relative.startswith('/upimages/'):
-                    file_path_relative = file_path_relative[len('/upimages/'):]
-                elif file_path_relative.startswith('/uploads/'):
-                    file_path_relative = file_path_relative[len('/uploads/'):]
-                elif file_path_relative.startswith('/'):
-                    file_path_relative = file_path_relative[1:]
-
-                # 現在 file_path_relative 應該是: 202510/20251015090141_58355747_image.png
-                file_path = file_path_relative
-
-                logger.info(f"處理檔案: URL={file_url} -> filepath={file_path}")
+                # ✅ 所有檔案都使用 CommonAPI URL 格式
+                # CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx
+                file_path = file_url
+                logger.info(f"處理 CommonAPI 檔案: {file_url}")
 
                 # 檢查是否已存在相同ID的記錄
                 check_sql = text("SELECT COUNT(*) FROM jps.tdr_upload_file WHERE id = :id")

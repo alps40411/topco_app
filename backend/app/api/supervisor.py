@@ -478,17 +478,10 @@ async def get_report_detail_deprecated(
                 else:
                     file_type = "application/octet-stream"
 
-                # 構建完整的檔案 URL
-                # 資料庫中的 filepath 格式是: YYYYMM/filename.ext
-                # 需要添加正確的前綴:
-                # - 本地環境: STATIC_URL_PREFIX 為空，使用 /uploads/YYYYMM/filename.ext
-                # - 正式機環境: STATIC_URL_PREFIX 為 /MyReportAI，使用 /MyReportAI/upimages/YYYYMM/filename.ext
-                if settings.STATIC_URL_PREFIX:
-                    # 正式機環境 (有 STATIC_URL_PREFIX，例如 /MyReportAI)
-                    file_url = f"{settings.STATIC_URL_PREFIX}/upimages/{filepath}"
-                else:
-                    # 本地環境 (沒有 STATIC_URL_PREFIX)
-                    file_url = f"/uploads/{filepath}"
+                # ✅ 所有檔案都使用 CommonAPI URL 格式
+                # 資料庫中的 filepath 應該是完整的 CommonAPI URL
+                # CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx
+                file_url = filepath
 
                 files.append({
                     "id": file_id,

@@ -118,6 +118,59 @@ async def get_completion(prompt: str, temperature: float = 0.3, max_tokens: int 
         print(error_msg)
         raise Exception("AI service call failed")
 
+async def extract_text_from_commonapi_url(url_path: str, file_name: str) -> str:
+    """
+    從 CommonAPI URL 下載檔案並提取文字內容
+    """
+    import tempfile
+    import os
+
+    logger.info(f"從 CommonAPI 下載檔案: {file_name}")
+
+    try:
+        # 組合完整的 CommonAPI URL
+        if url_path.startswith('/'):
+            full_url = f"{settings.COMMONAPI_BASE_URL}{url_path}"
+        else:
+            full_url = url_path
+
+        logger.info(f"完整下載 URL: {full_url}")
+
+        # 下載檔案到暫存目錄
+        async with aiohttp.ClientSession() as session:
+            async with session.get(full_url) as response:
+                if response.status != 200:
+                    logger.error(f"下載檔案失敗: {response.status}")
+                    return ""
+
+                # 創建暫存檔案
+                file_ext = os.path.splitext(file_name)[1] or '.tmp'
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
+                temp_path = temp_file.name
+
+                # 寫入檔案內容
+                content = await response.read()
+                temp_file.write(content)
+                temp_file.close()
+
+                logger.info(f"檔案已下載到暫存位置: {temp_path}")
+
+        # 使用 Document Intelligence 提取文字
+        try:
+            extracted_text = await extract_text_from_file(temp_path)
+            return extracted_text
+        finally:
+            # 清理暫存檔案
+            try:
+                os.unlink(temp_path)
+                logger.info(f"已清理暫存檔案: {temp_path}")
+            except Exception as e:
+                logger.warning(f"清理暫存檔案失敗: {e}")
+
+    except Exception as e:
+        logger.error(f"從 CommonAPI 提取檔案內容失敗: {e}")
+        return ""
+
 async def extract_text_from_file(file_path: str) -> str:
     """
     使用 Azure Document Intelligence 從檔案中提取文字內容
@@ -308,24 +361,14 @@ async def process_attachments_for_ai(attachment_records: List[dict]) -> List[str
             logger.warning(f"附件 {file_name} 沒有檔案路徑")
             continue
 
-        # 將 URL 路徑轉換為實體檔案路徑
-        # 移除 STATIC_URL_PREFIX (如 /MyReportAI)
-        if settings.STATIC_URL_PREFIX and file_path.startswith(settings.STATIC_URL_PREFIX):
-            file_path = file_path[len(settings.STATIC_URL_PREFIX):]
+        # ✅ 所有檔案都使用 CommonAPI URL 格式
+        # CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx
+        logger.info(f"開始處理AI參考檔案: {file_name} (URL: {file_path})")
 
-        # 移除開頭的 /，並組合成完整路徑
-        # 例如: /upimages/202510/xxx.pdf -> D:\Websites\MyReport\MyReport\upimages\202510\xxx.pdf
-        if file_path.startswith('/'):
-            file_path = file_path[1:]
-
-        # 使用 UPLOAD_DIR 的父目錄作為基準
-        upload_base = Path(settings.UPLOAD_DIR).parent
-        file_path = str(upload_base / file_path)
-
-        logger.info(f"開始處理AI參考檔案: {file_name} (路徑: {file_path})")
-        
         try:
-            extracted_text = await extract_text_from_file(file_path)
+            # CommonAPI 檔案需要透過 HTTP 下載後處理
+            logger.info(f"從 CommonAPI 下載檔案: {file_path}")
+            extracted_text = await extract_text_from_commonapi_url(file_path, file_name)
             
             if extracted_text:
                 # 添加檔案來源標識

@@ -109,13 +109,14 @@ async def upload_file(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
-    """檔案上傳端點"""
+    """檔案上傳端點 - 使用 CommonAPI"""
     try:
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
 
         empno = current_user.employee.empno
-        result = await RecordService.upload_file(db, file, doc_date, empno)
+        cocode = current_user.employee.cocode or 'A'
+        result = await RecordService.upload_file(db, file, doc_date, empno, cocode)
         return result
 
     except Exception as e:
@@ -123,32 +124,7 @@ async def upload_file(
         raise HTTPException(status_code=500, detail=f"檔案上傳失敗: {str(e)}")
 
 
-@router.delete("/files/{year_month}/{filename}")
-async def delete_file(
-    year_month: str,
-    filename: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """
-    從伺服器上刪除一個已上傳的檔案。
-    路徑格式: /files/YYYYMM/filename
-    """
-    try:
-        if not current_user.employee:
-            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
-
-        empno = current_user.employee.empno
-        result = RecordService.delete_upload(db, year_month, filename, empno)
-        return result
-
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="檔案不存在")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"刪除檔案時發生錯誤: {e}")
-        raise HTTPException(status_code=500, detail=f"刪除檔案時發生內部錯誤: {str(e)}")
+# ✅ REMOVED: DELETE /files/{year_month}/{filename} - CommonAPI 檔案不實體刪除
 
 
 @router.post("/submit")

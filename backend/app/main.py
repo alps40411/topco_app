@@ -35,8 +35,7 @@ app = FastAPI(
 # --- 掛載 storage 資料夾為靜態檔案目錄 ---
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
-# --- 掛載 uploads 資料夾為靜態檔案目錄 ---
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+# ✅ REMOVED: uploads 掛載 - 改用 CommonAPI，不再需要本地 uploads 目錄
 
 # 最寬鬆的CORS設置，允許所有來源
 origins = ["*"]  # 允許所有來源

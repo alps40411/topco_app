@@ -184,16 +184,14 @@ class RecordService:
         db: Session,
         file: UploadFile,
         doc_date: str,
-        empno: str
+        empno: str,
+        cocode: str
     ) -> Dict[str, Any]:
-        """檔案上傳端點"""
+        """檔案上傳端點 - 使用 CommonAPI"""
+        from ..services.commonapi_file_service import CommonApiFileService
+
         try:
-            # 檢查檔案大小
-            if file.size and file.size > settings.MAX_FILE_SIZE:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"檔案太大，最大允許 {settings.MAX_FILE_SIZE // (1024*1024)}MB"
-                )
+            logger.info(f"上傳檔案: {file.filename}, empno={empno}, cocode={cocode}")
 
             # 檢查檔案類型
             allowed_extensions = {'.txt', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.gif'}
@@ -204,80 +202,21 @@ class RecordService:
                     detail=f"不支援的檔案類型: {file_ext}"
                 )
 
-            # 從 doc_date 提取年月 (YYYYMM)
-            year_month = doc_date[:6]
+            # 使用 CommonAPI 上傳
+            result = await CommonApiFileService.upload_file(
+                file=file,
+                cocode=cocode,
+                csrf_token=""  # 如需要可從 request header 取得
+            )
 
-            # 創建上傳目錄，包含年月子目錄
-            upload_dir = Path(settings.UPLOAD_DIR) / year_month
-            upload_dir.mkdir(parents=True, exist_ok=True)
-
-            # 生成唯一檔案名（yyyymmddhhmmssfffff 格式）
-            now = datetime.now()
-            # 格式：年月日時分秒毫秒 (20位數字)
-            timestamp_with_ms = now.strftime('%Y%m%d%H%M%S') + f"{now.microsecond:06d}"
-            file_ext = Path(file.filename or "").suffix
-            safe_filename = f"{timestamp_with_ms}{file_ext}"
-            file_path = upload_dir / safe_filename
-
-            # 保存檔案
-            async with aiofiles.open(file_path, 'wb') as f:
-                content = await file.read()
-                await f.write(content)
-
-            # 返回檔案資訊（包含年月子目錄）
-            relative_path = file_path.relative_to(Path(settings.UPLOAD_DIR).parent)
-            final_url = f"{settings.STATIC_URL_PREFIX}/{relative_path.as_posix()}"
-
-            return {
-                "id": timestamp_with_ms,
-                "name": file.filename,
-                "type": file.content_type or "application/octet-stream",
-                "size": len(content),
-                "url": final_url,
-                "path": str(file_path),
-                "upload_date": now.strftime('%Y%m%d'),
-                "upload_time": now.strftime('%H%M%S'),
-                "status": "success"
-            }
+            logger.info(f"檔案上傳成功: {result['id']}")
+            return result
 
         except Exception as e:
             logger.error(f"Error uploading file: {str(e)}")
             raise
 
-    @staticmethod
-    def delete_upload(
-        db: Session,
-        year_month: str,
-        filename: str,
-        empno: str
-    ) -> Dict[str, str]:
-        """從伺服器上刪除一個已上傳的檔案"""
-        try:
-            # 驗證 year_month 格式 (應為6位數字 YYYYMM)
-            if not year_month.isdigit() or len(year_month) != 6:
-                raise HTTPException(status_code=400, detail="年月格式錯誤，應為 YYYYMM")
-
-            # 組合檔案的完整路徑
-            upload_dir = Path(settings.UPLOAD_DIR)
-            file_path = upload_dir / year_month / filename
-
-            # 安全性檢查：確保檔案路徑是在我們預期的 UPLOAD_DIR 底下
-            if not file_path.is_file() or not str(file_path.resolve()).startswith(str(upload_dir.resolve())):
-                raise HTTPException(status_code=404, detail="檔案不存在或路徑無效")
-
-            # 執行刪除
-            os.remove(file_path)
-            logger.info(f"File deleted successfully: {file_path}")
-
-            return {"message": "檔案刪除成功", "filename": f"{year_month}/{filename}"}
-
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="檔案不存在")
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"刪除檔案時發生錯誤: {e}")
-            raise HTTPException(status_code=500, detail=f"刪除檔案時發生內部錯誤: {str(e)}")
+    # ✅ REMOVED: delete_upload - CommonAPI 檔案不實體刪除
 
     @staticmethod
     def submit_daily_report(

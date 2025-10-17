@@ -275,53 +275,97 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
     }));
   };
 
+  // ✅ CommonAPI 檔案不實體刪除，只從 UI 中移除
   const handleRemoveFile = useCallback(
     async (urlOrPath: string) => {
       try {
-        let fullUrl: string;
-        let relativePath: string;
+        console.log("[DataInputTab] handleRemoveFile 被呼叫，參數:", urlOrPath);
+        console.log("[DataInputTab] 當前 files:", currentRecord.files);
 
-        if (urlOrPath.startsWith("http")) {
-          fullUrl = urlOrPath;
-          // 解碼 URL 編碼的路徑
-          relativePath = decodeURIComponent(new URL(urlOrPath).pathname);
-        } else {
-          relativePath = urlOrPath;
-          fullUrl = getFullFileUrl(urlOrPath);
-        }
+        // ✅ 修正：將 HTML 編碼的 &amp; 轉回 &
+        const decodedUrl = urlOrPath.replace(/&amp;/g, '&');
 
-        // 從路徑中提取 YYYYMM/filename
-        const pathParts = relativePath.split("/");
-        const yearMonth = pathParts[pathParts.length - 2];
-        const filename = pathParts[pathParts.length - 1];
+        // ✅ 修正：直接用完整 URL 比對，不要用 pathname（會丟失查詢參數）
+        const targetUrl = decodedUrl.startsWith("http")
+          ? decodedUrl
+          : getFullFileUrl(decodedUrl);
 
-        if (!yearMonth || !filename) {
-          throw new Error("無法從路徑中解析年月或檔案名稱");
-        }
+        console.log("[DataInputTab] 解碼後 URL:", decodedUrl);
+        console.log("[DataInputTab] 目標 URL:", targetUrl);
 
-        // 1. 呼叫後端 API 刪除實體檔案
-        await RecordsApi.deleteFile(yearMonth, filename, authFetch);
+        // 1. 從 currentRecord 的 files 列表中移除該檔案
+        setCurrentRecord((prev) => {
+          const newFiles = (prev.files || []).filter((file) => {
+            // 取得檔案的完整 URL
+            const fileFullUrl = file.url.startsWith("http")
+              ? file.url
+              : getFullFileUrl(file.url);
 
-        // 2. 從 currentRecord 的 files 列表中移除該檔案
-        setCurrentRecord((prev) => ({
-          ...prev,
-          files: (prev.files || []).filter((file) => file.url !== relativePath),
-        }));
+            console.log("[DataInputTab] 比對檔案:");
+            console.log("  file.url:", file.url);
+            console.log("  fileFullUrl:", fileFullUrl);
+            console.log("  vs targetUrl:", targetUrl);
 
-        // 3. 從 RichTextEditor 的內容中移除圖片
-        setCurrentRecord((prev) => ({
-          ...prev,
-          content: (prev.content || "").replace(
-            new RegExp(`<img[^>]*src="${fullUrl}"[^>]*>`, "g"),
-            ""
-          ),
-        }));
+            // 只比對完整 URL
+            const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
+
+            console.log("  isMatch:", isMatch);
+
+            return !isMatch;
+          });
+          console.log("[DataInputTab] 過濾後的 files:", newFiles);
+          return {
+            ...prev,
+            files: newFiles,
+          };
+        });
+
+        // 2. 從 RichTextEditor 的內容中移除圖片
+        setCurrentRecord((prev) => {
+          const oldContent = prev.content || "";
+          let newContent = oldContent;
+
+          console.log("[DataInputTab] 原始內容:", oldContent);
+
+          // HTML 中的 & 會被轉義為 &amp;
+          const htmlEncodedUrl = targetUrl.replace(/&/g, '&amp;');
+
+          // 嘗試原始 URL
+          const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex1 = new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g");
+          const beforeReplace1 = newContent;
+          newContent = newContent.replace(regex1, "");
+
+          if (beforeReplace1 !== newContent) {
+            console.log(`[DataInputTab] 成功移除圖片，使用原始 URL: ${targetUrl}`);
+          }
+
+          // 嘗試 HTML 編碼的 URL
+          const escapedHtmlUrl = htmlEncodedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex2 = new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g");
+          const beforeReplace2 = newContent;
+          newContent = newContent.replace(regex2, "");
+
+          if (beforeReplace2 !== newContent) {
+            console.log(`[DataInputTab] 成功移除圖片，使用 HTML 編碼 URL: ${htmlEncodedUrl}`);
+          }
+
+          console.log("[DataInputTab] 更新後內容:", newContent);
+          console.log("[DataInputTab] 內容是否改變:", oldContent !== newContent);
+
+          return {
+            ...prev,
+            content: newContent,
+          };
+        });
+
+        toast.success("檔案已從清單移除");
       } catch (error) {
-        console.error("刪除檔案時發生錯誤:", error);
-        toast.error("檔案刪除失敗");
+        console.error("移除檔案時發生錯誤:", error);
+        toast.error("移除檔案失敗");
       }
     },
-    [authFetch]
+    [currentRecord.files]
   );
 
   // 只有在完全沒有其他可填寫日期時才顯示禁用提示
