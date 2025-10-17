@@ -299,26 +299,47 @@ class DraftService:
                     existing_att_file2 = existing_record[1] or "" if existing_record else ""
                     existing_files = existing_record[2] or "[]" if existing_record else "[]"
 
-                    # 合併檔案
-                    merged_att_file1 = existing_att_file1
-                    merged_att_file2 = existing_att_file2
-
-                    if att_file1:
-                        merged_att_file1 = f"{merged_att_file1},{att_file1}" if merged_att_file1 else att_file1
-                    if att_file2:
-                        merged_att_file2 = f"{merged_att_file2},{att_file2}" if merged_att_file2 else att_file2
-
-                    # 合併 files JSON
+                    # ✅ 合併檔案 JSON（先合併再生成 ATT_FILE1/ATT_FILE2）
                     if files_json and files_json != "[]":
                         try:
                             existing_files_list = json.loads(existing_files) if existing_files != "[]" else []
                             new_files_list = json.loads(files_json)
-                            merged_files_list = existing_files_list + new_files_list
+
+                            # 去重：根據 URL 去除重複的檔案
+                            existing_urls = {f.get('url') for f in existing_files_list if isinstance(f, dict)}
+                            unique_new_files = [f for f in new_files_list if isinstance(f, dict) and f.get('url') not in existing_urls]
+
+                            merged_files_list = existing_files_list + unique_new_files
                             merged_files = json.dumps(merged_files_list, ensure_ascii=False)
-                        except:
+
+                            logger.info(f"部分匹配檔案合併：既有 {len(existing_files_list)} 個 + 新增 {len(unique_new_files)} 個 = 總共 {len(merged_files_list)} 個")
+                        except Exception as e:
+                            logger.error(f"部分匹配合併檔案 JSON 時發生錯誤: {str(e)}")
                             merged_files = files_json
                     else:
                         merged_files = existing_files
+
+                    # ✅ 從合併後的 FILES JSON 重新生成 ATT_FILE1 和 ATT_FILE2
+                    try:
+                        merged_files_list = json.loads(merged_files) if merged_files != "[]" else []
+                        merged_att_file1_list = []
+                        merged_att_file2_list = []
+
+                        for file_info in merged_files_list:
+                            if isinstance(file_info, dict):
+                                file_name = file_info.get('name', '')
+                                file_path = file_info.get('file_path') or file_info.get('url', '')
+                                if file_name:
+                                    merged_att_file1_list.append(file_name)
+                                if file_path:
+                                    merged_att_file2_list.append(file_path)
+
+                        merged_att_file1 = ','.join(merged_att_file1_list) if merged_att_file1_list else ""
+                        merged_att_file2 = ','.join(merged_att_file2_list) if merged_att_file2_list else ""
+                    except Exception as e:
+                        logger.error(f"部分匹配生成 ATT_FILE1/ATT_FILE2 時發生錯誤: {str(e)}")
+                        merged_att_file1 = existing_att_file1
+                        merged_att_file2 = existing_att_file2
 
                     update_partial_sql = text("""
                         UPDATE jps.tdr_draft
