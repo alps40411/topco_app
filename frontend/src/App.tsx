@@ -195,10 +195,19 @@ function App() {
       setActiveTab(tab);
       setSelectedEmployee(null);
       setSelectedReportId(null);
-      // 使用 navigate 更新 URL (相對於 basename)
-      navigate(`?tab=${tab}`, { replace: false });
+
+      // ✅ 只有在切換到 supervisor (日報首頁) 時才保留日期參數
+      if (tab === "supervisor") {
+        const dateParam = globalSelectedDate || searchParams.get("date");
+        const url = dateParam ? `?tab=${tab}&date=${dateParam}` : `?tab=${tab}`;
+        navigate(url, { replace: false });
+      } else {
+        // 切換到日報編輯或隨筆紀錄時，不帶日期參數，並清除全域日期狀態
+        setGlobalSelectedDate(null);
+        navigate(`?tab=${tab}`, { replace: false });
+      }
     },
-    [navigate]
+    [navigate, globalSelectedDate, searchParams]
   );
 
   const handleSelectEmployee = (employee: EmployeeInList, reportId: number) => {
@@ -312,6 +321,9 @@ function App() {
     // 同步日期
     if (dateParam && dateParam !== globalSelectedDate) {
       setGlobalSelectedDate(dateParam);
+    } else if (!dateParam && globalSelectedDate !== null) {
+      // ✅ URL 沒有 date 參數時，清除全域日期
+      setGlobalSelectedDate(null);
     }
 
     // 同步 report 和 employee - 必須同時存在或同時不存在

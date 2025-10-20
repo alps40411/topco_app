@@ -79,12 +79,37 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     // 就會直接回傳預設的今天日期
     return dateToReturn;
   };
+
+  // ✅ 通用日期解析函數：支援 YYYY-MM-DD 和 YYYYMMDD 兩種格式
+  const parseDateParam = (dateParam: string): Date | null => {
+    if (!dateParam) return null;
+
+    // 格式1: YYYY-MM-DD
+    if (dateParam.includes("-")) {
+      const [year, month, day] = dateParam.split("-").map(Number);
+      if (year && month && day) {
+        return new Date(year, month - 1, day, 12, 0, 0);
+      }
+    }
+    // 格式2: YYYYMMDD
+    else if (dateParam.length === 8) {
+      const year = parseInt(dateParam.substring(0, 4));
+      const month = parseInt(dateParam.substring(4, 6));
+      const day = parseInt(dateParam.substring(6, 8));
+      if (year && month && day) {
+        return new Date(year, month - 1, day, 12, 0, 0);
+      }
+    }
+
+    return null;
+  };
+
   // ✅ 從 URL 參數讀取日期，如果沒有則使用當天
   const getInitialDate = () => {
     const dateParam = searchParams.get("date");
     if (dateParam) {
-      const [year, month, day] = dateParam.split("-").map(Number);
-      return new Date(year, month - 1, day, 12, 0, 0);
+      const parsedDate = parseDateParam(dateParam);
+      if (parsedDate) return parsedDate;
     }
     // 使用五點前顯示前一天的邏輯
     return getDefaultDate();
@@ -108,11 +133,16 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   useEffect(() => {
     const dateParam = searchParams.get("date");
     if (dateParam) {
-      const [year, month, day] = dateParam.split("-").map(Number);
-      const urlDate = new Date(year, month - 1, day, 12, 0, 0);
-      // 只有當 URL 日期與當前日期不同時才更新
-      if (selectedDate?.toDateString() !== urlDate.toDateString()) {
+      const urlDate = parseDateParam(dateParam);
+      // 只有當 URL 日期有效且與當前日期不同時才更新
+      if (urlDate && selectedDate?.toDateString() !== urlDate.toDateString()) {
         setSelectedDate(urlDate);
+      }
+    } else {
+      // ✅ URL 沒有 date 參數時，重置為預設日期
+      const defaultDate = getDefaultDate();
+      if (selectedDate?.toDateString() !== defaultDate.toDateString()) {
+        setSelectedDate(defaultDate);
       }
     }
   }, [searchParams]);
