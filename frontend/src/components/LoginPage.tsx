@@ -30,8 +30,12 @@ const LoginPage: React.FC = () => {
         // 清除日期快取，確保獲取新使用者的日期資料
         clearDateCache();
 
+        // 將當前 URL 的查詢參數傳遞給 SSO 登入端點
+        const currentSearch = window.location.search; // 例如: ?cocode=A01&userid=03252
+        const ssoUrl = `/api/auth/sso${currentSearch}`;
+
         // 嘗試調用 SSO 登入端點看是否有有效的 SSO headers
-        const response = await fetch(buildApiUrl("/api/auth/sso"), {
+        const response = await fetch(buildApiUrl(ssoUrl), {
           method: "POST",
         });
 
@@ -40,7 +44,7 @@ const LoginPage: React.FC = () => {
 
           login(data.token.access_token, data.user);
 
-          // ✅ 優先使用保存的重定向參數，否則使用當前 URL 參數，最後才是預設首頁
+          // 優先使用保存的重定向參數，否則使用當前 URL 參數，最後才是預設首頁
           const savedRedirect = sessionStorage.getItem("redirect_after_login");
           const currentSearch = window.location.search;
 
@@ -90,7 +94,7 @@ const LoginPage: React.FC = () => {
       const data = await response.json();
       login(data.token.access_token, data.user);
 
-      // ✅ 優先使用保存的重定向參數，否則使用當前 URL 參數，最後才是預設首頁
+      // 優先使用保存的重定向參數，否則使用當前 URL 參數，最後才是預設首頁
       const savedRedirect = sessionStorage.getItem("redirect_after_login");
       const currentSearch = window.location.search;
 
@@ -118,7 +122,11 @@ const LoginPage: React.FC = () => {
       // 清除日期快取，確保獲取新使用者的日期資料
       clearDateCache();
 
-      const response = await fetch(buildApiUrl("/api/auth/sso"), {
+      // 將當前 URL 的查詢參數傳遞給 SSO 登入端點
+      const urlParams = window.location.search; // 例如: ?cocode=A01&userid=03252
+      const ssoUrl = `/api/auth/sso${urlParams}`;
+
+      const response = await fetch(buildApiUrl(ssoUrl), {
         method: "POST",
       });
 
