@@ -1,10 +1,8 @@
 // frontend/src/components/EmployeeListTab.tsx
 
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, UserCheck, User } from "lucide-react";
 import type { DailyReport, EmployeeInList } from "../App";
 import { useAuth } from "../hooks/useAuth";
-import type { SupervisorApprovalInfo } from "../types/supervisor";
 import SupervisorDateBar from "./SupervisorDateBar";
 import { toast } from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -33,7 +31,6 @@ interface HomepageReport {
   customers: Array<{ name: string; company: string } | null>;
   last_update: string | null;
   can_view_detail: boolean; // 是否可以查看詳情
-  supervision_status: "pending" | "approved" | "no_permission"; // 主管審核狀態
   is_forwarded_to_me?: boolean; // 別人轉寄給我的 (來自 forwardedReports)
 }
 
@@ -398,34 +395,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     );
   };
 
-  // 渲染主管審核狀態
-  const renderSupervisionStatus = (status: string) => {
-    switch (status) {
-      case "pending":
-        return (
-          <div className="flex items-center space-x-1 text-orange-600">
-            <Clock className="w-4 h-4" />
-            <span className="text-sm font-medium">待審核</span>
-          </div>
-        );
-      case "approved":
-        return (
-          <div className="flex items-center space-x-1 text-green-600">
-            <UserCheck className="w-4 h-4" />
-            <span className="text-sm font-medium">已審核</span>
-          </div>
-        );
-      case "no_permission":
-        return (
-          <div className="flex items-center space-x-1 text-gray-500">
-            <User className="w-4 h-4" />
-            <span className="text-sm font-medium">無須審核</span>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
+  // ✅ 已移除 renderSupervisionStatus - 前端未使用此功能
 
   if (isLoading) {
     return <div className="p-6 text-center">載入日報中...</div>;

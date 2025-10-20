@@ -51,17 +51,19 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# 添加請求日誌中間件
+# 添加請求日誌中間件 (僅記錄慢請求和錯誤)
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
-    print(f"{request.method} {request.url.path} - Start processing")
-    
+
     response = await call_next(request)
-    
+
     process_time = time.time() - start_time
-    print(f"{request.method} {request.url.path} - Completed ({response.status_code}) - {process_time:.2f}s")
-    
+
+    # 只記錄慢請求 (>1秒) 或錯誤請求
+    if process_time > 1.0 or response.status_code >= 400:
+        print(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.2f}s")
+
     return response
 
 # 基本啟動前檢查：確保必要環境變數已設定
@@ -74,6 +76,25 @@ if missing:
     raise RuntimeError(
         f"Missing required settings: {missing_str}. Please create .env file in backend folder or set corresponding environment variables."
     )
+
+# ✅ 優化: 應用啟動時預熱資料庫連接池，避免第一次請求卡頓
+@app.on_event("startup")
+async def warmup_database_pool():
+    """預熱資料庫連接池，消除第一次請求的冷啟動延遲"""
+    from app.core.legacy_database import legacy_engine
+    from sqlalchemy import text
+
+    print("🔥 Warming up database connection pool...")
+
+    try:
+        # 建立初始連接並執行簡單查詢
+        with legacy_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            conn.commit()
+
+        print("✅ Database connection pool ready")
+    except Exception as e:
+        print(f"⚠️ Database pool warmup failed: {e}")
 
 # --- 修正：加入 "/api" 前綴以匹配前端代理設定 ---
 # 前端透過 Vite 代理將 /api/* 請求轉發到後端

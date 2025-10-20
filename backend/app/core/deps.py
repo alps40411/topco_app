@@ -89,29 +89,29 @@ async def get_current_user(
         raise credentials_exception
 
     token_data = TokenData(empno=empno)
-    
+
     # 從 JPS Legacy 資料庫查詢用戶資訊
     from app.core.legacy_database import get_legacy_db
     from app.schemas.employee import EmployeeForUser
     from app.schemas.user import User as UserSchema
     from sqlalchemy import text
-    
+
     legacy_db = next(get_legacy_db())
-    
+
     user_sql = text("""
-        SELECT a.empno, a.empnamec, a.cocode, a.deptno, a.dutyscript, 
+        SELECT a.empno, a.empnamec, a.cocode, a.deptno, a.dutyscript,
                a.mailbox, a.pass, b.deptabbv, a.adm_rank, a.sop_role
         FROM jps.dcd003$master a
         LEFT JOIN jps.dcd002$master b ON a.cocode = b.cocode AND a.deptno = b.deptno
         WHERE a.empno = :empno AND a.cocode = 'A'
     """)
-    
+
     result = legacy_db.execute(user_sql, {"empno": empno})
     user_row = result.fetchone()
-    
+
     if not user_row:
         raise credentials_exception
-    
+
     # 創建用戶物件，確保格式與認證 API 一致
     user = UserSchema(
         id=1,  # 使用非零 ID，避免前端條件檢查失敗
@@ -129,7 +129,7 @@ async def get_current_user(
             deptno=user_row[3] or "",       # deptno
         )
     )
-    
+
     return user
 
 async def get_current_user_with_employee(

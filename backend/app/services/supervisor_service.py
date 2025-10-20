@@ -21,7 +21,7 @@ class SupervisorService:
     ) -> List[Dict[str, Any]]:
         """取得日報首頁 - 所有下屬的日報列表"""
         try:
-            # 使用完整的主查詢
+            # ✅ 優化: 整合 can_view_detail 到主查詢中，消除 N+1 問題
             main_reports_sql = text("""
                 SELECT
                     daily_no, cocode, empno, empnamec, emergency, classify, att_file1,
@@ -30,7 +30,7 @@ class SupervisorService:
                     reply_status, memo_status, doc_date, proj_status, openpath,
                     openwebpage, sort_cocode, g_deptno, deptnamec, reply_count,
                     replier_count, my_ask, other_ask, isForwarded, LASTDATETIME,
-                    practice_cocode, coabbv
+                    practice_cocode, coabbv, can_view_detail
                 FROM (
                     SELECT
                         a.daily_no, a.cocode, a.empno, a.empnamec, a.emergency, a.classify,
@@ -74,7 +74,18 @@ class SupervisorService:
                          AND sc.doc_date = a.doc_date
                          AND EXISTS (SELECT 1 FROM tdr_reply r WHERE r.daily_no = a.daily_no AND r.empno <> :empno AND r.memo NOT LIKE '電子表單%' AND r.memo NOT IN (SELECT memo FROM TDR_REPLY_GENERAL_COMMENT))) AS other_ask,
                         (SELECT CASE WHEN COUNT(daily_no) > 0 THEN 'true' ELSE 'false' END FROM tdr_msg_send_log WHERE daily_no = a.daily_no AND from_empno = :empno) AS isForwarded,
-                        a.LASTDATETIME, e.practice_cocode, f.coabbv
+                        a.LASTDATETIME, e.practice_cocode, f.coabbv,
+                        (CASE
+                            WHEN :empno IN ('00002','01174','01376','02970','Z0005') THEN 'Y'
+                            WHEN LPAD(a.empno, 5, '0') = LPAD(:empno, 5, '0') THEN 'Y'
+                            WHEN EXISTS (
+                                SELECT 1 FROM groupfoodchn gfc
+                                WHERE gfc.cocode = a.cocode
+                                  AND LPAD(gfc.empno, 5, '0') = LPAD(a.empno, 5, '0')
+                                  AND LPAD(gfc.supervisor, 5, '0') = LPAD(:empno, 5, '0')
+                            ) THEN 'Y'
+                            ELSE 'N'
+                        END) AS can_view_detail
                     FROM tdr_master a
                     LEFT JOIN dcd003$master e ON a.cocode = e.cocode AND a.empno = e.empno
                     LEFT JOIN dcd002$master d ON e.cocode = d.cocode AND e.deptno = d.deptno
@@ -108,7 +119,7 @@ class SupervisorService:
                     reply_status, memo_status, doc_date, proj_status, openpath,
                     openwebpage, gdeptno, sort_cocode, g_deptno, deptnamec, reply_count,
                     replier_count, my_ask, other_ask, isForwarded, LASTDATETIME,
-                    practice_cocode, coabbv
+                    practice_cocode, coabbv, can_view_detail
                 ORDER BY
                     sort_cocode,
                     DECODE(SUBSTR(g_deptno, 1, 2), '00', '99', g_deptno),
@@ -132,12 +143,12 @@ class SupervisorService:
                         "id": str(row[2] or "").zfill(5),
                         "empno": str(row[2] or "").zfill(5),
                         "name": row[3] or "",
-                        "department_no": row[22] or "",
-                        "department_name": row[23] or "",
+                        "department_no": row[23] or "",  # ✅ 修正索引 (新增 can_view_detail 欄位後位移)
+                        "department_name": row[24] or "",  # ✅ 修正索引
                         "company_code": row[1] or "",
                     },
                     "date": row[18],
-                    "status": "pending" if row[15] != 'Y' else "reviewed",
+                    "status": "pending" if row[16] != 'Y' else "reviewed",  # ✅ 修正索引
                     "emergency": row[4] or "",
                     "classify": row[5] or "",
                     "sop_desc_c": row[15] or "",
@@ -154,8 +165,7 @@ class SupervisorService:
                         {"name": row[11], "company": row[14]} if row[11] else None,
                     ],
                     "last_update": row[30] if row[30] else None,
-                    "can_view_detail": False,
-                    "supervision_status": "no_permission"
+                    "can_view_detail": row[33] == 'Y'  # ✅ 從 SQL 直接取得權限值 (新增的欄位)
                 }
                 reports.append(report)
 
@@ -370,8 +380,7 @@ class SupervisorService:
                         {"name": row[12], "company": row[15]} if row[12] else None,
                     ],
                     "last_update": row[32] if row[32] else None,
-                    "can_view_detail": True,  # 轉寄的日報一定可以查看
-                    "supervision_status": "no_permission"  # 轉寄的日報不需要審核權限
+                    "can_view_detail": True  # ✅ 轉寄的日報一定可以查看
                 }
                 reports.append(report)
 
@@ -381,100 +390,5 @@ class SupervisorService:
             logger.error(f"Error getting forwarded reports: {str(e)}")
             raise
 
-    @staticmethod
-    def check_view_permission_for_detail(
-        db: Session,
-        viewer_empno: str,
-        report_empno: str,
-        report_cocode: str
-    ) -> bool:
-        """檢查詳情查看權限"""
-        try:
-            # 檢查條件 5: 是否為自己的日報（最優先）
-            if viewer_empno == report_empno or f"{int(viewer_empno):05d}" == f"{int(report_empno):05d}":
-                return True
-
-            # 檢查條件 1: Chairman權限（硬編碼避免表不存在問題）
-            if viewer_empno in ['00002', '01174', '01376', '02970', 'Z0005']:
-                return True
-
-            # 檢查條件 2: 簽核組織規則 (GROUPFOODCHN)
-            formatted_report_empno = f"{int(report_empno):05d}"
-            formatted_viewer_empno = f"{int(viewer_empno):05d}"
-
-            groupfood_sql = text("""
-                SELECT empno FROM jps.groupfoodchn
-                WHERE cocode = :cocode AND empno = :report_empno AND supervisor = :viewer_empno
-            """)
-            groupfood_result = db.execute(groupfood_sql, {
-                "cocode": report_cocode,
-                "report_empno": formatted_report_empno,
-                "viewer_empno": formatted_viewer_empno
-            })
-            if groupfood_result.fetchone():
-                return True
-
-            return False
-
-        except Exception as e:
-            logger.error(f"Error checking view permission: {str(e)}")
-            return False
-
-    @staticmethod
-    def check_supervision_status(
-        db: Session,
-        viewer_empno: str,
-        report_id: int,
-        report_empno: str,
-        report_cocode: str
-    ) -> str:
-        """檢查主管審核狀態"""
-        try:
-            # 自己的日報不能審核
-            if viewer_empno == report_empno or f"{int(viewer_empno):05d}" == f"{int(report_empno):05d}":
-                return "no_permission"
-
-            # 檢查是否為該員工的主管
-            formatted_report_empno = f"{int(report_empno):05d}"
-            formatted_viewer_empno = f"{int(viewer_empno):05d}"
-
-            supervisor_sql = text("""
-                SELECT COUNT(*) FROM jps.groupfoodchn
-                WHERE cocode = :cocode AND empno = :report_empno AND supervisor = :viewer_empno
-            """)
-            supervisor_result = db.execute(supervisor_sql, {
-                "cocode": report_cocode,
-                "report_empno": formatted_report_empno,
-                "viewer_empno": formatted_viewer_empno
-            })
-            supervisor_row = supervisor_result.fetchone()
-
-            has_supervisor_permission = (supervisor_row and supervisor_row[0] > 0)
-
-            # 檢查Chairman權限
-            if not has_supervisor_permission and viewer_empno in ['00002', '01174', '01376', '02970', 'Z0005']:
-                has_supervisor_permission = True
-
-            if not has_supervisor_permission:
-                return "no_permission"
-
-            # 檢查是否已經審核過
-            approval_sql = text("""
-                SELECT
-                    (SELECT COUNT(*) FROM jps.tdr_reply WHERE daily_no = :report_id AND empno = :viewer_empno) as reply_count,
-                    (SELECT COUNT(*) FROM jps.tdr_score WHERE daily_no = :report_id AND reply_empno = :viewer_empno) as score_count
-            """)
-            approval_result = db.execute(approval_sql, {
-                "report_id": report_id,
-                "viewer_empno": viewer_empno
-            })
-            approval_row = approval_result.fetchone()
-
-            if approval_row and (approval_row[0] > 0 or approval_row[1] > 0):
-                return "approved"
-            else:
-                return "pending"
-
-        except Exception as e:
-            logger.error(f"Error checking supervision status: {str(e)}")
-            return "no_permission"
+    # ✅ 已移除 check_view_permission_for_detail - 權限檢查已整合到 SQL 中
+    # ✅ 已移除 check_supervision_status - 前端未使用此功能

@@ -677,7 +677,8 @@ async def get_daily_homepage_reports(
 
         logger.info(f"Fetching reports for empno={empno}, date={doc_date}, cocode={cocode}, deptno={deptno}")
 
-        # 1. 取得下屬日報列表 (現有邏輯不變)
+        # ✅ 優化: 權限檢查已整合到 SQL 中，無需 Python 迴圈
+        # 1. 取得下屬日報列表 (can_view_detail 已在 SQL 層計算)
         subordinate_reports = SupervisorService.get_daily_homepage_reports(
             db=legacy_db,
             empno=empno,
@@ -686,35 +687,12 @@ async def get_daily_homepage_reports(
             doc_date=doc_date
         )
 
-        # 使用 SupervisorService 為每個下屬報告執行權限檢查
-        for report in subordinate_reports:
-            report_empno = str(report["employee"]["id"])
-            report_cocode = report["employee"]["company_code"]
-
-            # 詳情查看權限檢查
-            report["can_view_detail"] = SupervisorService.check_view_permission_for_detail(
-                db=legacy_db,
-                viewer_empno=empno,
-                report_empno=report_empno,
-                report_cocode=report_cocode
-            )
-
-            # 主管審核狀態檢查
-            report["supervision_status"] = SupervisorService.check_supervision_status(
-                db=legacy_db,
-                viewer_empno=empno,
-                report_id=report["id"],
-                report_empno=report_empno,
-                report_cocode=report_cocode
-            )
-
-        # 2. 取得轉寄日報列表 (新增功能)
+        # 2. 取得轉寄日報列表 (can_view_detail 固定為 True)
         forwarded_reports = SupervisorService.get_forwarded_reports(
             db=legacy_db,
             empno=empno,
             doc_date=doc_date
         )
-        # 轉寄日報的 can_view_detail 已在 service 層設為 True，不需要額外檢查
 
         logger.info(f"Fetched {len(subordinate_reports)} subordinate reports and {len(forwarded_reports)} forwarded reports for user {empno} on date {doc_date}")
 
