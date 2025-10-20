@@ -7,7 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
 import SupervisorDateBar from "./SupervisorDateBar";
 import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 // 新的日報首頁數據結構
 interface HomepageReport {
@@ -61,17 +61,40 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   const [editableStatus, setEditableStatus] = useState<Record<string, boolean>>(
     {}
   );
+
   const navigate = useNavigate();
-  // 日報首頁預設顯示前一天的日報，因為當天的日報通常隔天才審閱
-  // const getDefaultDate = () => {
-  //   const yesterday = new Date();
-  //   yesterday.setDate(yesterday.getDate() - 1);
-  //   return yesterday;
-  // };
+  const [searchParams] = useSearchParams();
+
+  const getDefaultDate = () => {
+    const now = new Date();
+
+    // 建立一個我們要回傳的日期，預設為今天
+    const dateToReturn = new Date();
+
+    // 檢查現在的小時是否早於下午 5 點 (17:00)
+    // getHours() 回傳的是 0-23 的 24 小時制數字
+    if (now.getHours() < 17) {
+      // 如果早於下午 5 點，就將日期設定為昨天
+      dateToReturn.setDate(dateToReturn.getDate() - 1);
+    }
+
+    // 如果時間已是 17:00 或更晚，if 條件不成立，
+    // 就會直接回傳預設的今天日期
+    return dateToReturn;
+  };
+  // ✅ 從 URL 參數讀取日期，如果沒有則使用當天
+  const getInitialDate = () => {
+    const dateParam = searchParams.get("date");
+    if (dateParam) {
+      const [year, month, day] = dateParam.split("-").map(Number);
+      return new Date(year, month - 1, day, 12, 0, 0);
+    }
+    // 使用五點前顯示前一天的邏輯
+    return getDefaultDate();
+  };
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(
-    // getDefaultDate()
-    new Date()
+    getInitialDate()
   );
   const { authFetch, user } = useAuth();
 
@@ -83,6 +106,19 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       setCurrentUserEmpno(user.employee.empno);
     }
   }, [user]);
+
+  // ✅ 監聽 URL 參數變化，同步日期狀態
+  useEffect(() => {
+    const dateParam = searchParams.get("date");
+    if (dateParam) {
+      const [year, month, day] = dateParam.split("-").map(Number);
+      const urlDate = new Date(year, month - 1, day, 12, 0, 0);
+      // 只有當 URL 日期與當前日期不同時才更新
+      if (selectedDate?.toDateString() !== urlDate.toDateString()) {
+        setSelectedDate(urlDate);
+      }
+    }
+  }, [searchParams]);
 
   // 檢查特定日期是否可編輯 (帶快取)
   const checkDateEditable = async (docDate: string) => {
@@ -195,6 +231,12 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
+    // ✅ 同步更新 URL 參數
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const dateString = `${year}-${month}-${day}`;
+    navigate(`?tab=supervisor&date=${dateString}`, { replace: true });
   };
 
   // 處理刪除日報
@@ -450,7 +492,17 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
             <td className="px-4 py-3" style={{ width: "auto" }}>
               {report.can_view_detail ? (
                 <div
-                  onClick={() =>
+                  onClick={() => {
+                    // ✅ 在導航到詳細頁前，先更新 URL 的日期參數
+                    if (selectedDate) {
+                      const year = selectedDate.getFullYear();
+                      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                      const day = String(selectedDate.getDate()).padStart(2, "0");
+                      const dateString = `${year}-${month}-${day}`;
+                      const currentUrl = new URL(window.location.href);
+                      currentUrl.searchParams.set("date", dateString);
+                      window.history.replaceState({}, "", currentUrl.toString());
+                    }
                     onSelectEmployee(
                       {
                         id: report.employee.id,
@@ -460,8 +512,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                         pending_reports_count: 0,
                       },
                       report.id
-                    )
-                  }
+                    );
+                  }}
                   className="text-base text-blue-600 hover:text-blue-900 max-w-xs cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
                 >
                   {report.sop_desc_c || "執行項目"}

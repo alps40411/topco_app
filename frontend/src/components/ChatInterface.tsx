@@ -312,7 +312,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (webType === "EIP") {
           window.location.href = "../TopcoWebCore/InBox";
         } else {
-          navigate("?tab=supervisor");
+          // ✅ 保留當前選擇的日期
+          const dateParam = urlParams.get("date");
+          const url = dateParam
+            ? `?tab=supervisor&date=${dateParam}`
+            : "?tab=supervisor";
+          navigate(url);
         }
       } else {
         const errorData = await response.json();
@@ -383,7 +388,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (webType === "EIP") {
           window.location.href = "../TopcoWebCore/InBox";
         } else {
-          navigate("?tab=supervisor");
+          // ✅ 保留當前選擇的日期
+          const dateParam = urlParams.get("date");
+          const url = dateParam
+            ? `?tab=supervisor&date=${dateParam}`
+            : "?tab=supervisor";
+          navigate(url);
         }
       } else {
         const errorData = await response.json();
@@ -416,7 +426,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (webType === "EIP") {
           window.location.href = "../TopcoWebCore/InBox";
         } else {
-          navigate("?tab=supervisor");
+          // ✅ 保留當前選擇的日期
+          const dateParam = urlParams.get("date");
+          const url = dateParam
+            ? `?tab=supervisor&date=${dateParam}`
+            : "?tab=supervisor";
+          navigate(url);
         }
       } else {
         const errorData = await response.json();

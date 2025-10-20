@@ -238,8 +238,8 @@ function App() {
     setSelectedReportId(null);
     setActiveTab("supervisor");
 
-    // 保留當前的日期參數（如果有的話）
-    const dateParam = searchParams.get("date");
+    // ✅ 保留當前選中的日期：優先使用 globalSelectedDate，其次才是 URL 參數
+    const dateParam = globalSelectedDate || searchParams.get("date");
     const url = dateParam
       ? `?tab=supervisor&date=${dateParam}`
       : "?tab=supervisor";
