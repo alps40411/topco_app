@@ -57,8 +57,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
+      // ✅ 從 URL 讀取 cocode
+      const searchParams = new URLSearchParams(window.location.search);
+      const cocodeFromUrl = searchParams.get("cocode");
+
+      // 建立 API URL，如果 URL 中有 cocode，則附加它
+      let profileUrl = "/api/users/profile";
+      if (cocodeFromUrl) {
+        profileUrl += `?cocode=${cocodeFromUrl}`;
+      }
+
       try {
-        const response = await fetch(buildApiUrl("/api/users/profile"), {
+        const response = await fetch(buildApiUrl(profileUrl), { // ✅ 使用新的 URL
           headers: { Authorization: `Bearer ${storedToken}` },
         });
 

@@ -100,8 +100,10 @@ async def get_current_user(
 
     legacy_db = next(get_legacy_db())
 
-    # ✅ 使用動態 cocode，優先使用 SSO cocode，否則預設為 'A'
-    query_cocode = sso_cocode or 'A'
+    # ✅ 優先從 URL query params 獲取 cocode，其次是 SSO headers，最後預設為 'A'
+    query_param_cocode = request.query_params.get("cocode")
+    query_cocode = query_param_cocode or sso_cocode or 'A'
+    logger.info(f"Determined cocode for query: {query_cocode} (URL: {query_param_cocode}, SSO: {sso_cocode})")
 
     user_sql = text("""
         SELECT a.empno, a.empnamec, a.cocode, a.deptno, a.dutyscript,
