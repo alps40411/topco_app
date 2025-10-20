@@ -46,11 +46,13 @@ async def get_current_user(
             logger.warning(f"JWT decode failed: {str(e)}")
 
     # 嘗試從 SSO Headers 獲取用戶信息
+    sso_cocode = None
     try:
         sso_headers = get_sso_headers_with_mock(request, enable_mock=False)
         sso_empno = sso_headers.get_empno()
+        sso_cocode = sso_headers.get_cocode()  # ✅ 同時獲取 cocode
         if sso_empno:
-            logger.info(f"SSO headers present: empno={sso_empno}")
+            print(f"SSO headers present: empno={sso_empno}, cocode={sso_cocode}")
     except Exception as e:
         logger.warning(f"SSO headers check failed: {str(e)}")
 
@@ -98,15 +100,18 @@ async def get_current_user(
 
     legacy_db = next(get_legacy_db())
 
+    # ✅ 使用動態 cocode，優先使用 SSO cocode，否則預設為 'A'
+    query_cocode = sso_cocode or 'A'
+
     user_sql = text("""
         SELECT a.empno, a.empnamec, a.cocode, a.deptno, a.dutyscript,
                a.mailbox, a.pass, b.deptabbv, a.adm_rank, a.sop_role
         FROM jps.dcd003$master a
         LEFT JOIN jps.dcd002$master b ON a.cocode = b.cocode AND a.deptno = b.deptno
-        WHERE a.empno = :empno AND a.cocode = 'A'
+        WHERE a.empno = :empno AND a.cocode = :cocode
     """)
 
-    result = legacy_db.execute(user_sql, {"empno": empno})
+    result = legacy_db.execute(user_sql, {"empno": empno, "cocode": query_cocode})
     user_row = result.fetchone()
 
     if not user_row:

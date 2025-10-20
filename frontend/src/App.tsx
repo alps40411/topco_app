@@ -13,6 +13,7 @@ import EmployeeListTab from "./components/EmployeeListTab";
 import EmployeeDetailTab from "./components/EmployeeDetailTab";
 import { useAuth } from "./hooks/useAuth";
 import { Toaster } from "react-hot-toast";
+import { getCompanyLogo, getCompanyName } from "./utils/companyLogo";
 
 interface WritingStatus {
   allowed: boolean;
@@ -401,16 +402,22 @@ function App() {
             <div className="flex items-center space-x-3">
               <div className="w-40 h-10 rounded-lg flex items-center justify-center max-w-40 min-w-40">
                 <img
-                  src="/MyReportAI/top_logoA.jpg"
+                  src={getCompanyLogo(user?.employee?.cocode)}
                   alt="業務日誌"
                   className="w-40 h-10 rounded-lg max-w-40 min-w-40"
+                  onError={(e) => {
+                    // 如果圖片載入失敗，使用預設 logo
+                    e.currentTarget.src = '/MyReportAI/top_logoA.jpg';
+                  }}
                 />
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">
                   業務日報
                 </h1>
-                <p className="text-sm text-gray-500">崇越科技</p>
+                <p className="text-sm text-gray-500">
+                  {getCompanyName(user?.employee?.cocode)}
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
