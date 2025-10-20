@@ -400,14 +400,15 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-40 h-10 rounded-lg flex items-center justify-center max-w-40 min-w-40">
+              <div className="w-40 h-13 rounded-lg flex items-center justify-center max-w-40 min-w-40">
                 <img
                   src={getCompanyLogo(user?.employee?.cocode)}
                   alt="業務日誌"
-                  className="w-40 h-10 rounded-lg max-w-40 min-w-40"
+                  className="w-40 h-13 rounded-lg max-w-40 min-w-40"
                   onError={(e) => {
                     // 如果圖片載入失敗，使用預設 logo
-                    e.currentTarget.src = '/MyReportAI/top_logoA.jpg';
+                    e.currentTarget.src = "/MyReportAI/top_logoA.jpg";
+                    console.log("圖片載入失敗，使用預設 logo");
                   }}
                 />
               </div>

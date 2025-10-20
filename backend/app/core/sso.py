@@ -17,50 +17,60 @@ class SSOHeaders:
     def get_empno(self) -> Optional[str]:
         """
         獲取員工編號 (empno)
-        優先順序: Headers > Cookies
+        優先順序: URL Query Params > Headers > Cookies
         """
-        
+
+        # ✅ 從 URL 查詢參數獲取 (最高優先級)
+        # URL 格式: ?userid=03252 或 ?empno=03252
+        query_params = dict(self.request.query_params)
+        for param_name in ["userid", "empno"]:
+            if param_name in query_params:
+                empno = query_params[param_name]
+                if empno:
+                    logger.info(f"Got empno from URL query ({param_name}): {empno}")
+                    return empno.strip()
 
         # 從 Header 獲取
         empno = self.headers.get("wwwuser.empno")
         if empno:
-            
             logger.info(f"Got empno from header: {empno}")
             return empno.strip()
 
         # 從 Cookie 獲取 (如果 Header 沒有)
         empno = self.cookies.get("empno")
         if empno:
-            
             logger.info(f"Got empno from cookie: {empno}")
             return empno.strip()
 
-        
         return None
 
     def get_cocode(self) -> Optional[str]:
         """
         獲取公司代碼 (cocode)
-        優先順序: Headers > Cookies > 默認值 'A'
+        優先順序: URL Query Params > Headers > Cookies > 默認值 'A'
         """
-        
+
+        # ✅ 從 URL 查詢參數獲取 (最高優先級)
+        query_params = dict(self.request.query_params)
+        if "cocode" in query_params:
+            cocode = query_params["cocode"]
+            if cocode:
+                logger.info(f"Got cocode from URL query: {cocode}")
+                return cocode.strip()
 
         # 從 Header 獲取
         cocode = self.headers.get("wwwuser.cocode")
         if cocode:
-            
             logger.info(f"Got cocode from header: {cocode}")
             return cocode.strip()
 
         # 從 Cookie 獲取
         cocode = self.cookies.get("CoCode")
         if cocode:
-            
             logger.info(f"Got cocode from cookie: {cocode}")
             return cocode.strip()
 
         # 默認值
-        
         logger.info("Using default cocode: A")
         return "A"
 
