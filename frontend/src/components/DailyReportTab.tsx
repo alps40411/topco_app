@@ -42,7 +42,10 @@ import { formatMinutesToHours } from "../utils/timeUtils";
 import { RecordsApi } from "../services/recordsApi";
 
 interface DailyRecordCreate
-  extends Omit<WorkRecordCreate, "service_company_id" | "service_target_id" | "work_item_id"> {
+  extends Omit<
+    WorkRecordCreate,
+    "service_company_id" | "service_target_id" | "work_item_id"
+  > {
   work_item_ids?: number[]; // 支援多選工作項目
   service_cocode?: string;
   service_empno?: string;
@@ -308,8 +311,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         prev.map((r) => {
           const rPlanno = r.project?.planno || "NULL";
           return r.daily_no === report.daily_no &&
-                 rPlanno === planno &&
-                 r.sopno === report.sopno
+            rPlanno === planno &&
+            r.sopno === report.sopno
             ? { ...r, ai_content: enhancedReport.ai_content }
             : r;
         })
@@ -374,8 +377,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               prev.map((r) => {
                 const rPlanno = r.project?.planno || "NULL";
                 return r.daily_no === report.daily_no &&
-                       rPlanno === planno &&
-                       r.sopno === report.sopno
+                  rPlanno === planno &&
+                  r.sopno === report.sopno
                   ? { ...r, ai_content: enhancedReport.ai_content }
                   : r;
               })
@@ -480,9 +483,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     const [daily_no, planno, sopno] = editingRecordKey.split("-");
 
     const reportToDelete = reports.find(
-      (r) => r.daily_no === daily_no &&
-             (r.project?.planno || "NULL") === planno &&
-             r.sopno === sopno
+      (r) =>
+        r.daily_no === daily_no &&
+        (r.project?.planno || "NULL") === planno &&
+        r.sopno === sopno
     );
     if (!reportToDelete) {
       toast.error("無法找到記錄資訊");
@@ -552,9 +556,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       const [daily_no, planno, sopno] = editingRecordKey.split("-");
 
       const reportToUpdate = reports.find(
-        (r) => r.daily_no === daily_no &&
-               (r.project?.planno || "NULL") === planno &&
-               r.sopno === sopno
+        (r) =>
+          r.daily_no === daily_no &&
+          (r.project?.planno || "NULL") === planno &&
+          r.sopno === sopno
       );
       if (!reportToUpdate) throw new Error("找不到原始報告");
 
@@ -644,7 +649,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       // 立即跳轉到日報首頁（使用 supervisor tab）
       if (onUploadComplete) {
         // 將 YYYYMMDD 轉換為 YYYY-MM-DD 格式
-        const formattedDate = docDate.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
+        const formattedDate = docDate.replace(
+          /(\d{4})(\d{2})(\d{2})/,
+          "$1-$2-$3"
+        );
         onUploadComplete(formattedDate);
       }
     } catch (error: any) {
@@ -704,7 +712,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     // 僅從 UI 中移除檔案顯示
     try {
       // ✅ 修正：將 HTML 編碼的 &amp; 轉回 &
-      const decodedUrl = urlOrPath.replace(/&amp;/g, '&');
+      const decodedUrl = urlOrPath.replace(/&amp;/g, "&");
 
       // ✅ 修正：直接用完整 URL 比對，不要用 pathname（會丟失查詢參數）
       const targetUrl = decodedUrl.startsWith("http")
@@ -712,29 +720,34 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         : getFullFileUrl(decodedUrl);
 
       // 從 UI 移除檔案 - 只比對完整 URL
-      setEditFiles((prev) => prev.filter((file) => {
-        const fileFullUrl = file.url.startsWith("http")
-          ? file.url
-          : getFullFileUrl(file.url);
+      setEditFiles((prev) =>
+        prev.filter((file) => {
+          const fileFullUrl = file.url.startsWith("http")
+            ? file.url
+            : getFullFileUrl(file.url);
 
-        const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
-        return !isMatch;
-      }));
+          const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
+          return !isMatch;
+        })
+      );
 
       // 從編輯內容中移除圖片標籤 - 需要處理 HTML 編碼的 &amp;
       setEditContent((prev) => {
         let newContent = prev || "";
-        const htmlEncodedUrl = targetUrl.replace(/&/g, '&amp;');
+        const htmlEncodedUrl = targetUrl.replace(/&/g, "&amp;");
 
         // 嘗試原始 URL
-        const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         newContent = newContent.replace(
           new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g"),
           ""
         );
 
         // 嘗試 HTML 編碼的 URL
-        const escapedHtmlUrl = htmlEncodedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedHtmlUrl = htmlEncodedUrl.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        );
         newContent = newContent.replace(
           new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g"),
           ""
@@ -803,73 +816,73 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     }));
   };
 
-  const handleRemoveNewRecordFile = useCallback(
-    async (urlOrPath: string) => {
-      // ✅ REMOVED: 檔案刪除邏輯 - CommonAPI 檔案不實體刪除
-      try {
-        // ✅ 修正：將 HTML 編碼的 &amp; 轉回 &
-        const decodedUrl = urlOrPath.replace(/&amp;/g, '&');
+  const handleRemoveNewRecordFile = useCallback(async (urlOrPath: string) => {
+    // ✅ REMOVED: 檔案刪除邏輯 - CommonAPI 檔案不實體刪除
+    try {
+      // ✅ 修正：將 HTML 編碼的 &amp; 轉回 &
+      const decodedUrl = urlOrPath.replace(/&amp;/g, "&");
 
-        // ✅ 修正：直接用完整 URL 比對，不要用 pathname（會丟失查詢參數）
-        const targetUrl = decodedUrl.startsWith("http")
-          ? decodedUrl
-          : getFullFileUrl(decodedUrl);
+      // ✅ 修正：直接用完整 URL 比對，不要用 pathname（會丟失查詢參數）
+      const targetUrl = decodedUrl.startsWith("http")
+        ? decodedUrl
+        : getFullFileUrl(decodedUrl);
 
-        // 1. 從 newRecord 的 files 列表中移除該檔案
-        setNewRecord((prev) => {
-          const newFiles = (prev.files || []).filter((file) => {
-            // 取得檔案的完整 URL
-            const fileFullUrl = file.url.startsWith("http")
-              ? file.url
-              : getFullFileUrl(file.url);
+      // 1. 從 newRecord 的 files 列表中移除該檔案
+      setNewRecord((prev) => {
+        const newFiles = (prev.files || []).filter((file) => {
+          // 取得檔案的完整 URL
+          const fileFullUrl = file.url.startsWith("http")
+            ? file.url
+            : getFullFileUrl(file.url);
 
-            // 只比對完整 URL
-            const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
+          // 只比對完整 URL
+          const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
 
-            return !isMatch;
-          });
-          return {
-            ...prev,
-            files: newFiles,
-          };
+          return !isMatch;
         });
+        return {
+          ...prev,
+          files: newFiles,
+        };
+      });
 
-        // 2. 從 RichTextEditor 的內容中移除圖片
-        setNewRecord((prev) => {
-          const oldContent = prev.content || "";
-          let newContent = oldContent;
+      // 2. 從 RichTextEditor 的內容中移除圖片
+      setNewRecord((prev) => {
+        const oldContent = prev.content || "";
+        let newContent = oldContent;
 
-          // HTML 中的 & 會被轉義為 &amp;
-          const htmlEncodedUrl = targetUrl.replace(/&/g, '&amp;');
+        // HTML 中的 & 會被轉義為 &amp;
+        const htmlEncodedUrl = targetUrl.replace(/&/g, "&amp;");
 
-          // 嘗試原始 URL
-          const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          newContent = newContent.replace(
-            new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g"),
-            ""
-          );
+        // 嘗試原始 URL
+        const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        newContent = newContent.replace(
+          new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g"),
+          ""
+        );
 
-          // 嘗試 HTML 編碼的 URL
-          const escapedHtmlUrl = htmlEncodedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          newContent = newContent.replace(
-            new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g"),
-            ""
-          );
+        // 嘗試 HTML 編碼的 URL
+        const escapedHtmlUrl = htmlEncodedUrl.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        );
+        newContent = newContent.replace(
+          new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g"),
+          ""
+        );
 
-          return {
-            ...prev,
-            content: newContent,
-          };
-        });
+        return {
+          ...prev,
+          content: newContent,
+        };
+      });
 
-        toast.success("檔案已從清單移除");
-      } catch (error) {
-        console.error("移除檔案時發生錯誤:", error);
-        toast.error("移除檔案失敗");
-      }
-    },
-    []
-  );
+      toast.success("檔案已從清單移除");
+    } catch (error) {
+      console.error("移除檔案時發生錯誤:", error);
+      toast.error("移除檔案失敗");
+    }
+  }, []);
 
   // ✅ REMOVED: cleanupNewRecordTempFiles - CommonAPI 檔案不需要清理
   const cleanupNewRecordTempFiles = useCallback(async () => {
@@ -1015,7 +1028,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           plan_subj_c: undefined,
           sopno: newRecord.execution_work_id?.toString(),
           sop_desc_c: undefined,
-          work_item_seq: newRecord.work_item_ids?.map((id) => id.toString()) || [],
+          work_item_seq:
+            newRecord.work_item_ids?.map((id) => id.toString()) || [],
           work_item_name: undefined,
           service_cocode: newRecord.service_cocode,
           service_empno: newRecord.service_empno,
@@ -1147,6 +1161,12 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     );
   }
 
+  // 計算總執行時間
+  const totalExecutionMinutes = reports.reduce(
+    (sum, report) => sum + (report.total_execution_time_minutes || 0),
+    0
+  );
+
   return (
     <>
       <div className="p-6">
@@ -1212,7 +1232,19 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           </div>
         </div>
 
-        <div className="space-y-6 sm:space-y-8 mt-6">
+        {/* 總執行時間顯示 - 報告列表外部右上角 */}
+        {reports.length > 0 && (
+          <div className="flex justify-end mb-3">
+            <div className="px-3 py-1.5 rounded-lg">
+              <span className="text-sm font-semibold text-gray-500">
+                執行時數 : {formatMinutesToHours(totalExecutionMinutes)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 報告列表區域 */}
+        <div className="space-y-6 sm:space-y-8">
           {reports.map((report) => (
             <div
               key={report.project.id}
@@ -1221,7 +1253,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               } gap-x-4 sm:gap-x-6 gap-y-6 sm:gap-y-12 items-stretch bg-gray-50 p-3 sm:p-4 rounded-xl border`}
             >
               {/* --- Card 1: Original Report --- */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 w-full flex flex-col h-full">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 w-full flex flex-col h-full relative">
                 <div className="mb-4">
                   {/* 第一行：工作計畫與操作按鈕 */}
                   <div className="mb-3">
@@ -1458,9 +1490,19 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                             />
                           )} */}
                         </div>
-                        <AttachedFilesDisplay files={report.files} content={report.content} />
+                        <AttachedFilesDisplay
+                          files={report.files}
+                          content={report.content}
+                        />
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* 執行時間顯示 - 右下角 */}
+                <div className="absolute bottom-4 right-4 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                  {formatMinutesToHours(
+                    report.total_execution_time_minutes || 0
                   )}
                 </div>
               </div>
@@ -1503,23 +1545,23 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               {(() => {
                 const planno = report.project?.planno || "NULL";
                 const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
-                return editingRecordKey === recordKey &&
+                return (
+                  editingRecordKey === recordKey &&
                   isAiViewActive &&
-                  report.ai_content;
+                  report.ai_content
+                );
               })() && (
-                  <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <button
-                      onClick={() =>
-                        handleApplyAiSuggestion(report.ai_content!)
-                      }
-                      className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg hover:bg-gray-100 border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-all duration-200 ease-in-out transform hover:scale-110"
-                      title="套用 AI 建議"
-                    >
-                      <ArrowUp className="w-6 h-6 lg:hidden" />
-                      <ArrowLeft className="w-6 h-6 hidden lg:block" />
-                    </button>
-                  </div>
-                )}
+                <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                  <button
+                    onClick={() => handleApplyAiSuggestion(report.ai_content!)}
+                    className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg hover:bg-gray-100 border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-all duration-200 ease-in-out transform hover:scale-110"
+                    title="套用 AI 建議"
+                  >
+                    <ArrowUp className="w-6 h-6 lg:hidden" />
+                    <ArrowLeft className="w-6 h-6 hidden lg:block" />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
 
@@ -1552,7 +1594,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <CascadingWorkSelector
                   selectedProjectId={newRecord.project_id?.toString()}
                   selectedExecutionWorkId={newRecord.execution_work_id?.toString()}
-                  selectedWorkItemId={newRecord.work_item_ids?.map((id) => id.toString())}
+                  selectedWorkItemId={newRecord.work_item_ids?.map((id) =>
+                    id.toString()
+                  )}
                   onProjectChange={handleProjectChange}
                   onExecutionWorkChange={handleExecutionWorkChange}
                   onWorkItemChange={handleWorkItemChange}

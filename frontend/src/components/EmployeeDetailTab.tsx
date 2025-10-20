@@ -31,14 +31,19 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
     null
   );
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>([]);
+  const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>(
+    []
+  );
   // ✅ 新增: 提取作者資訊並傳遞給 ChatInterface
-  const [reportAuthor, setReportAuthor] = useState<{empno: string, empname: string} | null>(null);
+  const [reportAuthor, setReportAuthor] = useState<{
+    empno: string;
+    empname: string;
+  } | null>(null);
   const { authFetch } = useAuth();
 
   // 從 URL 獲取 status 參數（status=P 表示從郵件進入）
   const urlParams = new URLSearchParams(window.location.search);
-  const status = urlParams.get('status') || undefined;
+  const status = urlParams.get("status") || undefined;
 
   const fetchReportDetails = useCallback(async () => {
     setIsLoading(true);
@@ -53,7 +58,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           const empno = String(specificReport.employee.empno).padStart(5, "0");
           setReportAuthor({
             empno: empno,
-            empname: specificReport.employee.name
+            empname: specificReport.employee.name,
           });
         }
 
@@ -256,11 +261,27 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                   className={TypographyClasses.richTextDisplay}
                   dangerouslySetInnerHTML={{ __html: projectReport.content }}
                 />
-                <AttachedFilesDisplay files={projectReport.files} content={projectReport.content} />
+                <AttachedFilesDisplay
+                  files={projectReport.files}
+                  content={projectReport.content}
+                />
               </div>
             )
           )}
         </div>
+        {/* 最後修改日期時間 - 整個日報內容區塊的底部 */}
+        {reportDetail.consolidated_content &&
+          reportDetail.consolidated_content.length > 0 &&
+          reportDetail.consolidated_content[0].xdate &&
+          reportDetail.consolidated_content[0].xtime && (
+            <div className="pt-3 text-right text-xs text-gray-400">
+              {reportDetail.consolidated_content[0].xdate.replace(
+                /(\d{4})(\d{2})(\d{2})/,
+                "$1/$2/$3"
+              )}{" "}
+              {reportDetail.consolidated_content[0].xtime}
+            </div>
+          )}
       </div>
 
       {/* 下方 - 對話區域 */}

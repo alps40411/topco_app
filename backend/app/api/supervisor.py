@@ -535,7 +535,9 @@ async def get_report_detail_deprecated(
                 "comp_desc": detail_row[14] or "",  # comp_desc
                 "ques_desc": detail_row[17] or "",  # ques_desc
                 "solut_desc": detail_row[19] or "",  # solut_desc
-                "files": files  # 新增檔案列表
+                "files": files,  # 新增檔案列表
+                "xdate": detail_row[23] or "",  # xdate - 最後修改日期
+                "xtime": detail_row[24] or ""   # xtime - 最後修改時間
             }
             consolidated_content.append(content_item)
         

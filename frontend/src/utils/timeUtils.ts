@@ -8,7 +8,9 @@
 export const formatMinutesToHours = (minutes: number): string => {
   if (minutes === 0) return "0 小時";
   const hours = minutes / 60;
-  return `${hours.toFixed(2)} 小時`;
+  // 如果是整數，不顯示小數點；否則顯示最多兩位小數
+  const formattedHours = hours % 1 === 0 ? hours.toString() : hours.toFixed(2).replace(/\.?0+$/, '');
+  return `${formattedHours} 小時`;
 };
 
 /**

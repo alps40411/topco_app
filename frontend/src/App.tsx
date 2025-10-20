@@ -80,6 +80,8 @@ export interface ConsolidatedReport {
   record_count: number;
   ai_content: string | null;
   total_execution_time_minutes?: number;
+  xdate?: string; // 最後修改日期 (YYYYMMDD)
+  xtime?: string; // 最後修改時間 (HH:MM:SS)
 }
 export interface EmployeeInList {
   id: number;
