@@ -43,7 +43,7 @@ async def submit_review(
         
         logger.info(f"提交審閱 daily_no={request.daily_no}, reviewer={current_user.employee.empno}")
         
-        result = ReviewService.submit_review(
+        result = await ReviewService.submit_review(
             db=db,
             daily_no=request.daily_no,
             reviewer_empno=current_user.employee.empno,
@@ -197,7 +197,7 @@ async def acknowledge_report(
 
         logger.info(f"確認日報請求 daily_no={request.daily_no}, user={current_user.employee.empno}")
 
-        result = ReviewService.acknowledge_report(
+        result = await ReviewService.acknowledge_report(
             db=db,
             daily_no=request.daily_no,
             user_empno=current_user.employee.empno,

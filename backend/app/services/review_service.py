@@ -16,7 +16,7 @@ class ReviewService:
     """評分和回復服務"""
     
     @staticmethod
-    def submit_review(
+    async def submit_review(
         db: Session,
         daily_no: str,
         reviewer_empno: str,
@@ -189,7 +189,7 @@ class ReviewService:
             
             # 8. 更新 wfinbox 狀態（透過 CommonAPI）
             try:
-                WfinboxService.update_status_to_read(
+                await WfinboxService.update_status_to_read(
                     empno=reviewer_empno,
                     serino=daily_no
                 )
@@ -380,7 +380,7 @@ class ReviewService:
             raise
 
     @staticmethod
-    def acknowledge_report(
+    async def acknowledge_report(
         db: Session,
         daily_no: str,
         user_empno: str,
@@ -403,7 +403,7 @@ class ReviewService:
 
             # 更新 wfinbox 狀態（透過 CommonAPI）
             try:
-                WfinboxService.update_status_to_read(
+                await WfinboxService.update_status_to_read(
                     empno=user_empno,
                     serino=daily_no
                 )

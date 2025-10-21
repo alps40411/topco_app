@@ -14,7 +14,7 @@ class WfinboxService:
     """工作流信箱服務"""
 
     @staticmethod
-    def update_status_to_read(empno: str, serino: str) -> bool:
+    async def update_status_to_read(empno: str, serino: str) -> bool:
         """
         更新 wfinbox 狀態為已讀 (xstatus = '3')
         透過調用 CommonAPI 的 ChangeWFINBOX 接口
@@ -37,9 +37,9 @@ class WfinboxService:
                 "SERINO": serino     # 日報編號
             }
 
-            # 發送 POST 請求
-            with httpx.Client(timeout=30.0) as client:
-                response = client.post(
+            # 發送 POST 請求 - 改用異步 AsyncClient
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
                     settings.WFINBOX_API_URL,
                     json=payload
                 )

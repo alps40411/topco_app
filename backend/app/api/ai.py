@@ -12,11 +12,18 @@ from ..core.legacy_database import get_legacy_db
 from ..core.deps import get_current_user
 from ..core.config import settings
 from ..schemas.user import User
-from ..services.azure_ai_service import get_ai_enhanced_report, process_attachments_for_ai
-from ..services.phison_ai_service import get_phison_enhanced_report
 
 router = APIRouter(tags=["AI Services"])
 logger = logging.getLogger(__name__)
+
+def _get_ai_services():
+    """Lazy import AI services to avoid loading heavy libraries at startup"""
+    from ..services.azure_ai_service import get_ai_enhanced_report, process_attachments_for_ai
+    from ..services.phison_ai_service import get_phison_enhanced_report
+    return {
+        'azure': (get_ai_enhanced_report, process_attachments_for_ai),
+        'phison': get_phison_enhanced_report
+    }
 
 # ✅ REMOVED: /api/ai/suggestions/{report_id} - Replaced by /api/supervisor/reports/{report_id}/ai-suggestions
 
@@ -167,6 +174,11 @@ async def _generate_enhanced_content(
 ):
     """使用指定的 AI Service 生成增強內容，支援附件處理"""
     try:
+        # 延遲載入 AI 服務
+        services = _get_ai_services()
+        get_ai_enhanced_report, process_attachments_for_ai = services['azure']
+        get_phison_enhanced_report = services['phison']
+        
         logger.info(f"開始生成增強內容，工作描述: {work_description}")
         logger.info(f"原始內容長度: {len(original_content)}")
         
