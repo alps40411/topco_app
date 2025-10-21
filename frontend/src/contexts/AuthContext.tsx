@@ -27,8 +27,6 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
-  hasSubordinates: boolean; // ✅ 新增
-  isCheckingSubordinates: boolean; // ✅ 新增
   writingStatus: WritingStatus | null; // ✅ 新增全域寫入狀態
   refreshWritingStatus: (docDate?: string) => Promise<void>; // ✅ 新增刷新函數
 }
@@ -40,12 +38,10 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true); //  замість isInitialized
-  const [hasSubordinates, setHasSubordinates] = useState(false);
-  const [isCheckingSubordinates, setIsCheckingSubordinates] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [writingStatus, setWritingStatus] = useState<WritingStatus | null>(
     null
-  ); // ✅ 新增全域寫入狀態
+  ); // ✅ 全域寫入狀態
 
   // 在應用程式啟動時驗證 token
   useEffect(() => {
@@ -101,28 +97,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const checkSubordinates = useCallback(async () => {
-    if (!token) return;
-
-    setIsCheckingSubordinates(true);
-    try {
-      const response = await fetch(
-        buildApiUrl("/api/users/has-subordinates"),
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setHasSubordinates(data.has_subordinates);
-      }
-    } catch (error) {
-      setHasSubordinates(false);
-    } finally {
-      setIsCheckingSubordinates(false);
-    }
-  }, [token]);
 
   // ✅ 刷新寫入狀態的函數（改用 dates/range）
   const refreshWritingStatus = useCallback(
@@ -154,17 +128,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [token, user?.employee]
   );
 
-  // ✅ 只在登入後檢查一次下屬關係和寫入狀態
+  // ✅ 只在登入後檢查寫入狀態
   useEffect(() => {
     if (token && user) {
-      checkSubordinates();
       refreshWritingStatus(); // ✅ 載入初始寫入狀態
     } else {
-      setHasSubordinates(false);
-      setIsCheckingSubordinates(false);
       setWritingStatus(null);
     }
-  }, [token, user, checkSubordinates, refreshWritingStatus]);
+  }, [token, user, refreshWritingStatus]);
 
   const login = useCallback((newToken: string, newUser: User) => {
     setToken(newToken);
@@ -253,8 +224,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logout,
         isAuthenticated,
         authFetch,
-        hasSubordinates,
-        isCheckingSubordinates,
         writingStatus, // ✅ 提供全域寫入狀態
         refreshWritingStatus, // ✅ 提供刷新函數
       }}

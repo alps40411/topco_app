@@ -165,7 +165,6 @@ function App() {
     user,
     logout,
     authFetch,
-    hasSubordinates,
     writingStatus,
     refreshWritingStatus,
   } = useAuth(); // ✅ 從 AuthContext 獲取全域狀態
@@ -481,8 +480,7 @@ function App() {
                     {user?.name}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {user?.employee?.dutyscript ||
-                      (hasSubordinates ? "主管" : "員工")}
+                    {user?.employee?.dutyscript || "員工"}
                   </p>
                 </div>
                 <button

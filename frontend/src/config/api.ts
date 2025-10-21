@@ -19,8 +19,6 @@ export const apiConfig = {
     },
     users: {
       profile: "/api/users/profile",
-      permissions: "/api/users/permissions",
-      subordinates: "/api/users/subordinates",
     },
     drafts: {
       base: "/api/drafts",
