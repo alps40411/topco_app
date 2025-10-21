@@ -117,20 +117,11 @@ const aiDrafts = await DraftsApi.getAIDrafts(empno, authFetch);
 ```typescript
 import { RecordsApi } from '@/services/recordsApi';
 
-// 取得今日記錄
-const todayRecords = await RecordsApi.getToday(docDate, authFetch);
-
 // 取得合併的今日記錄
 const consolidated = await RecordsApi.getConsolidatedToday(docDate, authFetch);
 
-// 取得特定項目的記錄
-const projectRecord = await RecordsApi.getConsolidatedByProject(projectId, authFetch);
-
 // 上傳檔案
 const uploadResult = await RecordsApi.uploadFile(file, docDate, authFetch);
-
-// 刪除檔案
-await RecordsApi.deleteFile('202510', 'filename.jpg', authFetch);
 
 // 提交日報
 const submitResult = await RecordsApi.submit(docDate, authFetch);

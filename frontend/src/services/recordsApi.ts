@@ -14,17 +14,6 @@ import type {
 
 export class RecordsApi {
   /**
-   * 取得今日記錄
-   */
-  static async getToday(
-    docDate?: string,
-    authFetch?: (url: string, options?: RequestInit) => Promise<Response>
-  ): Promise<any> {
-    const client = authFetch ? createAuthApiClient(authFetch) : apiClient;
-    return client.get('/api/records/today', docDate ? { doc_date: docDate } : undefined);
-  }
-
-  /**
    * 取得合併的今日記錄
    */
   static async getConsolidatedToday(
@@ -33,17 +22,6 @@ export class RecordsApi {
   ): Promise<ConsolidatedRecord[]> {
     const client = authFetch ? createAuthApiClient(authFetch) : apiClient;
     return client.get<ConsolidatedRecord[]>('/api/records/consolidated/today', docDate ? { doc_date: docDate } : undefined);
-  }
-
-  /**
-   * 取得特定項目的合併記錄
-   */
-  static async getConsolidatedByProject(
-    projectId: string,
-    authFetch?: (url: string, options?: RequestInit) => Promise<Response>
-  ): Promise<{ daily_no: string; consolidated_content: any }> {
-    const client = authFetch ? createAuthApiClient(authFetch) : apiClient;
-    return client.get(`/api/records/consolidated/${projectId}`);
   }
 
   /**

@@ -31,9 +31,7 @@ export const apiConfig = {
     },
     records: {
       base: "/api/records",
-      today: "/api/records/today",
       consolidatedToday: "/api/records/consolidated/today",
-      consolidatedByProject: (projectId: string) => `/api/records/consolidated/${projectId}`,
       upload: "/api/records/upload",
       deleteFile: (yearMonth: string, filename: string) => `/api/records/files/${yearMonth}/${filename}`,
       submit: "/api/records/submit",
