@@ -1,45 +1,78 @@
-# /topco_app/.gitignore
-
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.log
+.env
+.venv
 env/
 venv/
-backend/venv/
-pip-log.txt
-pip-delete-this-directory.txt
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# Node
+# Node.js
 node_modules/
-frontend/node_modules/
-dist/
-dist-ssr/
-*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
+dist/
+dist-ssr/
+*.local
+.cache/
+.vite/
+.npm/
+.eslintcache
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+# IDEs
+.vscode/
 .idea/
+*.swp
+*.swo
+*~
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
 
-# Environment variables
-.env
-.env.*
-backend/.env
-frontend/.env
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
-# Local storage and temporary files
-backend/storage/*
-!backend/storage/.gitkeep
+# Uploads (已使用 CommonAPI，保留供參考)
+backend/uploads/
+backend/storage/
+
+# Logs
+*.log
+logs/
