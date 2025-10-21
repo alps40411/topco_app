@@ -10,16 +10,16 @@ export default defineConfig({
     exclude: ["lucide-react"],
   },
   server: {
-    // <<< 加入這段
-    host: true,
-    port: 5173,
+    host: '0.0.0.0',
+    port: 5000,
+    allowedHosts: true,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8000", // 指向本機的後端服務
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
       "/storage": {
-        target: "http://127.0.0.1:8000", // 代理圖片等靜態資源
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
     },
