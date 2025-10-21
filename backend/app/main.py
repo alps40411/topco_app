@@ -7,8 +7,6 @@ from app.core.config import settings
 from typing import Dict
 import time
 
-from fastapi.staticfiles import StaticFiles
-
 # --- 引入所有需要的 API 路由 ---
 from app.api import supervisor, auth, legacy_reports, reviews, users, reports, drafts, ai, work_data, dates, records
 
@@ -32,10 +30,7 @@ app = FastAPI(
     ],
 )
 
-# --- 掛載 storage 資料夾為靜態檔案目錄 ---
-app.mount("/storage", StaticFiles(directory="storage"), name="storage")
-
-# ✅ REMOVED: uploads 掛載 - 改用 CommonAPI，不再需要本地 uploads 目錄
+# ✅ REMOVED: storage 和 uploads 掛載 - 已全面改用 CommonAPI
 
 # 最寬鬆的CORS設置，允許所有來源
 origins = ["*"]  # 允許所有來源
@@ -60,9 +55,9 @@ async def log_requests(request: Request, call_next):
 
     process_time = time.time() - start_time
 
-    # 只記錄慢請求 (>1秒) 或錯誤請求
-    if process_time > 1.0 or response.status_code >= 400:
-        print(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.2f}s")
+    # 記錄慢請求 (>0.5秒) 或錯誤請求，幫助識別效能瓶頸
+    if process_time > 0.5 or response.status_code >= 400:
+        print(f"⏱️ {request.method} {request.url.path} - {response.status_code} - {process_time:.3f}s")
 
     return response
 
