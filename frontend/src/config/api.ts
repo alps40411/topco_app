@@ -33,7 +33,8 @@ export const apiConfig = {
       base: "/api/records",
       consolidatedToday: "/api/records/consolidated/today",
       upload: "/api/records/upload",
-      deleteFile: (yearMonth: string, filename: string) => `/api/records/files/${yearMonth}/${filename}`,
+      deleteFile: (yearMonth: string, filename: string) =>
+        `/api/records/files/${yearMonth}/${filename}`,
       submit: "/api/records/submit",
     },
     reports: {
@@ -55,7 +56,8 @@ export const apiConfig = {
       base: "/api/supervisor",
       dailyHomepage: "/api/supervisor/daily-homepage",
       forwardCandidates: "/api/supervisor/forward/candidates",
-      aiSuggestions: (reportId: string) => `/api/supervisor/reports/${reportId}/ai-suggestions`,
+      aiSuggestions: (reportId: string) =>
+        `/api/supervisor/reports/${reportId}/ai-suggestions`,
     },
 
     // === 保留用於向後兼容 ===
@@ -66,15 +68,15 @@ export const apiConfig = {
       reportContent: "/api/legacy/reports",
       workPlans: "/api/legacy/work-plans",
       companies: "/api/legacy/companies",
-      drafts: "/api/drafts",                          // 已遷移
+      drafts: "/api/drafts", // 已遷移
       attachments: "/api/legacy/attachments",
-      submit: "/api/records/submit",                  // 已遷移到 records.submit
+      submit: "/api/records/submit", // 已遷移到 records.submit
       workItems: "/api/legacy/work-items",
       serviceCompanies: "/api/legacy/service-companies",
       // nextDailyNo 已棄用 - daily_no 現在由後端 /api/drafts 自動生成
-      executionWorks: "/api/work-data",               // 已遷移到 workData
-      serviceTargets: "/api/work-data",               // 已遷移到 workData
-      workData: "/api/work-data",                     // 已遷移到 workData
+      executionWorks: "/api/work-data", // 已遷移到 workData
+      serviceTargets: "/api/work-data", // 已遷移到 workData
+      workData: "/api/work-data", // 已遷移到 workData
     },
   },
 };
@@ -82,7 +84,9 @@ export const apiConfig = {
 // 輔助函數：構建完整的 API URL
 export const buildApiUrl = (endpoint: string): string => {
   if (API_BASE_URL) {
-    return `${API_BASE_URL}${endpoint}`;
+    const baseUrl = API_BASE_URL.replace(/\/+$/, ""); // 移除末尾所有斜線
+    const path = endpoint.replace(/^\/+/, "/"); // 確保開頭只有一個斜線
+    return `${baseUrl}${path}`;
   }
 
   // 如果沒有設定 API_BASE_URL，使用當前頁面的主機和端口
