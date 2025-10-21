@@ -67,6 +67,7 @@ interface ChatInterfaceProps {
   selectedForwardUsers?: string[]; // 選中的轉寄用戶
   onForwardUsersChange?: (users: string[]) => void; // 轉寄用戶變更回調
   urlStatus?: string; // URL 中的 status 參數，'P' 表示顯示確認按鈕
+  urlReplyId?: string; // ✅ URL 中的 replyid 參數，用於預設回覆目標
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -84,6 +85,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   selectedForwardUsers = [],
   onForwardUsersChange,
   urlStatus,
+  urlReplyId, // ✅ 接收 replyid 參數
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -204,19 +206,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       setReplyTargets(targets);
 
-      // 設定預設選擇：優先選擇日報作者，如果沒有則選第一個
+      // ✅ 設定預設選擇：優先根據 urlReplyId 選擇，其次選擇日報作者
       if (targets.length > 0) {
-        const defaultTarget = targets.find((t) => t.is_author);
-        if (defaultTarget) {
-          setSelectedReplyTargets([defaultTarget.empno]);
-        } else {
-          setSelectedReplyTargets([targets[0].empno]);
+        let defaultSelected: string[] = [];
+
+        // 1. 如果有 urlReplyId，找到對應的 comment，並選擇該 comment 的作者
+        if (urlReplyId && commentsData.length > 0) {
+          const targetComment = commentsData.find(
+            (c) => c.id === parseInt(urlReplyId)
+          );
+          if (targetComment && targetComment.author?.id) {
+            const targetEmpno = String(targetComment.author.id).padStart(5, "0");
+            // 確保這個 empno 在 targets 中存在
+            const targetInList = targets.find((t) => t.empno === targetEmpno);
+            if (targetInList) {
+              defaultSelected = [targetEmpno];
+              console.log(`✅ 根據 replyid=${urlReplyId} 預設回覆給 ${targetInList.empname} (${targetEmpno})`);
+            }
+          }
         }
+
+        // 2. 如果沒有從 urlReplyId 找到，則使用原有邏輯（選擇日報作者）
+        if (defaultSelected.length === 0) {
+          const defaultTarget = targets.find((t) => t.is_author);
+          if (defaultTarget) {
+            defaultSelected = [defaultTarget.empno];
+          } else {
+            defaultSelected = [targets[0].empno];
+          }
+        }
+
+        setSelectedReplyTargets(defaultSelected);
       } else {
         setSelectedReplyTargets([]);
       }
     },
-    [reportAuthor, user?.employee?.empno] // ✅ 依賴 reportAuthor 而非 fetchReportAuthor
+    [reportAuthor, user?.employee?.empno, urlReplyId] // ✅ 新增 urlReplyId 依賴
   );
 
   const fetchComments = useCallback(async () => {

@@ -41,9 +41,10 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   } | null>(null);
   const { authFetch } = useAuth();
 
-  // 從 URL 獲取 status 參數（status=P 表示從郵件進入）
+  // 從 URL 獲取 status 和 replyid 參數（從郵件進入時使用）
   const urlParams = new URLSearchParams(window.location.search);
   const status = urlParams.get("status") || undefined;
+  const replyid = urlParams.get("replyid") || undefined;
 
   const fetchReportDetails = useCallback(async () => {
     setIsLoading(true);
@@ -300,6 +301,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           selectedForwardUsers={selectedForwardUsers}
           onForwardUsersChange={setSelectedForwardUsers}
           urlStatus={status}
+          urlReplyId={replyid} // ✅ 傳遞 replyid 參數
         />
       </div>
 
