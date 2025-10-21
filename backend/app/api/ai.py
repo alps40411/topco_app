@@ -1,6 +1,7 @@
 # backend/app/api/ai.py
 
 from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Dict, Any, Optional
@@ -58,12 +59,15 @@ async def enhance_record(
             WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
         """)
 
-        record_result = db.execute(record_sql, {
-            "daily_no": daily_no,
-            "planno": planno,
-            "sopno": sopno,
-            "empno": empno
-        }).fetchone()
+        # ✅ 使用 threadpool 避免阻塞事件循環
+        record_result = await run_in_threadpool(
+            lambda: db.execute(record_sql, {
+                "daily_no": daily_no,
+                "planno": planno,
+                "sopno": sopno,
+                "empno": empno
+            }).fetchone()
+        )
 
         if not record_result:
             raise HTTPException(status_code=404, detail="Record not found")
@@ -129,16 +133,19 @@ async def enhance_record(
             WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
         """)
         
-        db.execute(update_sql, {
-            "daily_no": daily_no,
-            "planno": planno,
-            "sopno": sopno,
-            "empno": empno,
-            "ai_content": enhanced_content,
-            "ai_service": ai_service
-        })
+        # ✅ 使用 threadpool 避免阻塞事件循環
+        await run_in_threadpool(
+            lambda: db.execute(update_sql, {
+                "daily_no": daily_no,
+                "planno": planno,
+                "sopno": sopno,
+                "empno": empno,
+                "ai_content": enhanced_content,
+                "ai_service": ai_service
+            })
+        )
         
-        db.commit()
+        await run_in_threadpool(db.commit)
         
         planno = record_result[2]
         sop_desc_c = record_result[5]
@@ -157,10 +164,10 @@ async def enhance_record(
         }
         
     except HTTPException:
-        db.rollback()
+        await run_in_threadpool(db.rollback)
         raise
     except Exception as e:
-        db.rollback()
+        await run_in_threadpool(db.rollback)
         logger.error(f"Error enhancing record {daily_no}: {str(e)}")
         raise HTTPException(status_code=500, detail="AI enhancement failed")
 

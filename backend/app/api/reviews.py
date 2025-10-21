@@ -78,7 +78,7 @@ async def get_review_status(
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
         
-        status = ReviewService.get_review_status(
+        status = await ReviewService.get_review_status(
             db=db,
             daily_no=daily_no,
             reviewer_empno=current_user.employee.empno

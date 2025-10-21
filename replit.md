@@ -99,20 +99,27 @@
 - ✅ 延遲載入重度函式庫
 - ✅ 請求計時和錯誤監控
 
-## ⚠️ 技術債務
-**同步資料庫 + 異步端點問題**：
-- 當前使用同步 SQLAlchemy Session 在 async 端點中，會阻塞事件循環
-- **短期解決方案**：使用 `run_in_threadpool` 包裝資料庫操作
-- **長期解決方案**：遷移到 SQLAlchemy AsyncEngine + AsyncSession
+## ✅ 已解決的技術債務
+
+### 同步資料庫 + 異步端點問題（已修復 2025-10-21）
+- **問題**：使用同步 SQLAlchemy Session 在 async 端點中，會阻塞事件循環
+- **解決方案**：使用 `fastapi.concurrency.run_in_threadpool` 包裝所有資料庫操作
+- **修復範圍**：
+  - ✅ `ai.py` - enhance_record 端點（AI 增強功能）
+  - ✅ `review_service.py` - submit_review, acknowledge_report, get_review_status
+  - ✅ 刪除未使用的 `user_service.py`
+- **效果**：消除事件循環阻塞，提升高並發場景下的效能
+- **未來改進**：可考慮遷移到 SQLAlchemy AsyncEngine + AsyncSession 以獲得更好的性能
 
 ## 下一步優化建議（按優先級）
-1. **🔴 高優先級**：修復同步 DB + async 端點問題（使用 run_in_threadpool 或遷移到 AsyncSession）
-2. **🟡 中優先級**：
+1. **🟡 中優先級**：
    - 審查並優化 N+1 查詢問題（使用 joinedload）
    - 為頻繁查詢的欄位加入資料庫索引
    - 為列表端點加入分頁功能
-   - 審查所有 httpx 調用確保有適當的 timeout 和 retry
-3. **🟢 低優先級**：
+   - 批量化循環中的 INSERT 操作（使用 executemany）
+   - 驗證 Oracle driver 線程安全設置（cx_Oracle threaded=True）
+2. **🟢 低優先級**：
    - 前端批次請求優化和資料快取
    - 考慮使用 Redis 快取靜態資料
    - 清理 backend/storage 和 backend/uploads 殘留目錄
+   - 長期：遷移到 SQLAlchemy AsyncEngine + AsyncSession

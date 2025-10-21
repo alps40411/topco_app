@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import json
+from fastapi.concurrency import run_in_threadpool
 
 from ..schemas.review_schemas import ReviewSubmitRequest
 from .wfinbox_service import WfinboxService
@@ -41,7 +42,10 @@ class ReviewService:
                 FROM jps.tdr_master
                 WHERE daily_no = :daily_no
             """)
-            report_result = db.execute(report_author_sql, {"daily_no": daily_no}).fetchone()
+            # ✅ 使用 threadpool 避免阻塞事件循環
+            report_result = await run_in_threadpool(
+                lambda: db.execute(report_author_sql, {"daily_no": daily_no}).fetchone()
+            )
 
             if not report_result:
                 raise ValueError(f"日報 {daily_no} 不存在")
@@ -54,7 +58,9 @@ class ReviewService:
                 WHERE daily_no = :daily_no 
                 ORDER BY daily_sub_nos LIMIT 1
             """)
-            planno_result = db.execute(planno_sql, {"daily_no": daily_no}).fetchone()
+            planno_result = await run_in_threadpool(
+                lambda: db.execute(planno_sql, {"daily_no": daily_no}).fetchone()
+            )
             planno = planno_result[0] if planno_result else None
             
             # 1. 取得下一個回應編號
@@ -63,7 +69,9 @@ class ReviewService:
                 FROM jps.tdr_reply 
                 WHERE daily_no = :daily_no
             """)
-            reply_nos = db.execute(max_reply_sql, {"daily_no": daily_no}).scalar()
+            reply_nos = await run_in_threadpool(
+                lambda: db.execute(max_reply_sql, {"daily_no": daily_no}).scalar()
+            )
             
             # 2. 寫入回應 (如果有回應內容)
             if reply_memo:
@@ -75,22 +83,26 @@ class ReviewService:
                     )
                 """)
 
-                db.execute(reply_sql, {
-                    "daily_no": daily_no,
-                    "reply_nos": reply_nos,
-                    "empno": reviewer_empno,
-                    "memo": reply_memo,
-                    "xuser": reviewer_empname,
-                    "xdate": current_date,
-                    "xtime": current_time
-                })
+                await run_in_threadpool(
+                    lambda: db.execute(reply_sql, {
+                        "daily_no": daily_no,
+                        "reply_nos": reply_nos,
+                        "empno": reviewer_empno,
+                        "memo": reply_memo,
+                        "xuser": reviewer_empname,
+                        "xdate": current_date,
+                        "xtime": current_time
+                    })
+                )
 
                 # 檢查是否為罐頭訊息，如果不是則記錄為特殊訊息
                 is_general_sql = text("""
                     SELECT COUNT(*) FROM jps.TDR_REPLY_GENERAL_COMMENT
                     WHERE memo = :memo
                 """)
-                is_general_count = db.execute(is_general_sql, {"memo": reply_memo}).scalar()
+                is_general_count = await run_in_threadpool(
+                    lambda: db.execute(is_general_sql, {"memo": reply_memo}).scalar()
+                )
 
                 # 如果不是罐頭訊息，則插入特殊訊息記錄
                 if is_general_count == 0:
@@ -100,17 +112,21 @@ class ReviewService:
                         VALUES (:daily_no, :doc_date, :empno, SYSDATE)
                     """)
 
-                    db.execute(insert_special_sql, {
-                        "daily_no": daily_no,
-                        "doc_date": doc_date,
-                        "empno": report_empno
-                    })
+                    await run_in_threadpool(
+                        lambda: db.execute(insert_special_sql, {
+                            "daily_no": daily_no,
+                            "doc_date": doc_date,
+                            "empno": report_empno
+                        })
+                    )
             
             # 3. 回應紀錄 - 取得日報內容項目數量
             detail_count_sql = text("""
                 SELECT COUNT(*) FROM jps.tdr_detail2 WHERE daily_no = :daily_no
             """)
-            detail_count = db.execute(detail_count_sql, {"daily_no": daily_no}).scalar()
+            detail_count = await run_in_threadpool(
+                lambda: db.execute(detail_count_sql, {"daily_no": daily_no}).scalar()
+            )
             
             # 為每個日報內容項目創建回應記錄
             for i in range(1, detail_count + 1):
@@ -122,14 +138,16 @@ class ReviewService:
                     )
                 """)
                 
-                db.execute(reply_detail_sql, {
-                    "daily_no": daily_no,
-                    "daily_sub_nos": i,
-                    "reply_nos": reply_nos,
-                    "xuser": reviewer_empname,
-                    "xdate": current_date,
-                    "xtime": current_time
-                })
+                await run_in_threadpool(
+                    lambda: db.execute(reply_detail_sql, {
+                        "daily_no": daily_no,
+                        "daily_sub_nos": i,
+                        "reply_nos": reply_nos,
+                        "xuser": reviewer_empname,
+                        "xdate": current_date,
+                        "xtime": current_time
+                    })
+                )
             
             # 4. 跨群轉寄 (如果有轉寄用戶)
             if forward_users:
@@ -142,15 +160,17 @@ class ReviewService:
                         )
                     """)
                     
-                    db.execute(msg_send_sql, {
-                        "daily_no": daily_no,
-                        "reply_nos": reply_nos,
-                        "from_empno": reviewer_empno,
-                        "to_empno": fw_user,
-                        "xuser": reviewer_empname,
-                        "xdate": current_date,
-                        "xtime": current_time
-                    })
+                    await run_in_threadpool(
+                        lambda: db.execute(msg_send_sql, {
+                            "daily_no": daily_no,
+                            "reply_nos": reply_nos,
+                            "from_empno": reviewer_empno,
+                            "to_empno": fw_user,
+                            "xuser": reviewer_empname,
+                            "xdate": current_date,
+                            "xtime": current_time
+                        })
+                    )
             
             # 5. 評分 (如果有評分)
             if score is not None:
@@ -162,16 +182,18 @@ class ReviewService:
                     )
                 """)
                 
-                db.execute(score_sql, {
-                    "daily_no": daily_no,
-                    "reply_nos": reply_nos,
-                    "cocode": reviewer_cocode,
-                    "reply_empno": reviewer_empno,
-                    "score": score,
-                    "xuser": reviewer_empname,
-                    "xdate": current_date,
-                    "xtime": current_time
-                })
+                await run_in_threadpool(
+                    lambda: db.execute(score_sql, {
+                        "daily_no": daily_no,
+                        "reply_nos": reply_nos,
+                        "cocode": reviewer_cocode,
+                        "reply_empno": reviewer_empno,
+                        "score": score,
+                        "xuser": reviewer_empname,
+                        "xdate": current_date,
+                        "xtime": current_time
+                    })
+                )
             
             # 6. 更新已回應狀態
             update_master_sql = text("""
@@ -179,10 +201,12 @@ class ReviewService:
                 SET reply_status = 'Y' 
                 WHERE daily_no = :daily_no
             """)
-            db.execute(update_master_sql, {"daily_no": daily_no})
+            await run_in_threadpool(
+                lambda: db.execute(update_master_sql, {"daily_no": daily_no})
+            )
             
             # 7. 處理高階長官特殊邏輯
-            ReviewService._handle_boss_review(
+            await ReviewService._handle_boss_review(
                 db, daily_no, reviewer_empno, reviewer_empname, 
                 forward_users is not None and len(forward_users) > 0
             )
@@ -218,7 +242,9 @@ class ReviewService:
             for i in range(len(ls_total_user)):  # 從0開始，通知所有目標用戶
                 # 取得 EAI 序號
                 eai_seq_sql = text("SELECT nextval('jps.seq_eai_source')")
-                eai_seq = db.execute(eai_seq_sql).scalar()
+                eai_seq = await run_in_threadpool(
+                    lambda: db.execute(eai_seq_sql).scalar()
+                )
 
                 ls_mq.append({
                     "fwUser": ls_total_user[i],
@@ -242,23 +268,25 @@ class ReviewService:
                         )
                     """)
 
-                    db.execute(eai_sql, {
-                        "eai_seq": mq_item["eai"],
-                        "subject": subject,
-                        "cocode": reviewer_cocode,
-                        "xuser": reviewer_empno,
-                        "touser": mq_item["fwUser"],
-                        "doc_date": f"{current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}",
-                        "doc_time": current_time,
-                        "key": daily_no,
-                        "doc_bady": doc_body
-                    })
+                    await run_in_threadpool(
+                        lambda: db.execute(eai_sql, {
+                            "eai_seq": mq_item["eai"],
+                            "subject": subject,
+                            "cocode": reviewer_cocode,
+                            "xuser": reviewer_empno,
+                            "touser": mq_item["fwUser"],
+                            "doc_date": f"{current_date[:4]}/{current_date[4:6]}/{current_date[6:8]}",
+                            "doc_time": current_time,
+                            "key": daily_no,
+                            "doc_bady": doc_body
+                        })
+                    )
 
                 except Exception as eai_error:
                     logger.warning(f"EAI 通知插入失敗: touser={mq_item['fwUser']}, error={str(eai_error)}")
                     # 不要因為EAI失敗而中斷整個流程，繼續處理
 
-            db.commit()
+            await run_in_threadpool(db.commit)
             logger.info(f"成功提交審閱 daily_no={daily_no}, reply_nos={reply_nos}")
             
             return {
@@ -269,12 +297,12 @@ class ReviewService:
             }
             
         except Exception as e:
-            db.rollback()
+            await run_in_threadpool(db.rollback)
             logger.error(f"提交審閱失敗: {str(e)}")
             raise
     
     @staticmethod
-    def _handle_boss_review(
+    async def _handle_boss_review(
         db: Session, 
         daily_no: str, 
         reviewer_empno: str, 
@@ -295,7 +323,9 @@ class ReviewService:
                 SELECT case_reply FROM jps.tdr_boss_daily 
                 WHERE daily_no = :daily_no
             """)
-            existing_reply = db.execute(check_sql, {"daily_no": daily_no}).fetchone()
+            existing_reply = await run_in_threadpool(
+                lambda: db.execute(check_sql, {"daily_no": daily_no}).fetchone()
+            )
             
             if not existing_reply or not existing_reply[0]:
                 # 第一次審閱
@@ -311,16 +341,18 @@ class ReviewService:
                 WHERE daily_no = :daily_no
             """)
             
-            db.execute(update_boss_sql, {
-                "daily_no": daily_no,
-                "case_reply": case_reply
-            })
+            await run_in_threadpool(
+                lambda: db.execute(update_boss_sql, {
+                    "daily_no": daily_no,
+                    "case_reply": case_reply
+                })
+            )
             
         except Exception as e:
             logger.warning(f"處理高階長官審閱邏輯失敗: {str(e)}")
     
     @staticmethod
-    def get_review_status(db: Session, daily_no: str, reviewer_empno: str) -> Dict[str, Any]:
+    async def get_review_status(db: Session, daily_no: str, reviewer_empno: str) -> Dict[str, Any]:
         """取得審閱狀態"""
         
         try:
@@ -329,20 +361,24 @@ class ReviewService:
                 SELECT COUNT(*) FROM jps.tdr_score 
                 WHERE daily_no = :daily_no AND reply_empno = :reply_empno
             """)
-            has_scored = db.execute(score_check_sql, {
-                "daily_no": daily_no, 
-                "reply_empno": reviewer_empno
-            }).scalar() > 0
+            has_scored = await run_in_threadpool(
+                lambda: db.execute(score_check_sql, {
+                    "daily_no": daily_no, 
+                    "reply_empno": reviewer_empno
+                }).scalar() > 0
+            )
             
             # 檢查是否已回應
             reply_check_sql = text("""
                 SELECT COUNT(*) FROM jps.tdr_reply 
                 WHERE daily_no = :daily_no AND empno = :empno
             """)
-            has_replied = db.execute(reply_check_sql, {
-                "daily_no": daily_no, 
-                "empno": reviewer_empno
-            }).scalar() > 0
+            has_replied = await run_in_threadpool(
+                lambda: db.execute(reply_check_sql, {
+                    "daily_no": daily_no, 
+                    "empno": reviewer_empno
+                }).scalar() > 0
+            )
             
             # 取得所有回應記錄
             replies_sql = text("""
@@ -353,7 +389,9 @@ class ReviewService:
                 ORDER BY r.reply_nos DESC
             """)
             
-            reply_results = db.execute(replies_sql, {"daily_no": daily_no}).fetchall()
+            reply_results = await run_in_threadpool(
+                lambda: db.execute(replies_sql, {"daily_no": daily_no}).fetchall()
+            )
             
             reply_records = []
             for row in reply_results:
@@ -396,7 +434,9 @@ class ReviewService:
                 FROM jps.tdr_master
                 WHERE daily_no = :daily_no
             """)
-            report_result = db.execute(report_check_sql, {"daily_no": daily_no}).fetchone()
+            report_result = await run_in_threadpool(
+                lambda: db.execute(report_check_sql, {"daily_no": daily_no}).fetchone()
+            )
 
             if not report_result:
                 raise ValueError(f"日報 {daily_no} 不存在")
@@ -410,7 +450,7 @@ class ReviewService:
             except Exception as e:
                 logger.warning(f"Wfinbox 更新失敗（不影響主流程）: {str(e)}")
 
-            db.commit()
+            await run_in_threadpool(db.commit)
             logger.info(f"成功確認日報 daily_no={daily_no}, user_empno={user_empno}")
 
             return {
@@ -420,6 +460,6 @@ class ReviewService:
             }
 
         except Exception as e:
-            db.rollback()
+            await run_in_threadpool(db.rollback)
             logger.error(f"確認日報失敗: {str(e)}")
             raise
