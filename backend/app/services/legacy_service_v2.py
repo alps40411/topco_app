@@ -415,65 +415,6 @@ class LegacyReportServiceV2:
             logger.error(f"Error fetching work plans: {str(e)}")
             raise
     
-    
-    @staticmethod
-    def save_attachment(
-        db: Session,
-        draft_record_id: str,
-        file_name: str,
-        file_path: str,
-        file_size: int,
-        file_type: str,
-        is_selected_for_ai: bool = False
-    ) -> str:
-        """保存附件到 tdr_draft_attachment 表"""
-        try:
-            from sqlalchemy import text
-            from datetime import datetime
-            
-            # 生成附件ID
-            att_id = str(uuid.uuid4())
-            
-            # 取得daily_no (從draft_record_id中取得)
-            daily_no = draft_record_id
-            
-            # 插入附件記錄
-            insert_sql = text("""
-                INSERT INTO jps.tdr_draft_attachment(
-                    att_id, draft_record_id, daily_no, file_name, file_path, 
-                    file_size, file_type, is_selected_for_ai, upload_date, 
-                    upload_time, status
-                ) VALUES (
-                    :att_id, :draft_record_id, :daily_no, :file_name, :file_path,
-                    :file_size, :file_type, :is_selected_for_ai, :upload_date,
-                    :upload_time, :status
-                )
-            """)
-            
-            now = datetime.now()
-            db.execute(insert_sql, {
-                "att_id": att_id,
-                "draft_record_id": draft_record_id,
-                "daily_no": daily_no,
-                "file_name": file_name,
-                "file_path": file_path,
-                "file_size": file_size,
-                "file_type": file_type,
-                "is_selected_for_ai": is_selected_for_ai,
-                "upload_date": now.strftime('%Y%m%d'),
-                "upload_time": now.strftime('%H%M%S'),
-                "status": 'A'
-            })
-            
-            db.commit()
-            logger.info(f"附件保存成功: att_id={att_id}, file_name={file_name}")
-            return att_id
-            
-        except Exception as e:
-            logger.error(f"Error saving attachment: {str(e)}")
-            db.rollback()
-            raise
-    
     @staticmethod
     def process_files_for_formal_report(
         db: Session,
@@ -621,19 +562,26 @@ class LegacyReportServiceV2:
             file_index = 1
             for file_info in files:
                 file_name = file_info.get('name', '')
+                # ✅ 優先使用 file_path（相對路徑，如 202510/xxxxx.png），如果沒有則使用 url
+                file_relative_path = file_info.get('file_path', '')
                 file_url = file_info.get('url', '')
 
-                if not file_name or not file_url:
-                    logger.warning(f"跳過無效檔案: name={file_name}, url={file_url}")
+                if not file_name:
+                    logger.warning(f"跳過無效檔案: name={file_name}")
+                    continue
+
+                # ✅ 必須有相對路徑才能處理
+                if not file_relative_path:
+                    logger.warning(f"跳過無相對路徑的檔案: name={file_name}, url={file_url}")
                     continue
 
                 # 生成檔案ID: dailyNo * 1000000 + dailySubNos * 1000 + index
                 file_id = int(daily_no) * 1000000 + daily_sub_nos * 1000 + file_index
 
-                # ✅ 所有檔案都使用 CommonAPI URL 格式
-                # CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx
-                file_path = file_url
-                logger.info(f"處理 CommonAPI 檔案: {file_url}")
+                # ✅ 使用相對路徑格式（與 DRAFT 的 ATT_FILE2 格式一致）
+                # 格式: 202510/xxxxx.png
+                file_path = file_relative_path
+                logger.info(f"處理檔案: {file_name} -> 相對路徑: {file_path}")
 
                 # 檢查是否已存在相同ID的記錄
                 check_sql = text("SELECT COUNT(*) FROM jps.tdr_upload_file WHERE id = :id")
