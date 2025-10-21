@@ -216,12 +216,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             (c) => c.id === parseInt(urlReplyId)
           );
           if (targetComment && targetComment.author?.id) {
-            const targetEmpno = String(targetComment.author.id).padStart(5, "0");
+            const targetEmpno = String(targetComment.author.id).padStart(
+              5,
+              "0"
+            );
             // 確保這個 empno 在 targets 中存在
             const targetInList = targets.find((t) => t.empno === targetEmpno);
             if (targetInList) {
               defaultSelected = [targetEmpno];
-              console.log(`✅ 根據 replyid=${urlReplyId} 預設回覆給 ${targetInList.empname} (${targetEmpno})`);
+              console.log(
+                `✅ 根據 replyid=${urlReplyId} 預設回覆給 ${targetInList.empname} (${targetEmpno})`
+              );
             }
           }
         }
@@ -248,7 +253,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!authFetch) return;
     try {
       setIsLoading(true);
-      const response = await authFetch(`/api/reports/${reportId}/comments`);
+      const response = await authFetch(`/api/supervisor/${reportId}/comments`);
       if (response.ok) {
         const responseData = await response.json();
         // 處理 API 返回的資料結構

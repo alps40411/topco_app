@@ -273,7 +273,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     }
 
     try {
-      const response = await authFetch(`/api/reports/${reportId}`, {
+      const response = await authFetch(`/api/records/${reportId}`, {
         method: "DELETE",
       });
 

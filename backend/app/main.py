@@ -8,7 +8,7 @@ from typing import Dict
 import time
 
 # --- 引入所有需要的 API 路由 ---
-from app.api import supervisor, auth, reviews, users, reports, drafts, ai, work_data, dates, records
+from app.api import supervisor, auth, reviews, users, drafts, ai, work_data, dates, records
 
 app = FastAPI(
     title="TSC 業務日誌 API",
@@ -98,7 +98,6 @@ async def warmup_database_pool():
 # === 新的組織化 API 路由 ===
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(users.router, prefix="/api/users")
-app.include_router(reports.router, prefix="/api/reports")
 app.include_router(drafts.router, prefix="/api/drafts")
 app.include_router(records.router, prefix="/api")  # prefix 已在 router 中定義為 /records
 app.include_router(ai.router, prefix="/api/ai")

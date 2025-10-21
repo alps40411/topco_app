@@ -21,6 +21,62 @@ logger = logging.getLogger(__name__)
 
 # ✅ REMOVED: /has-subordinates - 已移至 /api/users/has-subordinates
 
+@router.get("/{report_id}/comments")
+async def get_report_comments(
+    report_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """取得日報的所有留言"""
+    try:
+        if not current_user.employee:
+            raise HTTPException(status_code=400, detail="用戶沒有員工資訊")
+
+        # 查詢回應記錄（包含轉寄資訊）
+        comments_sql = text("""
+            SELECT r.reply_nos, r.empno, r.xuser, r.memo, r.xdate, r.xtime,
+                   s.score,
+                   (SELECT LISTAGG(g.empnamec, ', ') WITHIN GROUP (ORDER BY g.empnamec)
+                    FROM (
+                        SELECT DISTINCT m.to_empno
+                        FROM jps.tdr_msg_send_log m
+                        WHERE m.daily_no = r.daily_no AND m.reply_nos = r.reply_nos
+                    ) m
+                    JOIN jps.groupmember g ON m.to_empno = g.empno
+                   ) as forwarded_to_names
+            FROM jps.tdr_reply r
+            LEFT JOIN jps.tdr_score s ON r.daily_no = s.daily_no AND r.reply_nos = s.reply_nos
+            WHERE r.daily_no = :daily_no
+            ORDER BY r.reply_nos ASC
+        """)
+
+        result = db.execute(comments_sql, {"daily_no": report_id})
+
+        comments = []
+        for row in result.fetchall():
+            comments.append({
+                "id": row[0],  # reply_nos
+                "content": row[3] or "",  # memo
+                "created_at": f"{row[4]} {row[5]}" if row[4] and row[5] else "",
+                "user_id": row[1],  # empno
+                "author": {
+                    "id": row[1],  # empno
+                    "name": row[2] or row[1],  # xuser 或 empno
+                },
+                "rating": row[6],  # score
+                "forwarded_to": row[7],  # 轉寄給誰的姓名列表
+                "replies": []
+            })
+
+        return {
+            "success": True,
+            "data": comments
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting report comments: {str(e)}")
+        raise HTTPException(status_code=500, detail="取得留言失敗")
+
 @router.get("/{daily_no}/approvals")
 async def get_daily_report_approvals(
     daily_no: str,
