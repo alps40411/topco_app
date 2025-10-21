@@ -31,25 +31,6 @@ logger = logging.getLogger(__name__)
 _work_data_cache = {}
 _cache_timeout = timedelta(minutes=10)  # 緩存 10 分鐘
 
-# ✅ REMOVED: /api/legacy/reports - Replaced by /api/supervisor/daily-homepage
-
-# ✅ REMOVED: /api/legacy/reports/{daily_no}/content - Replaced by /api/supervisor/reports/{report_id}
-
-# ✅ REMOVED: /api/legacy/work-plans - Replaced by /api/legacy/work-data
-
-# ✅ REMOVED: /api/legacy/companies - Replaced by /api/legacy/work-data
-
-# ✅ REMOVED: /api/legacy/next-daily-no - Replaced by /api/dates/next-daily-no
-
-# ✅ REMOVED: /api/legacy/attachments - Replaced by /api/records/upload
-
-# 舊的提交端點已移除，請使用 /upload-daily-report 端點
-
-# === 查詢相關 API ===
-
-# 注意：drafts 相關的 GET 和 DELETE API 已移至 app/api/drafts.py
-
-# === 工作計畫相關 API ===
 
 @router.get("/api-status")
 async def get_api_status():
@@ -77,31 +58,6 @@ async def get_api_status():
             "description": "服務對象為非必填項目"
         }
     }
-
-# ✅ REMOVED: /api/legacy/work-items - Replaced by /api/legacy/work-data
-
-# ✅ REMOVED: /api/legacy/service-companies - Duplicate of /api/legacy/companies, replaced by /api/legacy/work-data
-
-
-# ✅ REMOVED: /api/legacy/test-tables - Development only endpoint, not used in production
-
-# ✅ REMOVED: /api/legacy/service-targets - Replaced by /api/work-data (包含在返回結果中)
-
-# ✅ REMOVED: /api/legacy/work-data - Replaced by /api/work-data
-
-# ✅ REMOVED: Records API - Moved to app/api/records.py
-# - GET /api/records/consolidated/today
-# - POST /api/records/upload
-# - DELETE /api/records/delete/{year_month}/{filename}
-# - POST /api/records/upload-record
-# - GET /api/records/consolidated/{project_id}
-# - POST /api/records/
-
-# === Comments API removed - now handled by /api/reports/ ===
-
-# ✅ REMOVED: /api/legacy/upload-daily-report - Moved to /api/records/submit
-# 提交日報功能已遷移到 app/api/records.py 的 /submit 端點
-
 # === Projects API (前端相容性) ===
 projects_router = APIRouter(prefix="/projects", tags=["projects"])
 

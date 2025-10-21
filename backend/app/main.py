@@ -8,7 +8,7 @@ from typing import Dict
 import time
 
 # --- 引入所有需要的 API 路由 ---
-from app.api import supervisor, auth, legacy_reports, reviews, users, reports, drafts, ai, work_data, dates, records
+from app.api import supervisor, auth, reviews, users, reports, drafts, ai, work_data, dates, records
 
 app = FastAPI(
     title="TSC 業務日誌 API",
@@ -107,9 +107,6 @@ app.include_router(dates.router, prefix="/api")  # prefix 已在 router 中定�
 
 # === 現有的 API 路由（保持向後兼容）===
 app.include_router(supervisor.router, prefix="/api/supervisor")
-app.include_router(legacy_reports.router, prefix="/api")
-# app.include_router(legacy_reports.records_router, prefix="/api")  # 已移至 records.py
-app.include_router(legacy_reports.projects_router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 
 @app.get("/")

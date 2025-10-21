@@ -66,8 +66,9 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
       );
     }
 
-    // 設定初始下拉選單的狀態
-    if (!selectedProjectId) {
+    // 🔧 修正: 只在完全沒有選擇時才自動設定第一個選項
+    // 避免覆蓋編輯模式時傳入的預設值
+    if (!selectedProjectId && !selectedExecutionWorkId) {
       const basicWorks = workData.basic_execution_works || [];
       setCurrentExecutionWorks(basicWorks);
       if (basicWorks.length > 0) {
@@ -95,17 +96,16 @@ const CascadingWorkSelector: React.FC<CascadingWorkSelectorProps> = ({
 
     setCurrentExecutionWorks(executionWorks);
 
-    if (executionWorks.length > 0 && !selectedExecutionWorkId) {
-      const firstExecutionWork = executionWorks[0];
-      onExecutionWorkChange(firstExecutionWork.sopno);
-    } else if (executionWorks.length === 0) {
+    // 🔧 修正: 移除自動選擇第一個選項的邏輯
+    // 這會覆蓋編輯模式時傳入的預設值
+    // 只有在執行工作列表為空時才清除選擇
+    if (executionWorks.length === 0 && selectedExecutionWorkId) {
       onExecutionWorkChange(undefined);
     }
 
-    if (!selectedExecutionWorkId) {
-      onWorkItemChange([]);
-    }
-  }, [selectedProjectId, selectedExecutionWorkId, workData]);
+    // 🔧 修正: 移除自動清空工作項目的邏輯
+    // 讓父組件自己決定何時清空
+  }, [selectedProjectId, workData]);
 
   // ✅ 修改: 依賴 selectedExecutionWorkId 的 useEffect
   useEffect(() => {

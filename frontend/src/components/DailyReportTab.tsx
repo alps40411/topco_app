@@ -18,7 +18,6 @@ import type {
   ConsolidatedReport,
   FileAttachment,
   FileForUpload,
-  Project,
   WorkRecordCreate,
 } from "../App";
 import { getProjectColors, blueButtonStyle } from "../utils/colorUtils";
@@ -75,7 +74,6 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   onSwitchToDaily,
 }) => {
   const [reports, setReports] = useState<ConsolidatedReport[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   // ✅ writingStatus 改用 AuthContext 的全域狀態
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -211,25 +209,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   // ✅ 移除本地的 fetchWritingStatus，改用 AuthContext 的 refreshWritingStatus
 
-  const fetchProjects = async () => {
-    if (!authFetch) return;
-    try {
-      const response = await authFetch("/api/projects/");
-      if (response.ok) {
-        setProjects(await response.json());
-      }
-    } catch (error) {
-      console.error("無法獲取專案列表:", error);
-      toast.error("無法獲取專案列表");
-    }
-  };
-
   // ✅ 修復: 合併兩個 useEffect，避免重複 API 呼叫
   useEffect(() => {
     if (!authFetch) return;
-
-    // 只在初始化時載入專案列表
-    fetchProjects();
 
     const docDate = selectedDate ? selectedDate.replace(/-/g, "") : undefined;
 
@@ -436,10 +418,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setEditContent(content);
     setEditFiles(files);
 
-    // 載入所有編輯欄位的值
-    setEditProjectId(
-      report.project?.id ? Number(report.project.id) : undefined
-    );
+    // 🔧 修正: 先設定所有編輯欄位的值（按正確順序）
+    // 注意：工作計畫使用 planno，但如果是 "NULL" 則表示沒有工作計畫
+    const projectId = report.project?.planno && report.project.planno !== "NULL"
+      ? parseInt(report.project.planno)
+      : undefined;
+
+    setEditProjectId(projectId);
     setEditExecutionWorkId(report.execution_work_id);
     setEditWorkItemIds(report.work_item_ids || []);
     setEditServiceCocode(report.service_cocode);
@@ -448,6 +433,15 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setEditServiceTargetCocode(report.service_target_cocode);
     setEditServiceDeptno(report.service_deptno);
     setEditExecutionTimeMinutes(report.total_execution_time_minutes || 0);
+
+    console.log("📝 開始編輯記錄:", {
+      recordKey,
+      projectId,
+      executionWorkId: report.execution_work_id,
+      workItemIds: report.work_item_ids,
+      serviceCocode: report.service_cocode,
+      serviceEmpno: report.service_empno,
+    });
 
     // ✅ REMOVED: pending 列表清空 - CommonAPI 不需要
   };
