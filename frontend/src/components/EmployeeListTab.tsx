@@ -132,19 +132,24 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   // ✅ 監聽 URL 參數變化，同步日期狀態
   useEffect(() => {
     const dateParam = searchParams.get("date");
+    console.log(`[EmployeeListTab] URL date 參數變化: ${dateParam}`);
+
     if (dateParam) {
       const urlDate = parseDateParam(dateParam);
-      // 只有當 URL 日期有效且與當前日期不同時才更新
-      if (urlDate && selectedDate?.toDateString() !== urlDate.toDateString()) {
-        setSelectedDate(urlDate);
-      }
-    } else {
-      // ✅ URL 沒有 date 參數時，重置為預設日期
-      const defaultDate = getDefaultDate();
-      if (selectedDate?.toDateString() !== defaultDate.toDateString()) {
-        setSelectedDate(defaultDate);
+      if (urlDate) {
+        console.log(`[EmployeeListTab] ✅ 設定日期為: ${urlDate.toDateString()}`);
+        // 使用函數式更新,確保比較的是最新狀態
+        setSelectedDate(prevDate => {
+          if (prevDate?.toDateString() !== urlDate.toDateString()) {
+            console.log(`[EmployeeListTab] 日期已更新: ${prevDate?.toDateString()} -> ${urlDate.toDateString()}`);
+            return urlDate;
+          }
+          console.log(`[EmployeeListTab] 日期相同,不更新: ${prevDate?.toDateString()}`);
+          return prevDate;
+        });
       }
     }
+    // ✅ 修復:移除自動重置為預設日期的邏輯,避免覆蓋從其他頁面傳入的日期
   }, [searchParams]);
 
   // 檢查特定日期是否可編輯 (帶快取)
@@ -184,6 +189,10 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   useEffect(() => {
     if (!selectedDate) return; // Don't fetch if date is null
 
+    // ✅ 使用 AbortController 來取消過期的請求
+    const abortController = new AbortController();
+    let isCancelled = false;
+
     const fetchHomepageReports = async () => {
       setIsLoading(true);
       // 確保使用本地日期，避免時區問題
@@ -192,14 +201,30 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       const day = String(selectedDate.getDate()).padStart(2, "0");
       const dateString = `${year}-${month}-${day}`;
 
+      console.log(`[EmployeeListTab] 🔍 開始載入日報資料: ${dateString} (${selectedDate.toDateString()})`);
+
       try {
         // 使用新的日報首頁API
         const response = await authFetch(
           `/api/supervisor/daily-homepage?date=${dateString}`
         );
 
+        // ✅ 檢查請求是否已被取消
+        if (isCancelled) {
+          console.log(`[EmployeeListTab] ⚠️ 請求已取消,忽略 ${dateString} 的回應`);
+          return;
+        }
+
         if (response.ok) {
           const data: HomepageData = await response.json();
+
+          // ✅ 再次檢查請求是否已被取消(避免 JSON 解析後狀態改變)
+          if (isCancelled) {
+            console.log(`[EmployeeListTab] ⚠️ 請求已取消,忽略 ${dateString} 的資料更新`);
+            return;
+          }
+
+          console.log(`[EmployeeListTab] ✅ 成功載入 ${dateString} 的資料`);
 
           setSubordinateReports(data.subordinate_reports || []);
           // 為轉寄日報標記 is_forwarded_to_me
@@ -245,15 +270,29 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
           setSubordinateReports([]);
           setForwardedReports([]);
         }
-      } catch (error) {
+      } catch (error: any) {
+        // ✅ 忽略被取消的請求錯誤
+        if (error.name === 'AbortError' || isCancelled) {
+          console.log(`[EmployeeListTab] 請求已取消: ${dateString}`);
+          return;
+        }
         console.error("無法獲取日報首頁列表:", error);
         setSubordinateReports([]);
         setForwardedReports([]);
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
     fetchHomepageReports();
+
+    // ✅ Cleanup: 當 selectedDate 改變時,取消前一個請求
+    return () => {
+      console.log(`[EmployeeListTab] 🚫 取消請求 (日期改變)`);
+      isCancelled = true;
+      abortController.abort();
+    };
   }, [selectedDate, authFetch]);
 
   const handleDateChange = (date: Date) => {
