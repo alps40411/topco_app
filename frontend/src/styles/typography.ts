@@ -85,7 +85,7 @@ export const TypographyClasses = {
   navItemActive: `${TypographyStandards.secondary.navigation} font-semibold`,
 
   // 富文本
-  richTextDisplay: `${TypographyStandards.richText.display} text-gray-700 leading-relaxed prose prose-sm max-w-none`,
+  richTextDisplay: `${TypographyStandards.richText.display} text-gray-700 leading-relaxed prose prose-sm max-w-none break-words overflow-hidden`,
 } as const;
 
 /**

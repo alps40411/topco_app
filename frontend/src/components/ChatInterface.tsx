@@ -721,9 +721,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         </>
       )}
-      <div className="p-4 bg-gray-50">
+      <div className="p-3 sm:p-4 bg-gray-50">
         {/* 統一的瞭解!/確認按鈕 */}
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end mt-3 sm:mt-4">
           <button
             onClick={() => {
               // 只判斷 URL 中的 status 參數
@@ -743,7 +743,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               }
             }}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             {isSubmitting ? "送出中..." : urlStatus === "P" ? "確認" : "瞭解 !"}
           </button>
@@ -753,16 +753,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4">
           {isReportSupervisor && !hasSubmittedReview && !isReportAuthor && (
             <div className="mb-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-blue-900 flex items-center">
-                    <Crown className="w-4 h-4 mr-2" />
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                {/* 大螢幕：標題和選擇器同一行（右側） */}
+                <div className="hidden md:flex items-center justify-between mb-3">
+                  <h4 className="text-base font-medium text-blue-900 flex items-center">
+                    <Crown className="w-5 h-5 mr-2" />
                     主管評分與回饋
                   </h4>
-                  {/* 回應目標選擇器 - 放在標題右側 */}
+                  {/* 回應目標選擇器 - 右側 */}
                   {replyTargets.length > 0 && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-blue-700">回應給：</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-blue-700 whitespace-nowrap">回應給：</span>
                       <select
                         value={
                           selectedReplyTargets.length === replyTargets.length
@@ -781,12 +782,54 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             setSelectedReplyTargets([value]);
                           }
                         }}
-                        className="text-xs border border-blue-300 rounded px-2 py-1 bg-white text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="text-sm border border-blue-300 rounded px-2 py-1.5 bg-white text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         {replyTargets.map((target) => (
                           <option key={target.empno} value={target.empno}>
                             {target.empname}
-                            {/* {target.is_author ? " (作者)" : ""} */}
+                          </option>
+                        ))}
+                        {replyTargets.length > 1 && (
+                          <option value="all">全部</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* 小螢幕：標題和選擇器垂直排列 */}
+                <div className="md:hidden flex flex-col gap-2 mb-3">
+                  <h4 className="text-sm font-medium text-blue-900 flex items-center">
+                    <Crown className="w-4 h-4 mr-2" />
+                    主管評分與回饋
+                  </h4>
+                  {/* 回應目標選擇器 - 下方 */}
+                  {replyTargets.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-blue-700 whitespace-nowrap">回應給：</span>
+                      <select
+                        value={
+                          selectedReplyTargets.length === replyTargets.length
+                            ? "all"
+                            : selectedReplyTargets[0] || ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "all") {
+                            setSelectedReplyTargets(
+                              replyTargets
+                                .map((t) => t.empno)
+                                .filter((empno) => empno)
+                            );
+                          } else if (value) {
+                            setSelectedReplyTargets([value]);
+                          }
+                        }}
+                        className="flex-1 text-xs border border-blue-300 rounded px-2 py-1.5 bg-white text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {replyTargets.map((target) => (
+                          <option key={target.empno} value={target.empno}>
+                            {target.empname}
                           </option>
                         ))}
                         {replyTargets.length > 1 && (
@@ -800,8 +843,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <span className="text-sm font-medium text-gray-700 mr-4">
                     評分:
                   </span>
+
+                  {/* 小螢幕：下拉式選單 */}
+                  <select
+                    value={selectedRating}
+                    onChange={(e) => setSelectedRating(Number(e.target.value))}
+                    className="md:hidden w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {ratingOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* 大螢幕：按鈕組 */}
                   <div
-                    className="inline-flex rounded-md shadow-sm"
+                    className="hidden md:inline-flex rounded-md shadow-sm"
                     role="group"
                   >
                     {ratingOptions.map((option) => (
@@ -827,22 +885,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                 {/* 建議回復區塊 */}
                 <div className="mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-blue-700">快速回覆建議：</p>
+                  {/* 標題和AI按鈕改為垂直排列（小螢幕） */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                    <p className="text-xs sm:text-sm text-blue-700">快速回覆建議：</p>
                     <button
                       onClick={handleGetAISuggestions}
                       disabled={isLoadingAI}
-                      className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs rounded-full hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
+                      className="inline-flex items-center justify-center px-2.5 sm:px-3 py-1.5 sm:py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs rounded-full hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg w-full sm:w-auto"
                     >
                       {isLoadingAI ? (
                         <>
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          生成中...
+                          <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                          <span>生成中...</span>
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          AI 產生建議
+                          <Sparkles className="w-3 h-3 mr-1.5" />
+                          <span>AI 產生建議</span>
                         </>
                       )}
                     </button>
@@ -850,87 +909,70 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                   {/* AI 建議 (垂直排列, Tag 樣式) */}
                   {showAISuggestions && aiSuggestions.length > 0 && (
-                    <div className="flex flex-col items-start gap-2 mb-3">
+                    <div className="flex flex-col items-stretch gap-2 mb-3 w-full">
                       {aiSuggestions.map((suggestion, index) => (
                         <button
                           key={`ai-${index}`}
                           onClick={() => handleSelectAISuggestion(suggestion)}
-                          className="px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-full hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 text-left max-w-full break-words whitespace-normal leading-snug"
+                          className="px-2 sm:px-2.5 py-1.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-xs rounded-lg hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 text-left w-full"
                         >
-                          <span className="inline-flex items-start">
-                            <span className="mr-1 flex-shrink-0">✨</span>
-                            <span className="flex-1">{suggestion.content}</span>
+                          <span className="flex items-start gap-1">
+                            <span className="flex-shrink-0">✨</span>
+                            <span className="flex-1 break-words">{suggestion.content}</span>
                           </span>
                         </button>
                       ))}
                     </div>
                   )}
 
-                  {/* 主管常用回覆 (水平展開/收合) - NEW ANIMATION */}
-                  <div
-                    className="relative flex items-center"
-                    style={{ minHeight: "32px" }}
-                  >
-                    {/* The expanded content, positioned to appear when active */}
-                    <div
-                      className={`flex items-center transition-all duration-300 ease-in-out ${
-                        isSupervisorRepliesExpanded
-                          ? "opacity-100 transform scale-100"
-                          : "opacity-0 transform scale-95 pointer-events-none"
-                      }`}
+                  {/* 主管常用回覆 (水平展開/收合) */}
+                  {!isSupervisorRepliesExpanded ? (
+                    /* 收合狀態：只顯示展開按鈕 */
+                    <button
+                      onClick={() => setIsSupervisorRepliesExpanded(true)}
+                      className="flex items-center px-2 sm:px-2.5 py-1 sm:py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-all duration-200 border border-blue-200"
                     >
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {supervisorSuggestedReplies.map((reply, index) => (
-                          <button
-                            key={`default-${index}`}
-                            onClick={() => setReviewComment(reply)}
-                            className="px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200 whitespace-nowrap"
-                          >
-                            {reply}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Collapse button */}
+                      <span>常用回覆</span>
+                      <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1" />
+                    </button>
+                  ) : (
+                    /* 展開狀態：顯示所有回覆選項 */
+                    <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                      {supervisorSuggestedReplies.map((reply, index) => (
+                        <button
+                          key={`default-${index}`}
+                          onClick={() => setReviewComment(reply)}
+                          className="px-2 sm:px-2.5 py-1 sm:py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors border border-blue-200 whitespace-nowrap"
+                        >
+                          {reply}
+                        </button>
+                      ))}
+                      {/* 收起按鈕 */}
                       <button
                         onClick={() => setIsSupervisorRepliesExpanded(false)}
-                        className="ml-2 flex flex-shrink-0 items-center px-2.5 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-full hover:bg-gray-200 transition-colors border border-gray-200 whitespace-nowrap"
+                        className="flex flex-shrink-0 items-center px-2 sm:px-2.5 py-1 sm:py-1.5 bg-gray-100 text-gray-700 text-xs rounded-full hover:bg-gray-200 transition-colors border border-gray-200 whitespace-nowrap"
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span className="hidden sm:inline ml-1">收起</span>
                       </button>
                     </div>
-
-                    {/* The "Expand" button, which disappears when content is shown */}
-                    <button
-                      onClick={() => setIsSupervisorRepliesExpanded(true)}
-                      className={`absolute top-0 left-0 flex items-center px-2.5 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-all duration-300 ease-in-out border border-blue-200 ${
-                        isSupervisorRepliesExpanded
-                          ? "opacity-0 scale-95 pointer-events-none"
-                          : "opacity-100 scale-100"
-                      }`}
-                      aria-expanded={isSupervisorRepliesExpanded}
-                    >
-                      <span>常用回覆</span>
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </button>
-                  </div>
+                  )}
                 </div>
 
                 <textarea
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
                   placeholder="請輸入您的審閱意見..."
-                  className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                  className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 text-base"
                   rows={4}
                   disabled={isSubmitting}
                 />
 
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
                   <button
                     onClick={() => handleSubmitReview(false)}
                     disabled={isSubmitting}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
                     {isSubmitting ? "提交中..." : "提交評分"}
                   </button>
@@ -952,7 +994,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       }
                     }}
                     disabled={isSubmitting}
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
                   >
                     清除重寫
                   </button>
@@ -972,17 +1014,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           )}
           {(!isReportSupervisor || hasSubmittedReview || isReportAuthor) && (
             <div>
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-slate-900 flex items-center">
-                    <User className="w-4 h-4 mr-2" />
-                    {/* 作者本人顯示「員工回覆」，其他所有人（主管已評分、第三方用戶）都顯示「追加留言」 */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:p-4">
+                {/* 大螢幕：標題和選擇器同一行（右側） */}
+                <div className="hidden md:flex items-center justify-between mb-3">
+                  <h4 className="text-base font-medium text-slate-900 flex items-center">
+                    <User className="w-5 h-5 mr-2" />
                     {isReportAuthor ? "員工回覆" : "追加留言"}
                   </h4>
-                  {/* 回應目標選擇器 - 放在標題右側 */}
                   {replyTargets.length > 0 && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-slate-700">回應給：</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-700 whitespace-nowrap">回應給：</span>
                       <select
                         value={
                           selectedReplyTargets.length === replyTargets.length
@@ -1001,12 +1042,53 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             setSelectedReplyTargets([value]);
                           }
                         }}
-                        className="text-xs border border-slate-300 rounded px-2 py-1 bg-white text-slate-700 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        className="text-sm border border-slate-300 rounded px-2 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                       >
                         {replyTargets.map((target) => (
                           <option key={target.empno} value={target.empno}>
                             {target.empname}
-                            {/* {target.is_author ? " (作者)" : ""} */}
+                          </option>
+                        ))}
+                        {replyTargets.length > 1 && (
+                          <option value="all">全部</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* 小螢幕：標題和選擇器垂直排列 */}
+                <div className="md:hidden flex flex-col gap-2 mb-3">
+                  <h4 className="text-sm font-medium text-slate-900 flex items-center">
+                    <User className="w-4 h-4 mr-2" />
+                    {isReportAuthor ? "員工回覆" : "追加留言"}
+                  </h4>
+                  {replyTargets.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-700 whitespace-nowrap">回應給：</span>
+                      <select
+                        value={
+                          selectedReplyTargets.length === replyTargets.length
+                            ? "all"
+                            : selectedReplyTargets[0] || ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "all") {
+                            setSelectedReplyTargets(
+                              replyTargets
+                                .map((t) => t.empno)
+                                .filter((empno) => empno)
+                            );
+                          } else if (value) {
+                            setSelectedReplyTargets([value]);
+                          }
+                        }}
+                        className="flex-1 text-xs border border-slate-300 rounded px-2 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      >
+                        {replyTargets.map((target) => (
+                          <option key={target.empno} value={target.empno}>
+                            {target.empname}
                           </option>
                         ))}
                         {replyTargets.length > 1 && (
@@ -1017,8 +1099,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   )}
                 </div>
                 <div className="mb-3">
-                  <p className="text-xs text-slate-700 mb-2">快速回覆建議：</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-xs sm:text-sm text-slate-700 mb-2">快速回覆建議：</p>
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {/* 只有作者本人顯示員工回覆建議，其他所有人都顯示主管回覆建議 */}
                     {(isReportAuthor
                       ? suggestedReplies
@@ -1027,7 +1109,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       <button
                         key={index}
                         onClick={() => setNewMessage(reply)}
-                        className="px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded hover:bg-slate-200 transition-colors border border-slate-200"
+                        className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-100 text-slate-700 text-xs sm:text-sm rounded hover:bg-slate-200 transition-colors border border-slate-200"
                       >
                         {reply}
                       </button>
@@ -1041,22 +1123,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   placeholder={
                     isReportAuthor ? "輸入您的回覆..." : "輸入追加留言..."
                   }
-                  className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3"
+                  className="w-full p-3 border border-gray-300 rounded resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent mb-3 text-base"
                   rows={4}
                   disabled={isSubmitting}
                 />
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
                   <button
                     onClick={() => handleSubmitMessage()}
                     disabled={isSubmitting}
-                    className="px-4 py-2 bg-slate-500 text-white rounded hover:bg-slate-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-slate-500 text-white rounded hover:bg-slate-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
                     {isSubmitting ? "提交中..." : "確認送出"}
                   </button>
                   <button
                     onClick={() => setNewMessage("")}
                     disabled={isSubmitting}
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-300 transition-colors"
                   >
                     清除重寫
                   </button>

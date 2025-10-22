@@ -420,9 +420,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
     // 🔧 修正: 先設定所有編輯欄位的值（按正確順序）
     // 注意：工作計畫使用 planno，但如果是 "NULL" 則表示沒有工作計畫
-    const projectId = report.project?.planno && report.project.planno !== "NULL"
-      ? parseInt(report.project.planno)
-      : undefined;
+    const projectId =
+      report.project?.planno && report.project.planno !== "NULL"
+        ? parseInt(report.project.planno)
+        : undefined;
 
     setEditProjectId(projectId);
     setEditExecutionWorkId(report.execution_work_id);
@@ -1163,31 +1164,31 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   return (
     <>
-      <div className="p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 sm:mb-6 space-y-4 lg:space-y-0">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:space-x-4">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 h-6 sm:h-8 flex items-center">
+      <div className="p-2 sm:p-4 md:p-6">
+        <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1 min-w-0">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
                 日報編輯
               </h2>
               {writingStatus && (
-                <div className="flex flex-col sm:flex-row sm:items-center mt-1 text-base text-gray-600">
-                  <span className="mr-0 sm:mr-2">
-                    🕐 {writingStatus.current_time}
+                <div className="flex flex-col xs:flex-row xs:items-center mt-1 text-xs sm:text-sm md:text-base text-gray-600 gap-1 xs:gap-2">
+                  <span>🕐 {writingStatus.current_time}</span>
+                  <span className="text-blue-600 truncate">
+                    {writingStatus.message}
                   </span>
-                  <span className="text-blue-600">{writingStatus.message}</span>
                 </div>
               )}
             </div>
             <DateSelector
               selectedDate={selectedDate || ""}
               onDateChange={handleDateChange}
-              className="mt-2 lg:mt-0"
+              className="w-full xs:w-auto flex-shrink-0"
               onRefreshRef={dateRefreshRef}
               showOnlyWritableDates={false}
             />
           </div>
-          <div className="flex flex-row items-center gap-3">
+          <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
               disabled={editingRecordKey !== null || generatingAiFor.size > 0}
@@ -1238,16 +1239,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         )}
 
         {/* 報告列表區域 */}
-        <div className="space-y-6 sm:space-y-8">
+        <div className="space-y-4 sm:space-y-6 md:space-y-8">
           {reports.map((report) => (
             <div
               key={report.project.id}
               className={`relative grid grid-cols-1 ${
-                isAiViewActive ? "xl:grid-cols-2" : ""
-              } gap-x-4 sm:gap-x-6 gap-y-6 sm:gap-y-12 items-stretch bg-gray-50 p-3 sm:p-4 rounded-xl border`}
+                isAiViewActive ? "lg:grid-cols-2" : ""
+              } gap-x-3 sm:gap-x-4 lg:gap-x-6 gap-y-4 sm:gap-y-6 lg:gap-y-12 items-stretch bg-gray-50 p-2 sm:p-3 md:p-4 rounded-xl border overflow-hidden`}
             >
               {/* --- Card 1: Original Report --- */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 w-full flex flex-col h-full relative">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 w-full flex flex-col h-full relative min-w-0">
                 <div className="mb-4">
                   {/* 第一行：工作計畫與操作按鈕 */}
                   <div className="mb-3">
@@ -1275,31 +1276,33 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                               isGeneratingAllAi ||
                               editingRecordKey !== null
                             }
-                            className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
+                            className="inline-flex items-center justify-center px-2 py-1 text-xs sm:text-sm font-medium rounded-md bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-200 border border-purple-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:border-gray-300"
                           >
                             {(() => {
                               const planno = report.project?.planno || "NULL";
                               const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
                               return generatingAiFor.has(reportKey);
                             })() ? (
-                              <div className="w-4 h-4 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-2"></div>
+                              <>
+                                <div className="w-3 h-3 border-2 border-transparent border-t-purple-500 rounded-full animate-spin mr-1.5"></div>
+                                <span className="whitespace-nowrap">潤飾</span>
+                              </>
                             ) : (
-                              <Wand2 className="w-4 h-4 mr-2" />
+                              <>
+                                <Wand2 className="w-3 h-3 mr-1.5" />
+                                <span className="whitespace-nowrap">潤飾</span>
+                              </>
                             )}
-                            <span className="hidden sm:inline whitespace-nowrap">
-                              潤飾
-                            </span>
-                            <span className="sm:hidden">AI</span>
                           </button>
                           <button
                             onClick={() => startEdit(report)}
                             disabled={
                               generatingAiFor.size > 0 || isGeneratingAllAi
                             }
-                            className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-green-100 text-green-700 hover:bg-green-200 border border-green-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center px-2 py-1 text-xs sm:text-sm font-medium rounded-md bg-green-100 text-green-700 hover:bg-green-200 border border-green-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
                           >
-                            <Edit className="w-4 h-4 sm:mr-2" />
-                            <span className="hidden sm:inline">編輯</span>
+                            <Edit className="w-3 h-3 mr-1.5" />
+                            <span className="whitespace-nowrap">編輯</span>
                           </button>
                         </div>
                       )}
@@ -1458,9 +1461,31 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           <Trash2 className="w-4 h-4 mr-2" />
                           {isDeletingDraft ? "刪除中..." : "刪除記錄"}
                         </button>
+                        {/* 套用 AI 建議按鈕 - 只在 lg 以下且有 AI 內容時顯示 */}
+                        {(() => {
+                          const planno = report.project?.planno || "NULL";
+                          const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                          return (
+                            editingRecordKey === recordKey &&
+                            isAiViewActive &&
+                            report.ai_content
+                          );
+                        })() && (
+                          <button
+                            onClick={() =>
+                              handleApplyAiSuggestion(report.ai_content!)
+                            }
+                            className="lg:hidden inline-flex items-center justify-center px-4 py-2 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-md hover:shadow-lg order-3"
+                            title="套用 AI 建議"
+                          >
+                            <ArrowUp className="w-4 h-4 mr-2" />
+                            套用 AI 建議
+                          </button>
+                        )}
+
                         <button
                           onClick={cancelEdit}
-                          className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 order-3"
+                          className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 order-4"
                         >
                           取消
                         </button>
@@ -1470,9 +1495,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                     <div className="space-y-4">
                       {/* 報告內容 */}
                       <div>
-                        <div className="flex items-start space-x-2">
+                        <div className="flex items-start space-x-2 min-w-0">
                           <div
-                            className={`${TypographyClasses.richTextDisplay} flex-1`}
+                            className={`${TypographyClasses.richTextDisplay} flex-1 min-w-0`}
                             dangerouslySetInnerHTML={{ __html: report.content }}
                           />
                           {/* {report.files && report.files.length > 0 && (
@@ -1493,17 +1518,23 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   )}
                 </div>
 
-                {/* 執行時間顯示 - 右下角 */}
-                <div className="absolute bottom-4 right-4 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                  {formatMinutesToHours(
-                    report.total_execution_time_minutes || 0
-                  )}
-                </div>
+                {/* 執行時間顯示 - 右下角（只在非編輯模式顯示） */}
+                {(() => {
+                  const planno = report.project?.planno || "NULL";
+                  const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                  return editingRecordKey !== recordKey;
+                })() && (
+                  <div className="absolute bottom-4 right-4 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                    {formatMinutesToHours(
+                      report.total_execution_time_minutes || 0
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* --- Card 2: AI Reference --- */}
               {isAiViewActive && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full h-full">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-full h-full min-w-0">
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-lg bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 border border-purple-200">
                       <Wand2 className="w-4 h-4 mr-1.5" /> AI 參考資料
@@ -1535,7 +1566,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 </div>
               )}
 
-              {/* --- Apply AI Suggestion Button (FINAL - Corrected Position) --- */}
+              {/* --- Apply AI Suggestion Button (中間浮動按鈕 - 只在 lg 以上顯示) --- */}
               {(() => {
                 const planno = report.project?.planno || "NULL";
                 const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
@@ -1545,14 +1576,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   report.ai_content
                 );
               })() && (
-                <div className="absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                <div className="hidden lg:block absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                   <button
                     onClick={() => handleApplyAiSuggestion(report.ai_content!)}
                     className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg hover:bg-gray-100 border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-all duration-200 ease-in-out transform hover:scale-110"
                     title="套用 AI 建議"
                   >
-                    <ArrowUp className="w-6 h-6 lg:hidden" />
-                    <ArrowLeft className="w-6 h-6 hidden lg:block" />
+                    <ArrowLeft className="w-6 h-6" />
                   </button>
                 </div>
               )}
@@ -1569,11 +1599,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
       {/* --- Add New Note Modal --- */}
       {isAddNoteModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out animate-fade-in p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto transform transition-all duration-300 ease-in-out scale-95 animate-fade-in-scale">
-            <div className="p-4 sm:p-6 lg:p-8">
-              <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out animate-fade-in p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-2xl lg:max-w-4xl max-h-[95vh] sm:max-h-screen overflow-y-auto transform transition-all duration-300 ease-in-out scale-95 animate-fade-in-scale">
+            <div className="p-3 sm:p-4 md:p-6 lg:p-8">
+              <div className="flex justify-between items-center mb-3 sm:mb-4 md:mb-6">
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
                   新增筆記到今日報告
                 </h3>
                 <button

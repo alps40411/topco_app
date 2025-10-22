@@ -409,15 +409,15 @@ function App() {
       />
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          {/* 桌面版：單行佈局 (≥ lg) */}
+          <div className="hidden lg:flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-40 h-13 rounded-lg flex items-center justify-center max-w-40 min-w-40">
+              <div className="w-40 h-13 rounded-lg flex items-center justify-center">
                 <img
                   src={getCompanyLogo(user?.employee?.cocode)}
                   alt="業務日誌"
-                  className="w-40 h-13 rounded-lg max-w-40 min-w-40"
+                  className="w-40 h-13 rounded-lg object-contain"
                   onError={(e) => {
-                    // 如果圖片載入失敗，使用預設 logo
                     e.currentTarget.src = "/MyReportAI/top_logoA.jpg";
                     console.log("圖片載入失敗，使用預設 logo");
                   }}
@@ -434,7 +434,7 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex space-x-1">
-                {/* 隨筆紀錄 - 只有在允許寫入時才顯示 */}
+                {/* 隨筆紀錄 */}
                 {writingStatus?.allowed && (
                   <button
                     onClick={() => changeTab("input")}
@@ -448,7 +448,7 @@ function App() {
                   </button>
                 )}
 
-                {/* 日報編輯 - 只有在允許寫入時才顯示 */}
+                {/* 日報編輯 */}
                 {writingStatus?.allowed && (
                   <button
                     onClick={() => changeTab("daily")}
@@ -462,7 +462,7 @@ function App() {
                   </button>
                 )}
 
-                {/* 日報首頁 (所有用戶都可見) */}
+                {/* 日報首頁 */}
                 <button
                   onClick={() => changeTab("supervisor")}
                   className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -489,6 +489,96 @@ function App() {
                   title="登出"
                 >
                   <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 平板/手機版：兩行佈局 (< lg) */}
+          <div className="lg:hidden">
+            {/* 第一行：Logo + 公司名稱 + 使用者資訊 + 登出 */}
+            <div className="flex items-center justify-between h-16 border-b border-gray-100">
+              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <div className="w-32 sm:w-36 h-11 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <img
+                    src={getCompanyLogo(user?.employee?.cocode)}
+                    alt="業務日誌"
+                    className="w-32 sm:w-36 h-11 sm:h-12 rounded-lg object-contain"
+                    onError={(e) => {
+                      e.currentTarget.src = "/MyReportAI/top_logoA.jpg";
+                      console.log("圖片載入失敗，使用預設 logo");
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0 hidden sm:block">
+                  <h1 className="text-base font-semibold text-gray-900 truncate">
+                    業務日報
+                  </h1>
+                  <p className="text-xs text-gray-500 truncate">
+                    {getCompanyName(user?.employee?.cocode)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 flex-shrink-0">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900 truncate max-w-[100px] sm:max-w-[150px]">
+                    {user?.name}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {user?.employee?.dutyscript || "員工"}
+                  </p>
+                </div>
+                <button
+                  onClick={logout}
+                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0"
+                  title="登出"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 第二行：導航按鈕 */}
+            <div className="flex items-center justify-center h-12 sm:h-14">
+              <div className="flex space-x-1 sm:space-x-2">
+                {/* 隨筆紀錄 */}
+                {writingStatus?.allowed && (
+                  <button
+                    onClick={() => changeTab("input")}
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === "input"
+                        ? "bg-green-100 text-green-700"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    隨筆紀錄
+                  </button>
+                )}
+
+                {/* 日報編輯 */}
+                {writingStatus?.allowed && (
+                  <button
+                    onClick={() => changeTab("daily")}
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === "daily"
+                        ? "bg-green-100 text-green-700"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    日報編輯
+                  </button>
+                )}
+
+                {/* 日報首頁 */}
+                <button
+                  onClick={() => changeTab("supervisor")}
+                  className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                    activeTab === "supervisor"
+                      ? "bg-green-100 text-green-700"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  日報首頁
                 </button>
               </div>
             </div>

@@ -1,3 +1,34 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 全域 prose 樣式 - 防止內容撐破容器 */
+@layer components {
+  .prose {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+  }
+
+  .prose p,
+  .prose div,
+  .prose span,
+  .prose a {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  /* 只針對純文字連結，排除包含圖片的連結 */
+  .prose a:not(:has(img)) {
+    max-width: 100%;
+    display: inline-block;
+  }
+
+  /* 確保圖片保持原有的 block 顯示模式 */
+  .prose img {
+    display: block;
+    max-width: 80%;
+    height: auto;
+  }
+}

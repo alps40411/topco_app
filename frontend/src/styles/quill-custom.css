@@ -12,7 +12,9 @@
 }
 
 .ql-editor {
-  @apply min-h-[200px] p-3 text-base leading-relaxed;
+  @apply min-h-[200px] p-3 text-base leading-relaxed break-words;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 /* 工具列樣式 */
@@ -59,4 +61,27 @@ div[dangerouslySetInnerHTML] img,
   [class*="prose"] img {
     max-width: 90%;
   }
+}
+
+/* 強制文字斷行，防止長 URL 或連續文字撐破容器 */
+.ql-editor p,
+.ql-editor a,
+.prose p,
+.prose a,
+div[dangerouslySetInnerHTML] p,
+div[dangerouslySetInnerHTML] a,
+[class*="prose"] p,
+[class*="prose"] a {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* 處理超連結顯示（排除包含圖片的連結） */
+.ql-editor a:not(:has(img)),
+.prose a:not(:has(img)),
+div[dangerouslySetInnerHTML] a:not(:has(img)),
+[class*="prose"] a:not(:has(img)) {
+  max-width: 100%;
+  display: inline-block;
 }

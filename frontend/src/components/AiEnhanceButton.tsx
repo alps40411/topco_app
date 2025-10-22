@@ -108,16 +108,10 @@ const AiEnhanceButton: React.FC<AiEnhanceButtonProps> = ({
 
           {/* 文字 */}
           {children || (
-            <span className="whitespace-nowrap">
-              {isLoading ? (
-                "AI 處理中..."
-              ) : (
-                <>
-                  <span className="hidden sm:inline">潤飾全部</span>
-                  <span className="sm:hidden">潤飾</span>
-                </>
-              )}
-            </span>
+            <>
+              <span className="hidden sm:inline whitespace-nowrap">潤飾全部</span>
+              <span className="sm:hidden whitespace-nowrap">潤飾</span>
+            </>
           )}
         </button>
 

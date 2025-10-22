@@ -479,34 +479,19 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     <>
       <thead className={bgColorClass}>
         <tr>
-          <th
-            className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider"
-            style={{ width: "100px" }}
-          >
+          <th className="px-1 sm:px-2 md:px-3 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-12 sm:w-16">
             狀態
           </th>
-          <th
-            className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-            style={{ width: "25%" }}
-          >
-            員工資訊
+          <th className="px-1 sm:px-2 md:px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-20 sm:w-24 md:w-32">
+            員工
           </th>
-          <th
-            className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-            style={{ width: "auto" }}
-          >
+          <th className="hidden md:table-cell px-2 md:px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
             執行項目
           </th>
-          <th
-            className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider"
-            style={{ width: "100px" }}
-          >
+          <th className="px-1 sm:px-2 md:px-3 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-12 sm:w-16">
             內容
           </th>
-          <th
-            className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider"
-            style={{ width: "120px" }}
-          >
+          <th className="px-1 sm:px-2 md:px-3 py-2 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-12 sm:w-16">
             編輯
           </th>
         </tr>
@@ -514,21 +499,66 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       <tbody className="bg-white divide-y divide-gray-200">
         {reports.map((report) => (
           <tr key={report.id} className="hover:bg-gray-50">
-            <td className="px-4 py-3" style={{ width: "100px" }}>
-              <div className="flex items-center justify-center gap-1">
+            <td className="px-1 sm:px-2 md:px-3 py-2.5 whitespace-nowrap">
+              <div className="flex items-center justify-center gap-1 flex-col sm:flex-row">
                 {renderFowardedStatus(report)}
                 {renderResponseStatus(report)}
               </div>
             </td>
-            <td
-              className="px-4 py-3 whitespace-nowrap"
-              style={{ width: "25%" }}
-            >
-              <div className="text-base font-medium text-gray-900">
+            <td className="px-1 sm:px-2 md:px-3 py-2.5">
+              <div className="text-sm sm:text-base font-medium text-gray-900 truncate max-w-[120px] sm:max-w-[140px] md:max-w-[160px]" title={report.employee.name}>
                 {report.employee.name}
               </div>
+              {/* 在小螢幕上顯示執行項目（因為md以下會隱藏執行項目列） */}
+              <div className="md:hidden mt-1">
+                {report.can_view_detail ? (
+                  <div
+                    onClick={() => {
+                      // ✅ 在導航到詳細頁前，先更新 URL 的日期參數
+                      if (selectedDate) {
+                        const year = selectedDate.getFullYear();
+                        const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                        const day = String(selectedDate.getDate()).padStart(2, "0");
+                        const dateString = `${year}-${month}-${day}`;
+                        const currentUrl = new URL(window.location.href);
+                        currentUrl.searchParams.set("date", dateString);
+                        window.history.replaceState({}, "", currentUrl.toString());
+                      }
+                      onSelectEmployee(
+                        {
+                          id: report.employee.id,
+                          name: report.employee.name,
+                          department_name: report.employee.department_name,
+                          department_no: report.employee.department_no,
+                          pending_reports_count: 0,
+                        },
+                        report.id
+                      );
+                    }}
+                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-900 cursor-pointer hover:bg-blue-50 px-1 py-0.5 rounded transition-colors truncate max-w-[120px] sm:max-w-[140px] block"
+                    title={report.sop_desc_c || "執行項目"}
+                  >
+                    {report.sop_desc_c || "執行項目"}
+                    {report.emergency && (
+                      <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                        急
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs sm:text-sm text-gray-400 px-1 py-0.5 truncate max-w-[120px] sm:max-w-[140px]" title={report.sop_desc_c || "執行項目"}>
+                    {report.sop_desc_c || "執行項目"}
+                    {report.emergency && (
+                      <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                        急
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </td>
-            <td className="px-4 py-3" style={{ width: "auto" }}>
+            {/* 執行項目列 - 只在md及以上顯示 */}
+            <td className="hidden md:table-cell px-2 sm:px-3 md:px-4 py-2 sm:py-3">
               {report.can_view_detail ? (
                 <div
                   onClick={() => {
@@ -553,9 +583,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                       report.id
                     );
                   }}
-                  className="text-base text-blue-600 hover:text-blue-900 max-w-xs cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
+                  className="text-sm md:text-base text-blue-600 hover:text-blue-900 cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors truncate block"
                 >
-                  {report.sop_desc_c || "執行項目"}
+                  <span className="truncate block">{report.sop_desc_c || "執行項目"}</span>
                   {report.emergency && (
                     <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       緊急
@@ -563,8 +593,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="text-base text-gray-400 max-w-xs p-2">
-                  {report.sop_desc_c || "執行項目"}
+                <div className="text-sm md:text-base text-gray-400 p-2 truncate">
+                  <span className="truncate block">{report.sop_desc_c || "執行項目"}</span>
                   {report.emergency && (
                     <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       緊急
@@ -573,10 +603,10 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 </div>
               )}
             </td>
-            <td className="px-4 py-3 text-center" style={{ width: "100px" }}>
+            <td className="px-1 sm:px-2 md:px-3 py-2.5 text-center whitespace-nowrap">
               {renderContentStatus(report)}
             </td>
-            <td className="px-4 py-3 text-center" style={{ width: "120px" }}>
+            <td className="px-1 sm:px-2 md:px-3 py-2.5 text-center whitespace-nowrap">
               {(() => {
                 const isOwnReport =
                   currentUserEmpno === String(report.employee.id);
@@ -589,7 +619,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                   hasNoReply &&
                   hasDate &&
                   isEditable && (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                       <button
                         onClick={() => handleEditReport(report.date)}
                         className="hover:opacity-75 transition-opacity"
@@ -598,7 +628,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                         <img
                           src="/MyReportAI/edit.png"
                           alt="編輯"
-                          className="w-5 h-5"
+                          className="w-5 h-5 sm:w-6 sm:h-6"
                         />
                       </button>
                       <button
@@ -611,7 +641,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                         <img
                           src="/MyReportAI/delete.png"
                           alt="刪除"
-                          className="w-5 h-5"
+                          className="w-5 h-5 sm:w-6 sm:h-6"
                         />
                       </button>
                     </div>
@@ -626,9 +656,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   );
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">日報首頁</h2>
+    <div className="p-2 sm:p-4 md:p-6">
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">日報首頁</h2>
 
         <SupervisorDateBar
           selectedDate={selectedDate}
@@ -639,8 +669,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
       {/* 區塊1: 轉寄給我的日報 (綠色表頭) */}
       {forwardedReports.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
-          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto mb-4 sm:mb-6">
+          <table className="min-w-full divide-y divide-gray-200">
             {renderReportsSection(
               forwardedReports,
               "轉寄給我的日報",
@@ -652,8 +682,8 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
       {/* 區塊2: 日報 (藍色表頭) */}
       {subordinateReports.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
-          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto mb-4 sm:mb-6">
+          <table className="min-w-full divide-y divide-gray-200">
             {renderReportsSection(subordinateReports, "日報", "bg-gray-100")}
           </table>
         </div>

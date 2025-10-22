@@ -3,6 +3,9 @@ export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      screens: {
+        xs: "480px",
+      },
       fontSize: {
         // 自定義字體大小 - 擴展現有的
         xs: "19px", // 原本是 12px

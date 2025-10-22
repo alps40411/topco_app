@@ -412,17 +412,17 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
+    <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 lg:gap-6 p-2 sm:p-4 md:p-6">
       <div className="w-full lg:w-1/2">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 h-6 flex items-center">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-2 sm:gap-0">
+            <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 flex items-center">
               記錄新筆記
             </h2>
             <DateSelector
               selectedDate={selectedDate || ""}
               onDateChange={handleDateChange}
-              className="mt-2 sm:mt-0"
+              className="w-full sm:w-auto"
             />
           </div>
           <div className="space-y-6">
@@ -540,8 +540,8 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
         </div>
       </div>
       <div className="w-full lg:w-1/2">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 h-6 flex items-center">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+          <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
             今日彙整預覽 ({consolidatedRecords.length})
           </h2>
           <div className="space-y-4">
@@ -556,7 +556,7 @@ const DataInputTab: React.FC<DataInputTabProps> = ({
               consolidatedRecords.map((report) => (
                 <div
                   key={report.project.id}
-                  className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-100 space-y-3"
+                  className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-100 space-y-3 min-w-0"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-2 space-y-2 sm:space-y-0">
                     <div className="flex flex-wrap items-center gap-2">

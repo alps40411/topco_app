@@ -1,6 +1,14 @@
 // frontend/src/components/SupervisorDateBar.tsx
 
 import React from "react";
+import DatePicker, { registerLocale } from "react-datepicker";
+import { zhTW } from "date-fns/locale/zh-TW";
+import "react-datepicker/dist/react-datepicker.css";
+import "../styles/datepicker-custom.css";
+import { Calendar } from "lucide-react";
+
+// 註冊中文語系
+registerLocale("zh-TW", zhTW);
 
 interface SupervisorDateBarProps {
   selectedDate: Date | null;
@@ -116,7 +124,44 @@ const SupervisorDateBar: React.FC<SupervisorDateBarProps> = ({
 
   return (
     <div className={`w-full ${className}`}>
-      <div className="w-full border-collapse bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden">
+      {/* 小螢幕版本：使用 react-datepicker (< md) */}
+      <div className="md:hidden">
+        <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-3">
+          <div className="relative">
+            <DatePicker
+              selected={currentDate}
+              onChange={onChange}
+              dateFormat="yyyy/MM/dd (E)"
+              locale="zh-TW"
+              maxDate={today}
+              minDate={(() => {
+                const minDate = new Date(today);
+                minDate.setDate(today.getDate() - 30);
+                return minDate;
+              })()}
+              className="w-full px-3 py-2.5 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              wrapperClassName="w-full"
+              calendarClassName="text-sm"
+              showPopperArrow={false}
+              popperClassName="z-50"
+              popperPlacement="bottom-start"
+              popperModifiers={[
+                {
+                  name: "preventOverflow",
+                  options: {
+                    boundary: "viewport",
+                    padding: 8,
+                  },
+                },
+              ]}
+            />
+            <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+      </div>
+
+      {/* 桌面版本：保留原有的日期條設計 (≥ md) */}
+      <div className="hidden md:block w-full border-collapse bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden">
         <table className="w-full">
           <tbody>
             <tr className="border-b border-gray-300">

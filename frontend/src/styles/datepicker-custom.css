@@ -1,0 +1,313 @@
+/* 自定義 React DatePicker 樣式 */
+
+/* 主容器 */
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker__input-container {
+  width: 100%;
+}
+
+/* 日曆彈出層 */
+.react-datepicker {
+  font-family: inherit;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+/* 頭部 (月份/年份選擇區) */
+.react-datepicker__header {
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  padding-top: 1rem;
+  border-top-left-radius: 0.75rem;
+  border-top-right-radius: 0.75rem;
+}
+
+/* 當前月份顯示 */
+.react-datepicker__current-month {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.75rem;
+}
+
+/* 星期標題 */
+.react-datepicker__day-names {
+  display: flex;
+  justify-content: space-around;
+  padding: 0.5rem 0;
+  background-color: #f3f4f6;
+  margin-top: 0.5rem;
+}
+
+.react-datepicker__day-name {
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  width: 2.5rem;
+  line-height: 2.5rem;
+  text-align: center;
+}
+
+/* 月份容器 */
+.react-datepicker__month {
+  margin: 0.75rem;
+}
+
+/* 每一週 */
+.react-datepicker__week {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 0.25rem;
+}
+
+/* 日期格子 */
+.react-datepicker__day {
+  width: 2.5rem;
+  height: 2.5rem;
+  line-height: 2.5rem;
+  text-align: center;
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin: 0.125rem;
+  font-weight: 500;
+}
+
+/* 日期hover效果 */
+.react-datepicker__day:hover {
+  background-color: #e0e7ff;
+  color: #4f46e5;
+}
+
+/* 今天 */
+.react-datepicker__day--today {
+  background-color: #dbeafe;
+  color: #1e40af;
+  font-weight: 700;
+}
+
+.react-datepicker__day--today:hover {
+  background-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
+/* 選中的日期 */
+.react-datepicker__day--selected,
+.react-datepicker__day--selected:hover {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  font-weight: 700;
+}
+
+/* 鍵盤焦點 */
+.react-datepicker__day--keyboard-selected {
+  background-color: #93c5fd;
+  color: #1e3a8a;
+}
+
+.react-datepicker__day--keyboard-selected:hover {
+  background-color: #60a5fa;
+  color: white;
+}
+
+/* 週末 */
+.react-datepicker__day--weekend {
+  color: #dc2626;
+}
+
+/* 其他月份的日期 */
+.react-datepicker__day--outside-month {
+  color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.react-datepicker__day--outside-month:hover {
+  background-color: transparent;
+  color: #d1d5db;
+}
+
+/* 禁用的日期 */
+.react-datepicker__day--disabled {
+  color: #d1d5db;
+  cursor: not-allowed;
+  background-color: #f9fafb;
+}
+
+.react-datepicker__day--disabled:hover {
+  background-color: #f9fafb;
+  color: #d1d5db;
+}
+
+/* 導航按鈕 (上一月/下一月) */
+.react-datepicker__navigation {
+  top: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.react-datepicker__navigation:hover {
+  background-color: #e5e7eb;
+  border-radius: 0.375rem;
+}
+
+.react-datepicker__navigation--previous {
+  left: 1rem;
+}
+
+.react-datepicker__navigation--next {
+  right: 1rem;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #6b7280;
+  border-width: 2px 2px 0 0;
+  height: 8px;
+  width: 8px;
+}
+
+/* 月份/年份下拉選擇 */
+.react-datepicker__month-dropdown,
+.react-datepicker__year-dropdown {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  padding: 0.5rem;
+}
+
+.react-datepicker__month-option,
+.react-datepicker__year-option {
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.react-datepicker__month-option:hover,
+.react-datepicker__year-option:hover {
+  background-color: #f3f4f6;
+}
+
+.react-datepicker__month-option--selected,
+.react-datepicker__year-option--selected {
+  background-color: #3b82f6;
+  color: white;
+}
+
+/* 時間選擇器（如果需要） */
+.react-datepicker__time-container {
+  border-left: 1px solid #e5e7eb;
+}
+
+.react-datepicker__time-box {
+  border-radius: 0.5rem;
+}
+
+/* 三角箭頭（如果啟用） */
+.react-datepicker__triangle {
+  display: none;
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+  .react-datepicker {
+    font-size: 0.875rem;
+    max-width: calc(100vw - 32px);
+  }
+
+  .react-datepicker__month-container {
+    width: 100%;
+  }
+
+  .react-datepicker__day-name,
+  .react-datepicker__day {
+    width: 2.25rem;
+    height: 2.25rem;
+    line-height: 2.25rem;
+    font-size: 0.875rem;
+    margin: 0.0625rem;
+  }
+
+  .react-datepicker__current-month {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .react-datepicker__header {
+    padding-top: 0.75rem;
+  }
+
+  .react-datepicker__month {
+    margin: 0.5rem;
+  }
+
+  .react-datepicker__navigation {
+    top: 0.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .react-datepicker__navigation--previous {
+    left: 0.5rem;
+  }
+
+  .react-datepicker__navigation--next {
+    right: 0.5rem;
+  }
+}
+
+/* 特殊: 週末高亮 */
+.react-datepicker__day--weekend:not(.react-datepicker__day--outside-month):not(.react-datepicker__day--disabled) {
+  background-color: #fef2f2;
+}
+
+.react-datepicker__day--weekend:hover:not(.react-datepicker__day--disabled) {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+/* 選中的週末 */
+.react-datepicker__day--selected.react-datepicker__day--weekend {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+/* 動畫效果 */
+.react-datepicker {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Popper定位 */
+.react-datepicker-popper {
+  z-index: 9999;
+}
+
+.react-datepicker-popper[data-placement^="bottom"] {
+  margin-top: 8px;
+}
+
+.react-datepicker-popper[data-placement^="top"] {
+  margin-bottom: 8px;
+}
