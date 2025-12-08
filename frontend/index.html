@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -9,22 +9,26 @@
     <!-- 預先連線到後端 API，減少首次請求延遲 -->
     <script>
       // 動態設置 API 預連線
-      (function() {
-        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      (function () {
+        const isDev =
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1";
         const protocol = window.location.protocol;
         const hostname = window.location.hostname;
-        const apiUrl = isDev ? 'http://localhost:8000' : `${protocol}//${hostname}:8000`;
+        const apiUrl = isDev
+          ? "http://localhost:8001"
+          : `${protocol}//${hostname}:8001`;
 
         // Preconnect
-        const preconnect = document.createElement('link');
-        preconnect.rel = 'preconnect';
+        const preconnect = document.createElement("link");
+        preconnect.rel = "preconnect";
         preconnect.href = apiUrl;
-        preconnect.crossOrigin = 'anonymous';
+        preconnect.crossOrigin = "anonymous";
         document.head.appendChild(preconnect);
 
         // DNS Prefetch
-        const dnsPrefetch = document.createElement('link');
-        dnsPrefetch.rel = 'dns-prefetch';
+        const dnsPrefetch = document.createElement("link");
+        dnsPrefetch.rel = "dns-prefetch";
         dnsPrefetch.href = apiUrl;
         document.head.appendChild(dnsPrefetch);
       })();

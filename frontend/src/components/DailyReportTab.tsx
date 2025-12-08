@@ -1,6 +1,6 @@
 // frontend/src/components/DailyReportTab.tsx
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Upload,
   Edit,
@@ -39,6 +39,7 @@ import { toast } from "react-hot-toast";
 import { TypographyClasses } from "../styles/typography";
 import { formatMinutesToHours } from "../utils/timeUtils";
 import { RecordsApi } from "../services/recordsApi";
+import { getDateCache } from "../utils/dateCache";
 
 interface DailyRecordCreate
   extends Omit<
@@ -147,6 +148,22 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   // DateSelector刷新函數的ref
   const dateRefreshRef = useRef<(() => Promise<void>) | null>(null);
+
+  // 計算當前選擇日期是否可提交
+  const canSubmitCurrentDate = useMemo(() => {
+    if (!selectedDate) return false;
+
+    const dateCache = getDateCache();
+    if (!dateCache?.data) return false;
+
+    // 將 selectedDate (YYYY-MM-DD) 轉換為 YYYYMMDD 格式
+    const formattedDate = selectedDate.replace(/-/g, "");
+    const currentDateOption = dateCache.data.find(
+      (date) => date.value === formattedDate
+    );
+
+    return currentDateOption?.can_submit ?? false;
+  }, [selectedDate]);
 
   // 服務資料載入回調
   const handleServiceDataLoaded = useCallback(
@@ -1213,8 +1230,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
             />
             <button
               onClick={handleSubmitReport}
-              disabled={isSubmitting || editingRecordKey !== null}
+              disabled={isSubmitting || editingRecordKey !== null || !canSubmitCurrentDate}
               className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
+              title={!canSubmitCurrentDate ? "當前日期不開放提交" : ""}
             >
               <Upload className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">

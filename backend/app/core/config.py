@@ -51,12 +51,12 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
 
     # CommonAPI 配置
-    COMMONAPI_BASE_URL: str = "http://10.129.7.248/CommonApi"
-    COMMONAPI_UPLOAD_URL: str = "http://10.129.7.248/CommonApi/api/SharedFile/upimages"
-    COMMONAPI_DOWNLOAD_URL: str = "http://10.129.7.248/CommonApi/api/SharedFile"
-    WFINBOX_API_URL: str = "http://10.129.7.248/CommonApi/EIP/ChangeWFINBOX"
-    MYREPORT_GET_WRITABLE_DATE_URL: str = "http://10.129.7.248/CommonApi/MyReport/GetWritableDate"
-    MYREPORT_GET_FORWARD_LIST_URL: str = "http://10.129.7.248/CommonApi/MyReport/GetForwardList"
+    COMMONAPI_BASE_URL: str = "http://10.129.1.98/CommonApi"
+    COMMONAPI_UPLOAD_URL: str = "http://10.129.1.98/CommonApi/api/SharedFile/upimages"
+    COMMONAPI_DOWNLOAD_URL: str = "http://10.129.1.98/CommonApi/api/SharedFile"
+    WFINBOX_API_URL: str = "http://10.129.1.98/CommonApi/EIP/ChangeWFINBOX"
+    MYREPORT_GET_WRITABLE_DATE_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetWritableDate"
+    MYREPORT_GET_FORWARD_LIST_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetForwardList"
 
 
 

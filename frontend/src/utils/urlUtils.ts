@@ -29,7 +29,7 @@ export const getFullFileUrl = (url: string): string => {
 
   // 開發環境使用 :8000 port，正式環境使用當前域名
   const backendUrl = isDevelopment
-    ? `${protocol}//${hostname}:8000`
+    ? `${protocol}//${hostname}:8001`
     : `${protocol}//${hostname}`;
 
   return url.startsWith("/") ? `${backendUrl}${url}` : `${backendUrl}/${url}`;

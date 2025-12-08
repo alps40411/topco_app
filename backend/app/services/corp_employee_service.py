@@ -17,7 +17,7 @@ class CorpEmployeeService:
 
     def __init__(self):
         # API 端點
-        self.api_url = "http://10.129.7.248/CommonApi/MyReport/GetForwardList"
+        self.api_url = "http://10.129.1.98/CommonApi/MyReport/GetForwardList"
         # HTTP 客戶端超時設置
         self.timeout = 30.0
 

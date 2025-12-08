@@ -22,6 +22,7 @@ interface WritingStatus {
   current_time: string;
   next_available_time: string;
   has_other_writable_dates?: boolean;
+  can_submit_today?: boolean;  // 新增: 當前日期是否可提交最終版
 }
 // --- Interface Definitions ---
 export interface Project {

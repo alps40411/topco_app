@@ -54,6 +54,7 @@ class DateService:
                 date_value = date_info["date"]
                 status = date_info["status"]
                 can_write = date_info["can_write"]
+                can_submit = date_info.get("can_submit", False)  # 從 API 獲取是否可提交
 
                 # 檢查該日期是否已被主管審閱
                 review_status_sql = text("""
@@ -75,10 +76,11 @@ class DateService:
                 reply_count = review_result[1] if review_result else 0
                 has_supervisor_review = score_count > 0 or reply_count > 0
 
-                # 如果已被主管審閱，標記為不可寫入
+                # 如果已被主管審閱，標記為不可寫入且不可提交
                 if has_supervisor_review:
-                    logger.info(f"日期 {date_value} 已被主管審閱，標記為不可寫入")
+                    logger.info(f"日期 {date_value} 已被主管審閱，標記為不可寫入且不可提交")
                     can_write = False
+                    can_submit = False
 
                 # 解析日期
                 try:
@@ -96,6 +98,7 @@ class DateService:
                         "is_today": is_today,
                         "is_default": False,
                         "can_write": can_write,
+                        "can_submit": can_submit,  # 新增: 是否可提交最終版
                         "status": "Reviewed" if has_supervisor_review else (status or "Available"),
                         "has_supervisor_review": has_supervisor_review
                     })
@@ -125,6 +128,10 @@ class DateService:
             writable_dates_count = len(writable_dates_list)
             allowed = writable_dates_count > 0
 
+            # 計算可提交的日期數量
+            submittable_dates_list = [d for d in available_dates if d["can_submit"]]
+            submittable_dates_count = len(submittable_dates_list)
+
             # 全局提示訊息
             message = ""
             if not allowed and available_dates:
@@ -134,11 +141,14 @@ class DateService:
 
             # 當前選擇日期的詳細狀態
             selected_date_info = None
+            can_submit_today = False
             if current_report_date:
                 selected_date_info = next(
                     (d for d in available_dates if d["value"] == current_report_date),
                     None
                 )
+                if selected_date_info:
+                    can_submit_today = selected_date_info.get("can_submit", False)
 
             return {
                 "success": True,
@@ -148,7 +158,9 @@ class DateService:
                 "cocode": cocode,
                 "total_dates": len(available_dates),
                 "writable_dates": writable_dates_count,
+                "submittable_dates": submittable_dates_count,  # 新增: 可提交日期數量
                 "allowed": allowed,
+                "can_submit_today": can_submit_today,  # 新增: 當前日期是否可提交
                 "message": message,
                 "has_other_writable_dates": writable_dates_count > 0,
                 "selected_date_info": selected_date_info,

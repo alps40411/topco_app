@@ -37,7 +37,7 @@ class DailyDateService:
 
     def __init__(self):
         # API 端點
-        self.api_url = "http://10.129.7.248/CommonApi/MyReport/GetWritableDate"
+        self.api_url = "http://10.129.1.98/CommonApi/MyReport/GetWritableDate"
         # HTTP 客戶端超時設置
         self.timeout = 30.0
 
@@ -109,13 +109,20 @@ class DailyDateService:
         API 回應格式:
         {
             "ResponseCmd": "GetWritableDate",
-            "ResponseData": [["20251015", ""]],
+            "ResponseData": [
+                {"doc_date": "20251205", "writable": true}
+            ],
             "ResponseNo": "0000",
             "ResponseNa": "Success"
         }
 
         轉換為:
-        [{"date": "20251015", "status": "OpenWrite", "can_write": true}, ...]
+        [{
+            "date": "20251205",
+            "status": "OpenWrite",
+            "can_write": true,    # 日期在列表中表示可填寫
+            "can_submit": true    # 對應 API 的 writable 欄位
+        }, ...]
         """
         try:
             # 檢查回應狀態
@@ -133,15 +140,24 @@ class DailyDateService:
             # 轉換格式
             result = []
             for date_item in response_dates:
-                if isinstance(date_item, list) and len(date_item) > 0:
-                    date_value = date_item[0]
-                    # ResponseData 格式為 [["20251015", ""]]
-                    # 第二個元素為空字串，我們假設所有返回的日期都是可寫入的
+                # 新格式: {"doc_date": "20251205", "writable": true}
+                if isinstance(date_item, dict):
+                    doc_date = date_item.get("doc_date")
+                    writable = date_item.get("writable", False)
+
+                    if not doc_date:
+                        logger.warning(f"日期項目缺少 doc_date 欄位: {date_item}")
+                        continue
+
                     result.append({
-                        "date": date_value,
+                        "date": doc_date,
                         "status": "OpenWrite",
-                        "can_write": True
+                        "can_write": True,      # 在列表中表示可填寫
+                        "can_submit": writable  # 是否可提交最終版
                     })
+                else:
+                    logger.warning(f"不支援的日期格式（預期為字典）: {date_item}")
+                    continue
 
             logger.info(f"成功解析 {len(result)} 筆日期資料")
             return result

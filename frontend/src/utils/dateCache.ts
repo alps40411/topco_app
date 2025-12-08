@@ -1,6 +1,6 @@
 // frontend/src/utils/dateCache.ts
 
-interface DateOption {
+export interface DateOption {
   value: string;
   display: string;
   date: string;
@@ -8,6 +8,7 @@ interface DateOption {
   is_today: boolean;
   is_default: boolean;
   can_write: boolean;
+  can_submit: boolean;  // 新增: 是否可提交最終版
   status: string;
 }
 

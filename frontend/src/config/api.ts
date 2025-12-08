@@ -101,7 +101,7 @@ export const buildApiUrl = (endpoint: string): string => {
     }
 
     // 生產環境：使用 HTTPS 協議和主機的 8000 端口作為後端
-    return `https://${currentHost}:8000${endpoint}`;
+    return `https://${currentHost}:8001${endpoint}`;
   }
 
   return endpoint; // 開發環境使用代理

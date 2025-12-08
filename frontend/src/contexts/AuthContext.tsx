@@ -18,6 +18,7 @@ interface WritingStatus {
   current_time: string;
   next_available_time: string;
   has_other_writable_dates?: boolean;
+  can_submit_today?: boolean;  // 新增: 當前日期是否可提交最終版
 }
 
 interface AuthContextType {
@@ -119,6 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             current_time: data.current_time || "",
             next_available_time: "", // 不再需要此欄位
             has_other_writable_dates: data.has_other_writable_dates,
+            can_submit_today: data.can_submit_today,  // 新增: 當前日期是否可提交
           };
 
           setWritingStatus(status);
