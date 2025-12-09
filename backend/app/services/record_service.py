@@ -482,7 +482,7 @@ class RecordService:
                 CUST_COMP_ABBV1, WORD_COUNT, ATT_FILE1, ATT_FILE2, openpath, openwebpage
             ) VALUES (
                 :daily_no, :cocode, :empno, :deptno, :doc_date, NULL,
-                NULL, 0, :empnamec, :current_date, :current_time, 'N', :leader, :g_deptno, :empnamec,
+                'Y', 0, :empnamec, :current_date, :current_time, 'N', :leader, :g_deptno, :empnamec,
                 :deptnamec, 'D', :empnamec, 'N', :sop_desc_c, NULL,
                 NULL, :word_count, :att_file1, :att_file2, '/MyReport/', 'viewed.aspx'
             )
