@@ -121,6 +121,13 @@ async def get_completion(prompt: str, temperature: float = 0.3, max_tokens: int 
 async def extract_text_from_commonapi_url(url_path: str, file_name: str) -> str:
     """
     從 CommonAPI URL 下載檔案並提取文字內容
+
+    Args:
+        url_path: CommonAPI 檔案路徑或完整 URL
+        file_name: 檔案名稱
+
+    Returns:
+        提取的文字內容，失敗時返回空字串
     """
     import tempfile
     import os
@@ -130,17 +137,26 @@ async def extract_text_from_commonapi_url(url_path: str, file_name: str) -> str:
     try:
         # 組合完整的 CommonAPI URL
         if url_path.startswith('/'):
+            # 相對路徑：使用內網 API 基礎 URL
             full_url = f"{settings.COMMONAPI_BASE_URL}{url_path}"
         else:
-            full_url = url_path
+            # 完整 URL：如果是外網域名，替換為內網 IP（避免認證問題）
+            if 'portal.topco-global.com/tap1-98/CommonApi' in url_path:
+                full_url = url_path.replace(
+                    'https://portal.topco-global.com/tap1-98/CommonApi',
+                    settings.COMMONAPI_BASE_URL
+                )
+                logger.info(f"替換外網域名為內網 IP: {settings.COMMONAPI_BASE_URL}")
+            else:
+                full_url = url_path
 
-        logger.info(f"完整下載 URL: {full_url}")
+        logger.info(f"下載 URL: {full_url}")
 
         # 下載檔案到暫存目錄
         async with aiohttp.ClientSession() as session:
             async with session.get(full_url) as response:
                 if response.status != 200:
-                    logger.error(f"下載檔案失敗: {response.status}")
+                    logger.error(f"下載檔案失敗: HTTP {response.status}")
                     return ""
 
                 # 創建暫存檔案
@@ -148,16 +164,32 @@ async def extract_text_from_commonapi_url(url_path: str, file_name: str) -> str:
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
                 temp_path = temp_file.name
 
-                # 寫入檔案內容
+                # 讀取檔案內容
                 content = await response.read()
+                file_size = len(content)
+                content_type = response.headers.get('Content-Type', 'unknown')
+
+                # 驗證下載的檔案
+                if file_ext.lower() == '.pdf' and content[:4] != b'%PDF':
+                    logger.error(f"下載的檔案不是有效的 PDF！Content-Type: {content_type}")
+                    logger.error(f"可能是認證失敗或重定向頁面，檔案開頭: {content[:100].decode('utf-8', errors='ignore')}")
+                    return ""
+
+                # 寫入暫存檔案
                 temp_file.write(content)
                 temp_file.close()
-
-                logger.info(f"檔案已下載到暫存位置: {temp_path}")
+                logger.info(f"檔案已下載: {file_size} bytes, Content-Type: {content_type}")
 
         # 使用 Document Intelligence 提取文字
         try:
+            logger.info(f"開始提取檔案文字: {file_name}")
             extracted_text = await extract_text_from_file(temp_path)
+
+            if extracted_text:
+                logger.info(f"文字提取成功: {file_name}, 長度: {len(extracted_text)} 字符")
+            else:
+                logger.warning(f"文字提取失敗或檔案為空: {file_name}")
+
             return extracted_text
         finally:
             # 清理暫存檔案
@@ -168,23 +200,32 @@ async def extract_text_from_commonapi_url(url_path: str, file_name: str) -> str:
                 logger.warning(f"清理暫存檔案失敗: {e}")
 
     except Exception as e:
-        logger.error(f"從 CommonAPI 提取檔案內容失敗: {e}")
+        import traceback
+        logger.error(f"從 CommonAPI 提取檔案內容失敗: {file_name}")
+        logger.error(f"錯誤詳情: {str(e)}")
+        logger.debug(f"完整錯誤堆疊:\n{traceback.format_exc()}")
         return ""
 
 async def extract_text_from_file(file_path: str) -> str:
     """
     使用 Azure Document Intelligence 從檔案中提取文字內容
+
+    Args:
+        file_path: 本地檔案路徑
+
+    Returns:
+        提取的文字內容（限制 10000 字符），失敗時返回空字串
     """
     logger.info(f"開始提取檔案內容: {file_path}")
-    
+
     # 檢查配置
     if not settings.AZURE_DOC_INTELLIGENCE_KEY or not settings.AZURE_DOC_INTELLIGENCE_ENDPOINT:
         logger.warning("Azure Document Intelligence 未配置，跳過檔案內容提取")
-        logger.warning(f"Key存在: {bool(settings.AZURE_DOC_INTELLIGENCE_KEY)}")
-        logger.warning(f"Endpoint存在: {bool(settings.AZURE_DOC_INTELLIGENCE_ENDPOINT)}")
+        logger.warning(f"配置狀態 - Key: {bool(settings.AZURE_DOC_INTELLIGENCE_KEY)}, "
+                      f"Endpoint: {bool(settings.AZURE_DOC_INTELLIGENCE_ENDPOINT)}")
         return ""
-    
-    logger.info(f"Azure Document Intelligence 已配置")
+
+    logger.debug(f"Azure Document Intelligence 配置已就緒")
     
     try:
         # 檢查檔案是否存在
@@ -231,7 +272,7 @@ async def extract_text_from_file(file_path: str) -> str:
         # 準備 API 請求
         logger.info(f"開始調用 Azure Document Intelligence API")
         endpoint_url = f"{settings.AZURE_DOC_INTELLIGENCE_ENDPOINT}/formrecognizer/documentModels/prebuilt-read:analyze"
-        logger.info(f"API 端點: {endpoint_url}")
+        logger.debug(f"API 端點: {endpoint_url}")
         
         headers = {
             "Ocp-Apim-Subscription-Key": settings.AZURE_DOC_INTELLIGENCE_KEY,
@@ -261,21 +302,21 @@ async def extract_text_from_file(file_path: str) -> str:
                     params=params,
                     data=file_content
                 ) as response:
-                    logger.info(f"API 響應狀態: {response.status}")
-                    
+                    logger.info(f"Document Intelligence API 響應: {response.status}")
+
                     if response.status != 202:
                         response_text = await response.text()
-                        logger.error(f"Document Intelligence 分析請求失敗: {response.status}")
-                        logger.error(f"響應內容: {response_text}")
+                        logger.error(f"Document Intelligence 分析請求失敗: HTTP {response.status}")
+                        logger.error(f"響應內容: {response_text[:500]}")
                         return ""
-                    
+
                     # 取得分析結果的URL
                     operation_location = response.headers.get('Operation-Location')
                     if not operation_location:
-                        logger.error("無法取得分析結果URL")
+                        logger.error("無法從響應標頭取得 Operation-Location")
                         return ""
-                    
-                    logger.info(f"分析請求成功，結果URL: {operation_location}")
+
+                    logger.info(f"分析請求已提交，等待結果...")
         except Exception as e:
             logger.error(f"發送API請求失敗: {str(e)}")
             return ""
@@ -307,7 +348,7 @@ async def extract_text_from_file(file_path: str) -> str:
                         logger.info(f"分析狀態: {status}")
                         
                         if status == 'succeeded':
-                            logger.info(f"Document Intelligence 分析成功！")
+                            logger.info(f"Document Intelligence 分析成功")
                             # 提取文字內容
                             content_parts = []
                             if 'analyzeResult' in result_data and 'content' in result_data['analyzeResult']:
@@ -322,7 +363,8 @@ async def extract_text_from_file(file_path: str) -> str:
                             return extracted_text[:10000]  # 限制長度避免token超限
                         
                         elif status == 'failed':
-                            logger.error(f"Document Intelligence 分析失敗: {result_data}")
+                            logger.error(f"Document Intelligence 分析失敗")
+                            logger.error(f"失敗詳情: {result_data}")
                             return ""
                         elif status in ['notStarted', 'running']:
                             logger.info(f"分析仍在進行中: {status}")
@@ -342,43 +384,50 @@ async def extract_text_from_file(file_path: str) -> str:
 async def process_attachments_for_ai(attachment_records: List[dict]) -> List[str]:
     """
     處理附件列表，提取標記為 AI 參考的檔案內容
+
+    Args:
+        attachment_records: 附件記錄列表，每個記錄應包含：
+            - file_name: 檔案名稱
+            - file_path: CommonAPI 檔案路徑或 URL
+            - is_selected_for_ai: 是否標記為 AI 參考
+
+    Returns:
+        提取的文字內容列表（包含檔案來源標識）
     """
     reference_texts = []
-
     logger.info(f"開始處理附件，總數: {len(attachment_records)}")
 
     for attachment in attachment_records:
-        logger.info(f"檢查附件: {attachment}")
-
+        # 只處理標記為 AI 參考的附件
         if not attachment.get('is_selected_for_ai', False):
-            logger.info(f"附件 {attachment.get('file_name', '未知')} 未標記為AI參考，跳過")
+            logger.debug(f"跳過未標記為AI參考的附件: {attachment.get('file_name', '未知')}")
             continue
 
         file_path = attachment.get('file_path')
         file_name = attachment.get('file_name', '未知檔案')
 
         if not file_path:
-            logger.warning(f"附件 {file_name} 沒有檔案路徑")
+            logger.warning(f"附件 {file_name} 缺少檔案路徑，跳過")
             continue
 
-        # ✅ 所有檔案都使用 CommonAPI URL 格式
-        # CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx
-        logger.info(f"開始處理AI參考檔案: {file_name} (URL: {file_path})")
+        logger.info(f"處理 AI 參考檔案: {file_name}")
 
         try:
-            # CommonAPI 檔案需要透過 HTTP 下載後處理
-            logger.info(f"從 CommonAPI 下載檔案: {file_path}")
+            # 從 CommonAPI 下載並提取檔案內容
             extracted_text = await extract_text_from_commonapi_url(file_path, file_name)
-            
+
             if extracted_text:
-                # 添加檔案來源標識
+                # 添加檔案來源標識，方便 AI 理解內容來源
                 formatted_text = f"【檔案：{file_name}】\n{extracted_text}"
                 reference_texts.append(formatted_text)
-                logger.info(f"成功提取檔案內容: {file_name} ({len(extracted_text)} 字符)")
+                logger.info(f"✅ 成功提取: {file_name} ({len(extracted_text)} 字符)")
             else:
-                logger.warning(f"無法提取檔案內容: {file_name}")
+                logger.warning(f"⚠️ 提取失敗或檔案為空: {file_name}")
+
         except Exception as e:
             logger.error(f"處理檔案 {file_name} 時發生錯誤: {str(e)}")
-    
-    logger.info(f"附件處理完成，成功提取 {len(reference_texts)} 個檔案內容")
+            # 繼續處理其他檔案，不中斷整個流程
+            continue
+
+    logger.info(f"✅ 附件處理完成，成功提取 {len(reference_texts)}/{len(attachment_records)} 個檔案")
     return reference_texts
