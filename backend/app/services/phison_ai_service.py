@@ -38,7 +38,14 @@ async def _get_phison_token() -> Optional[str]:
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
+        # 跳過 SSL 證書驗證（因為內網 IP 使用自簽名證書）
+        import ssl
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(
                 login_url,
                 json=login_payload,
@@ -63,6 +70,10 @@ async def _get_phison_token() -> Optional[str]:
                 logger.info("成功取得 Phison token，快取 23 小時")
                 return token
 
+    except aiohttp.ClientConnectorError as e:
+        logger.warning(f"⚠️ Phison 服務器連接失敗 ({settings.PHISON_API_URL}): 服務器可能離線或網絡不可達")
+        logger.debug(f"連接錯誤詳情: {str(e)}")
+        return None
     except aiohttp.ClientError as e:
         logger.error(f"Phison 登入請求失敗: {str(e)}")
         return None
@@ -92,7 +103,7 @@ async def get_phison_enhanced_report(
     # 取得 token
     token = await _get_phison_token()
     if not token:
-        raise Exception("無法取得 Phison API Token")
+        raise ConnectionError(f"無法連接到 Phison AI 服務 ({settings.PHISON_API_URL})，請檢查服務狀態或切換到 Azure OpenAI 服務")
 
     # 構建 prompt (與 Azure OpenAI 使用相同的格式)
     system_instruction = (
@@ -154,7 +165,14 @@ async def get_phison_enhanced_report(
 
     try:
         logger.info(f"調用 Phison Chat API: {chat_url}")
-        async with aiohttp.ClientSession() as session:
+        # 跳過 SSL 證書驗證
+        import ssl
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(
                 chat_url,
                 json=payload,

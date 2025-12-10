@@ -1,6 +1,12 @@
 // frontend/src/components/DailyReportTab.tsx
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import {
   Upload,
   Edit,
@@ -1188,14 +1194,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
                 日報編輯
               </h2>
-              {writingStatus && (
+              {/* {writingStatus && (
                 <div className="flex flex-col xs:flex-row xs:items-center mt-1 text-xs sm:text-sm md:text-base text-gray-600 gap-1 xs:gap-2">
                   <span>🕐 {writingStatus.current_time}</span>
                   <span className="text-blue-600 truncate">
                     {writingStatus.message}
                   </span>
                 </div>
-              )}
+              )} */}
             </div>
             <DateSelector
               selectedDate={selectedDate || ""}
@@ -1230,7 +1236,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
             />
             <button
               onClick={handleSubmitReport}
-              disabled={isSubmitting || editingRecordKey !== null || !canSubmitCurrentDate}
+              disabled={
+                isSubmitting ||
+                editingRecordKey !== null ||
+                !canSubmitCurrentDate
+              }
               className={`inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg ${blueButtonStyle} disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex-shrink-0`}
               title={!canSubmitCurrentDate ? "當前日期不開放提交" : ""}
             >
