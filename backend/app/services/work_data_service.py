@@ -36,6 +36,7 @@ class WorkDataService:
                 LEFT JOIN jps.tjp_partner E ON A.planno = E.planno
                 WHERE (A.empno = :empno OR A.pm_empno = :empno OR E.part_empno = :empno)
                 AND (A.plan_date2 IS NULL OR A.plan_date2 >= TO_CHAR(CURRENT_DATE,'YYYYMMDD'))
+                AND A.status IS NULL
                 ORDER BY A.planno DESC
             """)
             projects = db.execute(projects_sql, {"empno": empno}).fetchall()
