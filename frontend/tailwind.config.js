@@ -8,6 +8,7 @@ export default {
       },
       fontSize: {
         // 自定義字體大小 - 擴展現有的
+        ss: "16px",
         xs: "19px", // 原本是 12px
         sm: "19px", // 原本是 14px
         base: "19px", // 原本是 16px

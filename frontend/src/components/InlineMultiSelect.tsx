@@ -58,7 +58,7 @@ const InlineMultiSelect: React.FC<InlineMultiSelectProps> = ({
               <label
                 key={option.id}
                 className={`
-                  flex items-center space-x-2 p-2 rounded cursor-pointer transition-colors text-sm
+                  flex items-center space-x-2 p-1 rounded cursor-pointer transition-colors text-ss
                   ${
                     isSelected
                       ? "bg-blue-50 border border-blue-200"
