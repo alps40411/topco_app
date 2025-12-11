@@ -5,7 +5,22 @@ import react from "@vitejs/plugin-react";
 // https://vitejs.dev/config/
 export default defineConfig({
   base: "/MyReportAI/",
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'html-transform',
+      transformIndexHtml(html) {
+        // 為 index.html 添加 meta 標籤防止快取
+        return html.replace(
+          '</head>',
+          `  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+</head>`
+        );
+      },
+    },
+  ],
 
   optimizeDeps: {
     include: ["lucide-react"],
