@@ -553,29 +553,157 @@ class DraftService:
             current_date = now.strftime('%Y%m%d')
             current_time = now.strftime('%H:%M:%S')
 
-            update_sql = text("""
-                UPDATE jps.tdr_draft
-                SET CONTENT = :content, WORD_COUNT = :word_count, ATT_FILE1 = :att_file1,
-                    ATT_FILE2 = :att_file2, FILES = :files, PLANNO = :new_planno,
-                    PLAN_SUBJ_C = :plan_subj_c, SOPNO = :new_sopno, SOP_DESC_C = :sop_desc_c,
-                    WORK_ITEM_SEQ = :work_item_seq, SERVICE_COCODE = :service_cocode,
-                    SERVICE_EMPNO = :service_empno, SERVICE_EMPNAMEC = :service_empnamec,
-                    SERVICE_TARGET_COCODE = :service_target_cocode, SERVICE_DEPTNO = :service_deptno,
-                    EXECUTION_TIME_MINUTES = :execution_time_minutes,
-                    UPDATED_DATE = :updated_date, UPDATED_TIME = :updated_time
-                WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
+            # ✅ 檢查是否需要合併：如果新的 planno+sopno 與其他記錄相同，則需要合併
+            # 排除當前正在編輯的記錄本身
+            conflict_check_sql = text("""
+                SELECT RECORD_ID, CONTENT, EXECUTION_TIME_MINUTES, WORK_ITEM_SEQ,
+                       ATT_FILE1, ATT_FILE2, FILES
+                FROM jps.tdr_draft
+                WHERE DAILY_NO = :daily_no
+                AND COALESCE(PLANNO, '') = COALESCE(:new_planno, '')
+                AND COALESCE(SOPNO, '') = COALESCE(:new_sopno, '')
+                AND RECORD_ID != :current_record_id
             """)
-            db.execute(update_sql, {
-                "content": content, "word_count": word_count, "att_file1": att_file1,
-                "att_file2": att_file2, "files": files_json, "new_planno": new_planno,
-                "plan_subj_c": plan_subj_c, "new_sopno": new_sopno, "sop_desc_c": sop_desc_c,
-                "work_item_seq": work_item_seq, "service_cocode": service_cocode,
-                "service_empno": service_empno, "service_empnamec": service_empnamec,
-                "service_target_cocode": service_target_cocode, "service_deptno": service_deptno,
-                "execution_time_minutes": execution_time_minutes,
-                "updated_date": current_date, "updated_time": current_time,
-                "daily_no": daily_no, "planno": planno, "sopno": sopno
-            })
+
+            conflict_records = db.execute(conflict_check_sql, {
+                "daily_no": daily_no,
+                "new_planno": new_planno,
+                "new_sopno": new_sopno,
+                "current_record_id": existing_record[0]
+            }).fetchall()
+
+            if conflict_records:
+                # 有衝突記錄，需要合併
+                logger.info(f"編輯時發現衝突記錄，需要合併 planno={new_planno}, sopno={new_sopno}")
+
+                # 找到目標記錄（第一個衝突記錄）
+                target_record = conflict_records[0]
+                target_record_id = target_record[0]
+                target_content = target_record[1] or ""
+                target_time = target_record[2] or 0
+                target_work_items = target_record[3] or ""
+                target_att_file1 = target_record[4] or ""
+                target_att_file2 = target_record[5] or ""
+                target_files = target_record[6] or "[]"
+
+                # 合併內容
+                merged_content = f"{target_content}\n{content}".strip() if target_content else content
+
+                # 累加執行時間
+                merged_time = target_time + execution_time_minutes
+
+                # 合併工作項目序列
+                existing_seqs = set(target_work_items.split('/')) if target_work_items else set()
+                new_seqs = set(work_item_seq.split('/')) if work_item_seq else set()
+                merged_seqs = sorted(list(existing_seqs | new_seqs - {''}))
+                merged_work_item_seq = '/'.join(merged_seqs)
+
+                # 合併檔案
+                try:
+                    target_files_list = json.loads(target_files) if target_files != "[]" else []
+                    new_files_list = json.loads(files_json) if files_json != "[]" else []
+
+                    # 去重：根據 URL 去除重複的檔案
+                    existing_urls = {f.get('url') for f in target_files_list if isinstance(f, dict)}
+                    unique_new_files = [f for f in new_files_list if isinstance(f, dict) and f.get('url') not in existing_urls]
+
+                    merged_files_list = target_files_list + unique_new_files
+                    merged_files = json.dumps(merged_files_list, ensure_ascii=False)
+
+                    # 重新生成 ATT_FILE1 和 ATT_FILE2
+                    merged_att_file1_list = []
+                    merged_att_file2_list = []
+                    for file_info in merged_files_list:
+                        if isinstance(file_info, dict):
+                            file_name = file_info.get('name', '')
+                            file_path = file_info.get('file_path') or file_info.get('url', '')
+                            if file_name:
+                                merged_att_file1_list.append(file_name)
+                            if file_path:
+                                merged_att_file2_list.append(file_path)
+
+                    merged_att_file1 = ','.join(merged_att_file1_list)
+                    merged_att_file2 = ','.join(merged_att_file2_list)
+                except Exception as e:
+                    logger.error(f"合併檔案時發生錯誤: {str(e)}")
+                    merged_files = target_files
+                    merged_att_file1 = target_att_file1
+                    merged_att_file2 = target_att_file2
+
+                merged_word_count = len(merged_content)
+
+                # 更新目標記錄
+                merge_update_sql = text("""
+                    UPDATE jps.tdr_draft
+                    SET CONTENT = :content,
+                        EXECUTION_TIME_MINUTES = :execution_time_minutes,
+                        WORK_ITEM_SEQ = :work_item_seq,
+                        WORD_COUNT = :word_count,
+                        ATT_FILE1 = :att_file1,
+                        ATT_FILE2 = :att_file2,
+                        FILES = :files,
+                        SERVICE_COCODE = COALESCE(:service_cocode, SERVICE_COCODE),
+                        SERVICE_EMPNO = COALESCE(:service_empno, SERVICE_EMPNO),
+                        SERVICE_EMPNAMEC = COALESCE(:service_empnamec, SERVICE_EMPNAMEC),
+                        SERVICE_TARGET_COCODE = COALESCE(:service_target_cocode, SERVICE_TARGET_COCODE),
+                        SERVICE_DEPTNO = COALESCE(:service_deptno, SERVICE_DEPTNO),
+                        UPDATED_DATE = :updated_date,
+                        UPDATED_TIME = :updated_time
+                    WHERE RECORD_ID = :record_id
+                """)
+
+                db.execute(merge_update_sql, {
+                    "content": merged_content,
+                    "execution_time_minutes": merged_time,
+                    "work_item_seq": merged_work_item_seq,
+                    "word_count": merged_word_count,
+                    "att_file1": merged_att_file1,
+                    "att_file2": merged_att_file2,
+                    "files": merged_files,
+                    "service_cocode": service_cocode,
+                    "service_empno": service_empno,
+                    "service_empnamec": service_empnamec,
+                    "service_target_cocode": service_target_cocode,
+                    "service_deptno": service_deptno,
+                    "updated_date": current_date,
+                    "updated_time": current_time,
+                    "record_id": target_record_id
+                })
+
+                # 刪除當前編輯的記錄
+                delete_current_sql = text("""
+                    DELETE FROM jps.tdr_draft WHERE RECORD_ID = :record_id
+                """)
+                db.execute(delete_current_sql, {"record_id": existing_record[0]})
+
+                logger.info(f"編輯合併完成：已將記錄 {existing_record[0]} 合併到 {target_record_id}")
+
+            else:
+                # 沒有衝突，正常更新
+                update_sql = text("""
+                    UPDATE jps.tdr_draft
+                    SET CONTENT = :content, WORD_COUNT = :word_count, ATT_FILE1 = :att_file1,
+                        ATT_FILE2 = :att_file2, FILES = :files, PLANNO = :new_planno,
+                        PLAN_SUBJ_C = :plan_subj_c, SOPNO = :new_sopno, SOP_DESC_C = :sop_desc_c,
+                        WORK_ITEM_SEQ = :work_item_seq, SERVICE_COCODE = :service_cocode,
+                        SERVICE_EMPNO = :service_empno, SERVICE_EMPNAMEC = :service_empnamec,
+                        SERVICE_TARGET_COCODE = :service_target_cocode, SERVICE_DEPTNO = :service_deptno,
+                        EXECUTION_TIME_MINUTES = :execution_time_minutes,
+                        UPDATED_DATE = :updated_date, UPDATED_TIME = :updated_time
+                    WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
+                """)
+                db.execute(update_sql, {
+                    "content": content, "word_count": word_count, "att_file1": att_file1,
+                    "att_file2": att_file2, "files": files_json, "new_planno": new_planno,
+                    "plan_subj_c": plan_subj_c, "new_sopno": new_sopno, "sop_desc_c": sop_desc_c,
+                    "work_item_seq": work_item_seq, "service_cocode": service_cocode,
+                    "service_empno": service_empno, "service_empnamec": service_empnamec,
+                    "service_target_cocode": service_target_cocode, "service_deptno": service_deptno,
+                    "execution_time_minutes": execution_time_minutes,
+                    "updated_date": current_date, "updated_time": current_time,
+                    "daily_no": daily_no, "planno": planno, "sopno": sopno
+                })
+
             db.commit()
         except Exception as e:
             db.rollback()

@@ -511,7 +511,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleSelectAISuggestion = (suggestion: AISuggestion) => {
     setReviewComment(suggestion.content);
-    toast.success(`已套用「${suggestion.title}」建議`);
+    toast.success(`已套用AI建議`);
   };
 
   const parseTimeString = (timeString: string): Date => {
@@ -763,7 +763,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   {/* 回應目標選擇器 - 右側 */}
                   {replyTargets.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-blue-700 whitespace-nowrap">回應給：</span>
+                      <span className="text-sm text-blue-700 whitespace-nowrap">
+                        回應給：
+                      </span>
                       <select
                         value={
                           selectedReplyTargets.length === replyTargets.length
@@ -806,7 +808,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   {/* 回應目標選擇器 - 下方 */}
                   {replyTargets.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-blue-700 whitespace-nowrap">回應給：</span>
+                      <span className="text-xs text-blue-700 whitespace-nowrap">
+                        回應給：
+                      </span>
                       <select
                         value={
                           selectedReplyTargets.length === replyTargets.length
@@ -887,7 +891,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <div className="mb-3">
                   {/* 標題和AI按鈕改為垂直排列（小螢幕） */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                    <p className="text-xs sm:text-sm text-blue-700">快速回覆建議：</p>
+                    <p className="text-xs sm:text-sm text-blue-700">
+                      快速回覆建議：
+                    </p>
                     <button
                       onClick={handleGetAISuggestions}
                       disabled={isLoadingAI}
@@ -918,7 +924,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         >
                           <span className="flex items-start gap-1">
                             <span className="flex-shrink-0">✨</span>
-                            <span className="flex-1 break-words">{suggestion.content}</span>
+                            <span className="flex-1 break-words">
+                              {suggestion.content}
+                            </span>
                           </span>
                         </button>
                       ))}
@@ -1023,7 +1031,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </h4>
                   {replyTargets.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-700 whitespace-nowrap">回應給：</span>
+                      <span className="text-sm text-slate-700 whitespace-nowrap">
+                        回應給：
+                      </span>
                       <select
                         value={
                           selectedReplyTargets.length === replyTargets.length
@@ -1065,7 +1075,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </h4>
                   {replyTargets.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-700 whitespace-nowrap">回應給：</span>
+                      <span className="text-xs text-slate-700 whitespace-nowrap">
+                        回應給：
+                      </span>
                       <select
                         value={
                           selectedReplyTargets.length === replyTargets.length
@@ -1099,7 +1111,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   )}
                 </div>
                 <div className="mb-3">
-                  <p className="text-xs sm:text-sm text-slate-700 mb-2">快速回覆建議：</p>
+                  <p className="text-xs sm:text-sm text-slate-700 mb-2">
+                    快速回覆建議：
+                  </p>
                   <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {/* 只有作者本人顯示員工回覆建議，其他所有人都顯示主管回覆建議 */}
                     {(isReportAuthor

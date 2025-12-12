@@ -137,14 +137,20 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
     if (dateParam) {
       const urlDate = parseDateParam(dateParam);
       if (urlDate) {
-        console.log(`[EmployeeListTab] ✅ 設定日期為: ${urlDate.toDateString()}`);
+        console.log(
+          `[EmployeeListTab] ✅ 設定日期為: ${urlDate.toDateString()}`
+        );
         // 使用函數式更新,確保比較的是最新狀態
-        setSelectedDate(prevDate => {
+        setSelectedDate((prevDate) => {
           if (prevDate?.toDateString() !== urlDate.toDateString()) {
-            console.log(`[EmployeeListTab] 日期已更新: ${prevDate?.toDateString()} -> ${urlDate.toDateString()}`);
+            console.log(
+              `[EmployeeListTab] 日期已更新: ${prevDate?.toDateString()} -> ${urlDate.toDateString()}`
+            );
             return urlDate;
           }
-          console.log(`[EmployeeListTab] 日期相同,不更新: ${prevDate?.toDateString()}`);
+          console.log(
+            `[EmployeeListTab] 日期相同,不更新: ${prevDate?.toDateString()}`
+          );
           return prevDate;
         });
       }
@@ -201,7 +207,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
       const day = String(selectedDate.getDate()).padStart(2, "0");
       const dateString = `${year}-${month}-${day}`;
 
-      console.log(`[EmployeeListTab] 🔍 開始載入日報資料: ${dateString} (${selectedDate.toDateString()})`);
+      console.log(
+        `[EmployeeListTab] 🔍 開始載入日報資料: ${dateString} (${selectedDate.toDateString()})`
+      );
 
       try {
         // 使用新的日報首頁API
@@ -211,7 +219,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
         // ✅ 檢查請求是否已被取消
         if (isCancelled) {
-          console.log(`[EmployeeListTab] ⚠️ 請求已取消,忽略 ${dateString} 的回應`);
+          console.log(
+            `[EmployeeListTab] ⚠️ 請求已取消,忽略 ${dateString} 的回應`
+          );
           return;
         }
 
@@ -220,7 +230,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
 
           // ✅ 再次檢查請求是否已被取消(避免 JSON 解析後狀態改變)
           if (isCancelled) {
-            console.log(`[EmployeeListTab] ⚠️ 請求已取消,忽略 ${dateString} 的資料更新`);
+            console.log(
+              `[EmployeeListTab] ⚠️ 請求已取消,忽略 ${dateString} 的資料更新`
+            );
             return;
           }
 
@@ -272,7 +284,7 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
         }
       } catch (error: any) {
         // ✅ 忽略被取消的請求錯誤
-        if (error.name === 'AbortError' || isCancelled) {
+        if (error.name === "AbortError" || isCancelled) {
           console.log(`[EmployeeListTab] 請求已取消: ${dateString}`);
           return;
         }
@@ -506,7 +518,10 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
               </div>
             </td>
             <td className="px-1 sm:px-2 md:px-3 py-2.5">
-              <div className="text-sm sm:text-base font-medium text-gray-900 truncate max-w-[120px] sm:max-w-[140px] md:max-w-[160px]" title={report.employee.name}>
+              <div
+                className="text-sm sm:text-base font-medium text-gray-900 truncate max-w-[120px] sm:max-w-[140px] md:max-w-[160px]"
+                title={report.employee.name}
+              >
                 {report.employee.name}
               </div>
               {/* 在小螢幕上顯示執行項目（因為md以下會隱藏執行項目列） */}
@@ -517,12 +532,21 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                       // ✅ 在導航到詳細頁前，先更新 URL 的日期參數
                       if (selectedDate) {
                         const year = selectedDate.getFullYear();
-                        const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
-                        const day = String(selectedDate.getDate()).padStart(2, "0");
+                        const month = String(
+                          selectedDate.getMonth() + 1
+                        ).padStart(2, "0");
+                        const day = String(selectedDate.getDate()).padStart(
+                          2,
+                          "0"
+                        );
                         const dateString = `${year}-${month}-${day}`;
                         const currentUrl = new URL(window.location.href);
                         currentUrl.searchParams.set("date", dateString);
-                        window.history.replaceState({}, "", currentUrl.toString());
+                        window.history.replaceState(
+                          {},
+                          "",
+                          currentUrl.toString()
+                        );
                       }
                       onSelectEmployee(
                         {
@@ -546,7 +570,10 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="text-xs sm:text-sm text-gray-400 px-1 py-0.5 truncate max-w-[120px] sm:max-w-[140px]" title={report.sop_desc_c || "執行項目"}>
+                  <div
+                    className="text-xs sm:text-sm text-gray-400 px-1 py-0.5 truncate max-w-[120px] sm:max-w-[140px]"
+                    title={report.sop_desc_c || "執行項目"}
+                  >
                     {report.sop_desc_c || "執行項目"}
                     {report.emergency && (
                       <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
@@ -558,19 +585,28 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
               </div>
             </td>
             {/* 執行項目列 - 只在md及以上顯示 */}
-            <td className="hidden md:table-cell px-2 sm:px-3 md:px-4 py-2 sm:py-3">
+            <td className="hidden md:table-cell px-2 sm:px-3 md:px-4 py-2">
               {report.can_view_detail ? (
                 <div
                   onClick={() => {
                     // ✅ 在導航到詳細頁前，先更新 URL 的日期參數
                     if (selectedDate) {
                       const year = selectedDate.getFullYear();
-                      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
-                      const day = String(selectedDate.getDate()).padStart(2, "0");
+                      const month = String(
+                        selectedDate.getMonth() + 1
+                      ).padStart(2, "0");
+                      const day = String(selectedDate.getDate()).padStart(
+                        2,
+                        "0"
+                      );
                       const dateString = `${year}-${month}-${day}`;
                       const currentUrl = new URL(window.location.href);
                       currentUrl.searchParams.set("date", dateString);
-                      window.history.replaceState({}, "", currentUrl.toString());
+                      window.history.replaceState(
+                        {},
+                        "",
+                        currentUrl.toString()
+                      );
                     }
                     onSelectEmployee(
                       {
@@ -585,7 +621,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                   }}
                   className="text-sm md:text-base text-blue-600 hover:text-blue-900 cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors truncate block"
                 >
-                  <span className="truncate block">{report.sop_desc_c || "執行項目"}</span>
+                  <span className="truncate block">
+                    {report.sop_desc_c || "執行項目"}
+                  </span>
                   {report.emergency && (
                     <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       緊急
@@ -594,7 +632,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
                 </div>
               ) : (
                 <div className="text-sm md:text-base text-gray-400 p-2 truncate">
-                  <span className="truncate block">{report.sop_desc_c || "執行項目"}</span>
+                  <span className="truncate block">
+                    {report.sop_desc_c || "執行項目"}
+                  </span>
                   {report.emergency && (
                     <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       緊急
@@ -658,7 +698,9 @@ const EmployeeListTab: React.FC<EmployeeListTabProps> = ({
   return (
     <div className="p-2 sm:p-4 md:p-6">
       <div className="mb-4 sm:mb-6">
-        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">日報首頁</h2>
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">
+          日報首頁
+        </h2>
 
         <SupervisorDateBar
           selectedDate={selectedDate}

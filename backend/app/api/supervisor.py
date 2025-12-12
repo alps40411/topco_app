@@ -534,17 +534,22 @@ async def get_report_detail_deprecated(
                 else:
                     file_type = "application/octet-stream"
 
-                # ✅ 所有檔案都使用 CommonAPI URL 格式
-                # 資料庫中的 filepath 應該是完整的 CommonAPI URL
-                # CommonAPI 格式: /CommonApi/api/SharedFile?FileId=xxx&Type=upimages&CoCode=A&FileName=xxx
-                file_url = filepath
+                # ✅ 使用 CommonApiFileService 生成完整的下載 URL
+                # filepath 是相對路徑 (例如: 202510/xxxxx.png)
+                # 需要轉換為完整的 CommonAPI URL
+                from app.services.commonapi_file_service import CommonApiFileService
+                file_url = CommonApiFileService.generate_download_url(
+                    file_id=filepath,  # 使用相對路徑作為 FileId
+                    filename=filename,
+                    cocode=cocode
+                )
 
                 files.append({
                     "id": file_id,
                     "name": filename,
                     "type": file_type,
                     "size": 0,  # 檔案大小暫時設為 0，因為資料庫中沒有這個欄位
-                    "url": file_url,  # 完整的檔案 URL
+                    "url": file_url,  # 完整的 CommonAPI 下載 URL
                     "filepath": filepath  # 保留原始路徑供後端使用
                 })
                 file_index += 1

@@ -284,48 +284,44 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
     >
       {/* 標題區塊 */}
       <div className="p-4 border-b border-blue-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Forward className="w-5 h-5 text-blue-600" />
-            <span className="text-lg font-medium text-blue-800">
-              跨群轉寄 (請勾選轉寄對象)
-            </span>
-          </div>
-          <div className="flex items-center">
-            {selectedCount > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {getSelectedItems().map((item) => (
-                  <div
-                    key={item.id}
-                    className="inline-flex items-center px-3 py-1 rounded-full font-medium bg-blue-100 text-blue-800 border border-blue-200"
-                    style={{ fontSize: "16px" }}
-                  >
-                    <span className="mr-2">{item.name}</span>
-                    <button
-                      onClick={() => handleRemoveSelection(item.id)}
-                      className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-200 hover:bg-blue-300 text-blue-600 hover:text-blue-800 focus:outline-none"
-                      title={`移除 ${item.name}`}
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="flex items-center space-x-2 mb-3">
+          <Forward className="w-5 h-5 text-blue-600" />
+          <span className="text-lg font-medium text-blue-800">
+            跨群轉寄 (請勾選轉寄對象)
+          </span>
         </div>
+        {selectedCount > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {getSelectedItems().map((item) => (
+              <div
+                key={item.id}
+                className="inline-flex items-center px-3 py-1 rounded-full font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                style={{ fontSize: "16px" }}
+              >
+                <span className="mr-2">{item.name}</span>
+                <button
+                  onClick={() => handleRemoveSelection(item.id)}
+                  className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-200 hover:bg-blue-300 text-blue-600 hover:text-blue-800 focus:outline-none"
+                  title={`移除 ${item.name}`}
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 內容區塊 - 始終顯示 */}
@@ -348,7 +344,7 @@ const ForwardSelector: React.FC<ForwardSelectorProps> = ({
                     key={uniqueTitleId}
                     style={{
                       display: "inline-block",
-                      flex: "1 1 calc(20% - 8px)",
+                      flex: "0 0 calc(20% - 8px)",
                       minWidth: "0",
                       boxSizing: "border-box",
                     }}

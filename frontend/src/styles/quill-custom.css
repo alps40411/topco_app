@@ -84,6 +84,18 @@ div[dangerouslySetInnerHTML] a:not(:has(img)),
 [class*="prose"] a:not(:has(img)) {
   max-width: 100%;
   display: inline-block;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 連結 hover 效果 */
+.ql-editor a:not(:has(img)):hover,
+.prose a:not(:has(img)):hover,
+div[dangerouslySetInnerHTML] a:not(:has(img)):hover,
+[class*="prose"] a:not(:has(img)):hover {
+  color: #1d4ed8;
+  text-decoration: underline;
 }
 
 /* 列表樣式 - 確保有序和無序列表能正確顯示 */

@@ -26,7 +26,7 @@ const AttachedFilesManager: React.FC<AttachedFilesManagerProps> = ({
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        附加檔案
+        附加檔案 (可勾選是否讓AI使用)
       </label>
       <div className="space-y-2">
         {files.map((file) => (
