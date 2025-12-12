@@ -225,7 +225,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             const clampedAvg = Math.min(5, Math.max(1, averageRating));
             return (
               <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200">
-                <span className="text-xs sm:text-sm text-gray-600 font-medium whitespace-nowrap">平均評分:</span>
+                <span className="text-xs sm:text-sm text-gray-600 font-medium whitespace-nowrap">
+                  平均評分:
+                </span>
                 {renderFiveLevelStars(Math.round(clampedAvg))}
               </div>
             );
@@ -266,9 +268,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
               >
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                   <div
-                    className={`inline-flex items-center px-2 sm:px-3 py-1 text-sm sm:text-base font-medium rounded-md ${
-                      getProjectColors(projectReport.project.plan_subj_c).tag
-                    }`}
+                    className={`inline-flex items-center px-2 sm:px-3 py-1 text-sm sm:text-base font-medium rounded-md bg-indigo-100 text-indigo-800`}
                   >
                     <span className="truncate max-w-[200px] sm:max-w-none">
                       {projectReport.project.plan_subj_c}

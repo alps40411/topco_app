@@ -634,12 +634,16 @@ async def get_report_detail_deprecated(
 @router.post("/reports/{report_id}/ai-suggestions")
 async def get_ai_suggestions(
     report_id: str,
+    request_body: dict,
     current_user: User = Depends(get_current_user)
 ):
     """生成 AI 建議"""
     try:
         if not current_user.employee:
             raise HTTPException(status_code=404, detail="該用戶不是員工")
+
+        # 從 request body 取得評分
+        rating = request_body.get('rating') if request_body else None
         
         # 取得 legacy 資料庫連接
         legacy_db_gen = get_legacy_db()
@@ -706,7 +710,8 @@ async def get_ai_suggestions(
             from app.services.ai_suggestion_service import generate_supervisor_reply_suggestions
             suggestions = await generate_supervisor_reply_suggestions(
                 report_content=report_content,
-                employee_name=employee_name
+                employee_name=employee_name,
+                rating=rating
             )
         
         return {"suggestions": suggestions}

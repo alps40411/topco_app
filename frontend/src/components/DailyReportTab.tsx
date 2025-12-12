@@ -1350,10 +1350,32 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
                   {/* 第三行：工作項目 */}
                   {report.work_item_name && (
-                    <div>
+                    <div className="mb-2">
                       <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-purple-100 text-purple-800 max-w-full">
                         <span className="truncate">
                           {report.work_item_name}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 第四行：服務公司 */}
+                  {report.service_company_name && (
+                    <div className="mb-2">
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 max-w-full">
+                        <span className="truncate">
+                          服務公司：{report.service_company_name}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 第五行：服務對象 */}
+                  {report.service_target_name && (
+                    <div>
+                      <div className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-orange-100 text-orange-800 max-w-full">
+                        <span className="truncate">
+                          服務對象：{report.service_target_name}
                         </span>
                       </div>
                     </div>

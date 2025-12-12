@@ -490,6 +490,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         `/api/supervisor/reports/${reportId}/ai-suggestions`,
         {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            rating: selectedRating,
+          }),
         }
       );
       if (response.ok) {
@@ -576,18 +582,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const date = parseTimeString(timeString);
     if (date.getTime() === 0) return "無效時間";
 
-    const now = new Date();
-    const diffInMinutes = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60)
-    );
-    if (diffInMinutes < 1) return "剛剛";
-    if (diffInMinutes < 60) return `${diffInMinutes}分鐘前`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}小時前`;
-    return date.toLocaleDateString("zh-TW", {
-      month: "numeric",
-      day: "numeric",
+    return date.toLocaleString("zh-TW", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
     });
   };
 

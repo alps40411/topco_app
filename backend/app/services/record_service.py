@@ -513,17 +513,21 @@ class RecordService:
         current_date: str, current_time: str
     ):
         """處理日報的詳細記錄（detail1 和 detail2）"""
-        # 按 planno + sopno 分組
+        # 按 planno + sopno + service_cocode + service_empno 分組
         planno_sopno_groups = {}
         for draft in draft_results:
             planno = draft[5] or ""
             sopno = draft[7]
-            group_key = f"{planno}_{sopno}"
+            service_cocode = draft[10] or ""
+            service_empno = draft[11] or ""
+            group_key = f"{planno}_{sopno}_{service_cocode}_{service_empno}"
 
             if group_key not in planno_sopno_groups:
                 planno_sopno_groups[group_key] = {
                     'planno': planno,
                     'sopno': sopno,
+                    'service_cocode': service_cocode,
+                    'service_empno': service_empno,
                     'drafts': [],
                     'files': []
                 }
@@ -640,12 +644,16 @@ class RecordService:
         for draft in draft_results:
             planno = draft[5] or ""
             sopno = draft[7]
-            group_key = f"{planno}_{sopno}"
+            service_cocode = draft[10] or ""
+            service_empno = draft[11] or ""
+            group_key = f"{planno}_{sopno}_{service_cocode}_{service_empno}"
 
             if group_key not in planno_sopno_groups:
                 planno_sopno_groups[group_key] = {
                     'planno': planno,
                     'sopno': sopno,
+                    'service_cocode': service_cocode,
+                    'service_empno': service_empno,
                     'drafts': [],
                     'files': []
                 }

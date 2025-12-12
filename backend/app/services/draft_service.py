@@ -122,27 +122,35 @@ class DraftService:
                         daily_no = f"DR{current_date}{current_time.replace(':', '')}"
                     logger.info(f"今天第一次填寫，創建新 daily_no: {daily_no}")
             
-            # 檢查是否已存在相同 planno + sopno + work_item_seq 組合的記錄
+            # 取得服務相關資訊
+            service_cocode = draft_content.get('service_cocode', '')
+            service_empno = draft_content.get('service_empno', '')
+
+            # 檢查是否已存在相同 planno + sopno + work_item_seq + service_cocode + service_empno 組合的記錄
             existing_exact_match_sql = text("""
-                SELECT RECORD_ID, DAILY_NO, CONTENT, EXECUTION_TIME_MINUTES, WORK_ITEM_SEQ, 
+                SELECT RECORD_ID, DAILY_NO, CONTENT, EXECUTION_TIME_MINUTES, WORK_ITEM_SEQ,
                        WORD_COUNT, ATT_FILE1, ATT_FILE2, FILES
                 FROM jps.tdr_draft
-                WHERE DAILY_NO = :daily_no 
+                WHERE DAILY_NO = :daily_no
                 AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
                 AND COALESCE(SOPNO, '') = COALESCE(:sopno, '')
                 AND COALESCE(WORK_ITEM_SEQ, '') = COALESCE(:work_item_seq, '')
+                AND COALESCE(SERVICE_COCODE, '') = COALESCE(:service_cocode, '')
+                AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:service_empno, '')
             """)
-            
+
             existing_exact_match = db.execute(existing_exact_match_sql, {
                 "daily_no": daily_no,
                 "planno": planno,
                 "sopno": sopno,
-                "work_item_seq": work_item_seq_str
+                "work_item_seq": work_item_seq_str,
+                "service_cocode": service_cocode,
+                "service_empno": service_empno
             }).fetchone()
-            
+
             if existing_exact_match:
-                # 完全相同的工作計畫+執行工作+工作項目：合併內容
-                logger.info(f"找到完全相同的 planno({planno})+sopno({sopno})+work_item_seq({work_item_seq_str}) 組合，合併內容")
+                # 完全相同的工作計畫+執行工作+工作項目+服務公司+服務對象：合併內容
+                logger.info(f"找到完全相同的 planno({planno})+sopno({sopno})+work_item_seq({work_item_seq_str})+service({service_cocode},{service_empno}) 組合，合併內容")
 
                 # 合併內容
                 existing_content = existing_exact_match[2] or ""
@@ -244,26 +252,30 @@ class DraftService:
                 return daily_no
                 
             else:
-                # 檢查是否存在相同 planno + sopno 但不同 work_item_seq 的記錄
+                # 檢查是否存在相同 planno + sopno + service 但不同 work_item_seq 的記錄
                 existing_partial_match_sql = text("""
                     SELECT RECORD_ID, WORK_ITEM_SEQ
                     FROM jps.tdr_draft
-                    WHERE DAILY_NO = :daily_no 
+                    WHERE DAILY_NO = :daily_no
                     AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
                     AND COALESCE(SOPNO, '') = COALESCE(:sopno, '')
+                    AND COALESCE(SERVICE_COCODE, '') = COALESCE(:service_cocode, '')
+                    AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:service_empno, '')
                     AND COALESCE(WORK_ITEM_SEQ, '') != COALESCE(:work_item_seq, '')
                 """)
-                
+
                 existing_partial_matches = db.execute(existing_partial_match_sql, {
                     "daily_no": daily_no,
                     "planno": planno,
                     "sopno": sopno,
+                    "service_cocode": service_cocode,
+                    "service_empno": service_empno,
                     "work_item_seq": work_item_seq_str
                 }).fetchall()
-                
+
                 if existing_partial_matches:
-                    # 相同工作計畫+執行工作，但不同工作項目：合併工作項目序列
-                    logger.info(f"找到相同 planno({planno})+sopno({sopno})，但不同工作項目，合併工作項目序列")
+                    # 相同工作計畫+執行工作+服務，但不同工作項目：合併工作項目序列
+                    logger.info(f"找到相同 planno({planno})+sopno({sopno})+service({service_cocode},{service_empno})，但不同工作項目，合併工作項目序列")
                     
                     # 收集所有現有的工作項目序列
                     existing_work_item_seqs = []
@@ -553,7 +565,11 @@ class DraftService:
             current_date = now.strftime('%Y%m%d')
             current_time = now.strftime('%H:%M:%S')
 
-            # ✅ 檢查是否需要合併：如果新的 planno+sopno 與其他記錄相同，則需要合併
+            # 取得新的服務資訊
+            new_service_cocode = service_cocode or ''
+            new_service_empno = service_empno or ''
+
+            # ✅ 檢查是否需要合併：如果新的 planno+sopno+service 與其他記錄相同，則需要合併
             # 排除當前正在編輯的記錄本身
             conflict_check_sql = text("""
                 SELECT RECORD_ID, CONTENT, EXECUTION_TIME_MINUTES, WORK_ITEM_SEQ,
@@ -562,6 +578,8 @@ class DraftService:
                 WHERE DAILY_NO = :daily_no
                 AND COALESCE(PLANNO, '') = COALESCE(:new_planno, '')
                 AND COALESCE(SOPNO, '') = COALESCE(:new_sopno, '')
+                AND COALESCE(SERVICE_COCODE, '') = COALESCE(:new_service_cocode, '')
+                AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:new_service_empno, '')
                 AND RECORD_ID != :current_record_id
             """)
 
@@ -569,12 +587,14 @@ class DraftService:
                 "daily_no": daily_no,
                 "new_planno": new_planno,
                 "new_sopno": new_sopno,
+                "new_service_cocode": new_service_cocode,
+                "new_service_empno": new_service_empno,
                 "current_record_id": existing_record[0]
             }).fetchall()
 
             if conflict_records:
                 # 有衝突記錄，需要合併
-                logger.info(f"編輯時發現衝突記錄，需要合併 planno={new_planno}, sopno={new_sopno}")
+                logger.info(f"編輯時發現衝突記錄，需要合併 planno={new_planno}, sopno={new_sopno}, service=({new_service_cocode},{new_service_empno})")
 
                 # 找到目標記錄（第一個衝突記錄）
                 target_record = conflict_records[0]

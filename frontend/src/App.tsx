@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { toast } from "react-hot-toast";
-import DataInputTab from "./components/DataInputTab";
 import DailyReportTab from "./components/DailyReportTab";
 // import MyReportsTab from "./components/MyReportsTab"; // 已移除我的日報功能
 // import AIDailyReportTab from './components/AIDailyReportTab';
@@ -173,7 +172,7 @@ function App() {
   const [searchParams] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<
-    "input" | "daily" | "supervisor" | "ai" | "comprehensive"
+    "daily" | "supervisor" | "ai" | "comprehensive"
   >("supervisor"); // 預設為日報首頁
 
   const [selectedEmployee, setSelectedEmployee] =
@@ -181,7 +180,7 @@ function App() {
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   // ✅ writingStatus 已移至 AuthContext，不再需要本地狀態
 
-  // 全局日期狀態，讓隨筆紀錄頁和日報編輯頁共享
+  // 全局日期狀態，讓日報相關頁面共享
   const [globalSelectedDate, setGlobalSelectedDate] = useState<string | null>(
     null
   );
@@ -191,7 +190,7 @@ function App() {
 
   // 添加歷史管理的標籤切換函數
   const changeTab = useCallback(
-    (tab: "input" | "daily" | "supervisor" | "ai" | "comprehensive") => {
+    (tab: "daily" | "supervisor" | "ai" | "comprehensive") => {
       setActiveTab(tab);
       setSelectedEmployee(null);
       setSelectedReportId(null);
@@ -202,7 +201,7 @@ function App() {
         const url = dateParam ? `?tab=${tab}&date=${dateParam}` : `?tab=${tab}`;
         navigate(url, { replace: false });
       } else {
-        // 切換到日報編輯或隨筆紀錄時，不帶日期參數，並清除全域日期狀態
+        // 切換到日報編輯時，不帶日期參數，並清除全域日期狀態
         setGlobalSelectedDate(null);
         navigate(`?tab=${tab}`, { replace: false });
       }
@@ -384,7 +383,7 @@ function App() {
   useEffect(() => {
     if (writingStatus && !writingStatus.allowed) {
       // 如果不允許寫入，且當前在編輯標籤，切換到日報首頁
-      if (activeTab === "input" || activeTab === "daily") {
+      if (activeTab === "daily") {
         changeTab("supervisor");
       }
     }
@@ -435,20 +434,6 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex space-x-1">
-                {/* 隨筆紀錄 */}
-                {writingStatus?.allowed && (
-                  <button
-                    onClick={() => changeTab("input")}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      activeTab === "input"
-                        ? "bg-green-100 text-green-700"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    隨筆紀錄
-                  </button>
-                )}
-
                 {/* 日報編輯 */}
                 {writingStatus?.allowed && (
                   <button
@@ -542,20 +527,6 @@ function App() {
             {/* 第二行：導航按鈕 */}
             <div className="flex items-center justify-center h-12 sm:h-14">
               <div className="flex space-x-1 sm:space-x-2">
-                {/* 隨筆紀錄 */}
-                {writingStatus?.allowed && (
-                  <button
-                    onClick={() => changeTab("input")}
-                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
-                      activeTab === "input"
-                        ? "bg-green-100 text-green-700"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    隨筆紀錄
-                  </button>
-                )}
-
                 {/* 日報編輯 */}
                 {writingStatus?.allowed && (
                   <button
@@ -619,13 +590,6 @@ function App() {
           )}
 
         {/* 內容區域 */}
-        {activeTab === "input" && (
-          <DataInputTab
-            key="data-input"
-            selectedDate={globalSelectedDate}
-            onDateChange={setGlobalSelectedDate}
-          />
-        )}
         {activeTab === "daily" && (
           <DailyReportTab
             key="daily-report"

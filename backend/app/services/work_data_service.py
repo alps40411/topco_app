@@ -35,7 +35,7 @@ class WorkDataService:
                 FROM jps.tjp_master A
                 LEFT JOIN jps.tjp_partner E ON A.planno = E.planno
                 WHERE (A.empno = :empno OR A.pm_empno = :empno OR E.part_empno = :empno)
-                AND (A.plan_date2 IS NULL OR A.plan_date2 >= TO_CHAR(CURRENT_DATE,'YYYYMMDD'))
+                AND (A.plan_date2 IS NULL OR A.plan_date2 >= TO_CHAR(CURRENT_DATE,'YYYYMMDD') OR A.plan_date2 = '')
                 AND A.status IS NULL
                 ORDER BY A.planno DESC
             """)
