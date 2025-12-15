@@ -512,17 +512,28 @@ class DraftService:
             raise
 
     @staticmethod
-    def update_draft(db: Session, daily_no: str, planno: str, sopno: str, update_data: Dict[str, Any]) -> None:
-        """根據 daily_no、planno 和 sopno 更新特定的暫存記錄"""
+    def update_draft(db: Session, daily_no: str, planno: str, sopno: str, update_data: Dict[str, Any],
+                     service_cocode: str = "", service_empno: str = "") -> None:
+        """根據 daily_no、planno、sopno、service_cocode 和 service_empno 更新特定的暫存記錄"""
         try:
             if planno == "NULL":
                 planno = ""
 
             check_sql = text("""
                 SELECT RECORD_ID FROM jps.tdr_draft
-                WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
+                WHERE DAILY_NO = :daily_no
+                AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
+                AND SOPNO = :sopno
+                AND COALESCE(SERVICE_COCODE, '') = COALESCE(:service_cocode, '')
+                AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:service_empno, '')
             """)
-            existing_record = db.execute(check_sql, {"daily_no": daily_no, "planno": planno, "sopno": sopno}).fetchone()
+            existing_record = db.execute(check_sql, {
+                "daily_no": daily_no,
+                "planno": planno,
+                "sopno": sopno,
+                "service_cocode": service_cocode,
+                "service_empno": service_empno
+            }).fetchone()
 
             if not existing_record:
                 raise ValueError("找不到指定的暫存記錄")
@@ -565,39 +576,40 @@ class DraftService:
             current_date = now.strftime('%Y%m%d')
             current_time = now.strftime('%H:%M:%S')
 
-            # 取得新的服務資訊
-            new_service_cocode = service_cocode or ''
-            new_service_empno = service_empno or ''
+            # 取得新的服務資訊（從 update_data）
+            new_service_cocode = update_data.get('service_cocode', '')
+            new_service_empno = update_data.get('service_empno', '')
 
-            # ✅ 檢查是否需要合併：如果新的 planno+sopno+service 與其他記錄相同，則需要合併
-            # 排除當前正在編輯的記錄本身
-            conflict_check_sql = text("""
+            # ✅ 第一層檢查：完全相同的記錄（planno + sopno + work_item_seq + service 都相同）
+            exact_match_sql = text("""
                 SELECT RECORD_ID, CONTENT, EXECUTION_TIME_MINUTES, WORK_ITEM_SEQ,
                        ATT_FILE1, ATT_FILE2, FILES
                 FROM jps.tdr_draft
                 WHERE DAILY_NO = :daily_no
                 AND COALESCE(PLANNO, '') = COALESCE(:new_planno, '')
                 AND COALESCE(SOPNO, '') = COALESCE(:new_sopno, '')
+                AND COALESCE(WORK_ITEM_SEQ, '') = COALESCE(:work_item_seq, '')
                 AND COALESCE(SERVICE_COCODE, '') = COALESCE(:new_service_cocode, '')
                 AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:new_service_empno, '')
                 AND RECORD_ID != :current_record_id
             """)
 
-            conflict_records = db.execute(conflict_check_sql, {
+            exact_match_records = db.execute(exact_match_sql, {
                 "daily_no": daily_no,
                 "new_planno": new_planno,
                 "new_sopno": new_sopno,
+                "work_item_seq": work_item_seq,
                 "new_service_cocode": new_service_cocode,
                 "new_service_empno": new_service_empno,
                 "current_record_id": existing_record[0]
             }).fetchall()
 
-            if conflict_records:
-                # 有衝突記錄，需要合併
-                logger.info(f"編輯時發現衝突記錄，需要合併 planno={new_planno}, sopno={new_sopno}, service=({new_service_cocode},{new_service_empno})")
+            if exact_match_records:
+                # 完全相同：合併內容、累加時間
+                logger.info(f"編輯時發現完全相同的記錄，合併內容 planno={new_planno}, sopno={new_sopno}, work_item_seq={work_item_seq}, service=({new_service_cocode},{new_service_empno})")
 
-                # 找到目標記錄（第一個衝突記錄）
-                target_record = conflict_records[0]
+                # 找到目標記錄（第一個完全相同的記錄）
+                target_record = exact_match_records[0]
                 target_record_id = target_record[0]
                 target_content = target_record[1] or ""
                 target_time = target_record[2] or 0
@@ -699,29 +711,102 @@ class DraftService:
                 logger.info(f"編輯合併完成：已將記錄 {existing_record[0]} 合併到 {target_record_id}")
 
             else:
-                # 沒有衝突，正常更新
-                update_sql = text("""
+                # ✅ 第二層檢查：部分相同的記錄（planno + sopno + service 相同，但 work_item_seq 不同）
+                partial_match_sql = text("""
+                    SELECT RECORD_ID, WORK_ITEM_SEQ
+                    FROM jps.tdr_draft
+                    WHERE DAILY_NO = :daily_no
+                    AND COALESCE(PLANNO, '') = COALESCE(:new_planno, '')
+                    AND COALESCE(SOPNO, '') = COALESCE(:new_sopno, '')
+                    AND COALESCE(SERVICE_COCODE, '') = COALESCE(:new_service_cocode, '')
+                    AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:new_service_empno, '')
+                    AND COALESCE(WORK_ITEM_SEQ, '') != COALESCE(:work_item_seq, '')
+                    AND RECORD_ID != :current_record_id
+                """)
+
+                partial_match_records = db.execute(partial_match_sql, {
+                    "daily_no": daily_no,
+                    "new_planno": new_planno,
+                    "new_sopno": new_sopno,
+                    "new_service_cocode": new_service_cocode,
+                    "new_service_empno": new_service_empno,
+                    "work_item_seq": work_item_seq,
+                    "current_record_id": existing_record[0]
+                }).fetchall()
+
+                if partial_match_records:
+                    # 部分相同：合併工作項目序列
+                    logger.info(f"編輯時發現部分相同的記錄，合併工作項目序列 planno={new_planno}, sopno={new_sopno}, service=({new_service_cocode},{new_service_empno})")
+
+                    # 取第一筆部分相同的記錄
+                    target_record_id = partial_match_records[0][0]
+                    target_work_items = partial_match_records[0][1] or ""
+
+                    # 合併工作項目序列
+                    existing_seqs = set(target_work_items.split('/')) if target_work_items else set()
+                    new_seqs = set(work_item_seq.split('/')) if work_item_seq else set()
+                    merged_seqs = sorted(list(existing_seqs | new_seqs - {''}))
+                    merged_work_item_seq = '/'.join(merged_seqs)
+
+                    # 使用 COALESCE 合併內容、累加時間
+                    merge_partial_sql = text("""
+                        UPDATE jps.tdr_draft
+                        SET CONTENT = COALESCE(CONTENT, '') || CASE WHEN COALESCE(CONTENT, '') = '' THEN '' ELSE '\n' END || :new_content,
+                            EXECUTION_TIME_MINUTES = COALESCE(EXECUTION_TIME_MINUTES, 0) + :additional_time,
+                            WORK_ITEM_SEQ = :merged_work_item_seq,
+                            WORD_COUNT = CHAR_LENGTH(COALESCE(CONTENT, '') || CASE WHEN COALESCE(CONTENT, '') = '' THEN '' ELSE '\n' END || :new_content),
+                            ATT_FILE1 = CASE WHEN :att_file1 = '' THEN ATT_FILE1 ELSE COALESCE(ATT_FILE1, '') || CASE WHEN COALESCE(ATT_FILE1, '') = '' THEN '' ELSE ',' END || :att_file1 END,
+                            ATT_FILE2 = CASE WHEN :att_file2 = '' THEN ATT_FILE2 ELSE COALESCE(ATT_FILE2, '') || CASE WHEN COALESCE(ATT_FILE2, '') = '' THEN '' ELSE ',' END || :att_file2 END,
+                            UPDATED_DATE = :updated_date,
+                            UPDATED_TIME = :updated_time
+                        WHERE RECORD_ID = :record_id
+                    """)
+
+                    db.execute(merge_partial_sql, {
+                        "new_content": content,
+                        "additional_time": execution_time_minutes,
+                        "merged_work_item_seq": merged_work_item_seq,
+                        "att_file1": att_file1,
+                        "att_file2": att_file2,
+                        "updated_date": current_date,
+                        "updated_time": current_time,
+                        "record_id": target_record_id
+                    })
+
+                    # 刪除當前編輯的記錄
+                    delete_current_sql = text("""
+                        DELETE FROM jps.tdr_draft WHERE RECORD_ID = :record_id
+                    """)
+                    db.execute(delete_current_sql, {"record_id": existing_record[0]})
+
+                    logger.info(f"編輯部分合併完成：已將記錄 {existing_record[0]} 合併到 {target_record_id}")
+
+                else:
+                    # 完全不同：正常更新
+                    update_sql = text("""
                     UPDATE jps.tdr_draft
                     SET CONTENT = :content, WORD_COUNT = :word_count, ATT_FILE1 = :att_file1,
                         ATT_FILE2 = :att_file2, FILES = :files, PLANNO = :new_planno,
                         PLAN_SUBJ_C = :plan_subj_c, SOPNO = :new_sopno, SOP_DESC_C = :sop_desc_c,
-                        WORK_ITEM_SEQ = :work_item_seq, SERVICE_COCODE = :service_cocode,
-                        SERVICE_EMPNO = :service_empno, SERVICE_EMPNAMEC = :service_empnamec,
+                        WORK_ITEM_SEQ = :work_item_seq, SERVICE_COCODE = :new_service_cocode,
+                        SERVICE_EMPNO = :new_service_empno, SERVICE_EMPNAMEC = :service_empnamec,
                         SERVICE_TARGET_COCODE = :service_target_cocode, SERVICE_DEPTNO = :service_deptno,
                         EXECUTION_TIME_MINUTES = :execution_time_minutes,
                         UPDATED_DATE = :updated_date, UPDATED_TIME = :updated_time
-                    WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno
+                    WHERE RECORD_ID = :record_id
                 """)
                 db.execute(update_sql, {
                     "content": content, "word_count": word_count, "att_file1": att_file1,
                     "att_file2": att_file2, "files": files_json, "new_planno": new_planno,
                     "plan_subj_c": plan_subj_c, "new_sopno": new_sopno, "sop_desc_c": sop_desc_c,
-                    "work_item_seq": work_item_seq, "service_cocode": service_cocode,
-                    "service_empno": service_empno, "service_empnamec": service_empnamec,
+                    "work_item_seq": work_item_seq,
+                    "new_service_cocode": update_data.get('service_cocode', ''),
+                    "new_service_empno": update_data.get('service_empno', ''),
+                    "service_empnamec": service_empnamec,
                     "service_target_cocode": service_target_cocode, "service_deptno": service_deptno,
                     "execution_time_minutes": execution_time_minutes,
                     "updated_date": current_date, "updated_time": current_time,
-                    "daily_no": daily_no, "planno": planno, "sopno": sopno
+                    "record_id": existing_record[0]
                 })
 
             db.commit()

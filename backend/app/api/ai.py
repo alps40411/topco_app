@@ -34,6 +34,8 @@ async def enhance_record(
     planno: str,
     sopno: str,
     ai_service: str = "aoai",  # 新增參數: aoai 或 phison
+    service_cocode: str = "",  # 服務公司代碼
+    service_empno: str = "",   # 服務對象員工編號
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
@@ -43,20 +45,25 @@ async def enhance_record(
         if planno == "NULL":
             planno = ""
 
-        logger.info(f"AI增強請求: daily_no={daily_no}, planno='{planno}', sopno={sopno}, ai_service={ai_service}")
+        logger.info(f"AI增強請求: daily_no={daily_no}, planno='{planno}', sopno={sopno}, service_cocode='{service_cocode}', service_empno='{service_empno}', ai_service={ai_service}")
 
         if not current_user.employee:
             raise HTTPException(status_code=400, detail="User has no employee information")
 
         empno = current_user.employee.empno
 
-        # 查詢記錄內容 - 使用 daily_no + planno + sopno 來精確識別單一記錄，同時取得FILES欄位
+        # 查詢記錄內容 - 使用 daily_no + planno + sopno + service 來精確識別單一記錄，同時取得FILES欄位
         record_sql = text("""
             SELECT DAILY_NO, CONTENT, PLANNO, PLAN_SUBJ_C, SOPNO, SOP_DESC_C,
                    WORK_ITEM_SEQ, SERVICE_COCODE, SERVICE_EMPNO, SERVICE_EMPNAMEC,
                    EXECUTION_TIME_MINUTES, AI_CONTENT, FILES
             FROM jps.tdr_draft
-            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
+            WHERE DAILY_NO = :daily_no
+            AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
+            AND SOPNO = :sopno
+            AND EMPNO = :empno
+            AND COALESCE(SERVICE_COCODE, '') = COALESCE(:service_cocode, '')
+            AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:service_empno, '')
         """)
 
         # ✅ 使用 threadpool 避免阻塞事件循環
@@ -65,7 +72,9 @@ async def enhance_record(
                 "daily_no": daily_no,
                 "planno": planno,
                 "sopno": sopno,
-                "empno": empno
+                "empno": empno,
+                "service_cocode": service_cocode,
+                "service_empno": service_empno
             }).fetchone()
         )
 
@@ -130,9 +139,14 @@ async def enhance_record(
                 AI_SERVICE = :ai_service,
                 UPDATED_DATE = TO_CHAR(sysdate, 'YYYYMMDD'),
                 UPDATED_TIME = TO_CHAR(sysdate, 'HH24:MI:SS')
-            WHERE DAILY_NO = :daily_no AND COALESCE(PLANNO, '') = COALESCE(:planno, '') AND SOPNO = :sopno AND EMPNO = :empno
+            WHERE DAILY_NO = :daily_no
+            AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
+            AND SOPNO = :sopno
+            AND EMPNO = :empno
+            AND COALESCE(SERVICE_COCODE, '') = COALESCE(:service_cocode, '')
+            AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:service_empno, '')
         """)
-        
+
         # ✅ 使用 threadpool 避免阻塞事件循環
         await run_in_threadpool(
             lambda: db.execute(update_sql, {
@@ -141,7 +155,9 @@ async def enhance_record(
                 "sopno": sopno,
                 "empno": empno,
                 "ai_content": enhanced_content,
-                "ai_service": ai_service
+                "ai_service": ai_service,
+                "service_cocode": service_cocode,
+                "service_empno": service_empno
             })
         )
         

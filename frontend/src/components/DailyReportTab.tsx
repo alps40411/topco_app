@@ -86,7 +86,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeletingDraft, setIsDeletingDraft] = useState(false);
-  const [editingRecordKey, setEditingRecordKey] = useState<string | null>(null); // 格式: daily_no-planno-sopno
+  const [editingRecordKey, setEditingRecordKey] = useState<string | null>(null); // 格式: daily_no-planno-sopno-service_cocode-service_empno
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
   const [editProjectId, setEditProjectId] = useState<number | undefined>(
@@ -277,9 +277,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const handleEnhanceOne = async (report: ConsolidatedReport) => {
     if (!authFetch || !user?.employee?.empno) return;
 
-    // 使用 daily_no + planno + sopno 作為唯一識別符
+    // 使用 daily_no + planno + sopno + service_cocode + service_empno 作為唯一識別符
     const planno = report.project?.planno || "NULL";
-    const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
+    const serviceCocode = report.service_cocode || "";
+    const serviceEmpno = report.service_empno || "";
+    const reportKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
     setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
 
     try {
@@ -295,8 +297,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       // 檢查 planno 是否存在，如果不存在則使用 "NULL" 作為佔位符
       const planno = report.project?.planno || "NULL";
 
+      // 構建查詢參數，包含 AI 服務和 service 資訊
+      const queryParams = new URLSearchParams();
+      queryParams.append("ai_service", selectedAiService);
+      if (serviceCocode) queryParams.append("service_cocode", serviceCocode);
+      if (serviceEmpno) queryParams.append("service_empno", serviceEmpno);
+
       const response = await authFetch(
-        `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?ai_service=${selectedAiService}`,
+        `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?${queryParams.toString()}`,
         {
           method: "POST",
           headers: {
@@ -311,13 +319,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
       const enhancedReport = await response.json();
 
-      // 更新報告內容 - 使用 daily_no + planno + sopno 精確識別
+      // 更新報告內容 - 使用 daily_no + planno + sopno + service 精確識別
       setReports((prev) =>
         prev.map((r) => {
           const rPlanno = r.project?.planno || "NULL";
+          const rServiceCocode = r.service_cocode || "";
+          const rServiceEmpno = r.service_empno || "";
           return r.daily_no === report.daily_no &&
             rPlanno === planno &&
-            r.sopno === report.sopno
+            r.sopno === report.sopno &&
+            rServiceCocode === serviceCocode &&
+            rServiceEmpno === serviceEmpno
             ? { ...r, ai_content: enhancedReport.ai_content }
             : r;
         })
@@ -356,16 +368,24 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
         // 檢查 planno 是否存在，如果不存在則使用 "NULL" 作為佔位符
         const planno = report.project?.planno || "NULL";
+        const serviceCocode = report.service_cocode || "";
+        const serviceEmpno = report.service_empno || "";
 
-        // 使用 daily_no + planno + sopno 作為唯一識別符
-        const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
+        // 使用 daily_no + planno + sopno + service_cocode + service_empno 作為唯一識別符
+        const reportKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
 
         try {
           // 設置該專案為生成中狀態
           setGeneratingAiFor((prev) => new Set([...prev, reportKey]));
 
+          // 構建查詢參數，包含 AI 服務和 service 資訊
+          const queryParams = new URLSearchParams();
+          queryParams.append("ai_service", selectedAiService);
+          if (serviceCocode) queryParams.append("service_cocode", serviceCocode);
+          if (serviceEmpno) queryParams.append("service_empno", serviceEmpno);
+
           const response = await authFetch(
-            `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?ai_service=${selectedAiService}`,
+            `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?${queryParams.toString()}`,
             {
               method: "POST",
               headers: {
@@ -377,13 +397,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           if (response.ok) {
             const enhancedReport = await response.json();
 
-            // 更新該專案的AI內容 - 使用 daily_no + planno + sopno 精確識別
+            // 更新該專案的AI內容 - 使用 daily_no + planno + sopno + service 精確識別
             setReports((prev) =>
               prev.map((r) => {
                 const rPlanno = r.project?.planno || "NULL";
+                const rServiceCocode = r.service_cocode || "";
+                const rServiceEmpno = r.service_empno || "";
                 return r.daily_no === report.daily_no &&
                   rPlanno === planno &&
-                  r.sopno === report.sopno
+                  r.sopno === report.sopno &&
+                  rServiceCocode === serviceCocode &&
+                  rServiceEmpno === serviceEmpno
                   ? { ...r, ai_content: enhancedReport.ai_content }
                   : r;
               })
@@ -424,9 +448,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       toast.error("無法編輯：缺少執行工作編號");
       return;
     }
-    // 使用 daily_no + planno + sopno 組合作為唯一識別
+    // 使用 daily_no + planno + sopno + service_cocode + service_empno 組合作為唯一識別
     const planno = report.project?.planno || "NULL";
-    const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+    const serviceCocode = report.service_cocode || "";
+    const serviceEmpno = report.service_empno || "";
+    const recordKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
     setEditingRecordKey(recordKey);
     const content = report.content;
     const files = report.files.map((f) => ({
@@ -497,14 +523,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       return;
     }
 
-    // 從 editingRecordKey 解析出 daily_no, planno, sopno
-    const [daily_no, planno, sopno] = editingRecordKey.split("-");
+    // 從 editingRecordKey 解析出 daily_no, planno, sopno, service_cocode, service_empno
+    const [daily_no, planno, sopno, service_cocode = "", service_empno = ""] = editingRecordKey.split("-");
 
     const reportToDelete = reports.find(
       (r) =>
         r.daily_no === daily_no &&
         (r.project?.planno || "NULL") === planno &&
-        r.sopno === sopno
+        r.sopno === sopno &&
+        (r.service_cocode || "") === service_cocode &&
+        (r.service_empno || "") === service_empno
     );
     if (!reportToDelete) {
       toast.error("無法找到記錄資訊");
@@ -570,19 +598,28 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
     setIsSaving(true);
     try {
-      // 從 editingRecordKey 解析出 daily_no, planno, sopno
-      const [daily_no, planno, sopno] = editingRecordKey.split("-");
+      // 從 editingRecordKey 解析出 daily_no, planno, sopno, service_cocode, service_empno
+      const [daily_no, planno, sopno, service_cocode = "", service_empno = ""] = editingRecordKey.split("-");
 
       const reportToUpdate = reports.find(
         (r) =>
           r.daily_no === daily_no &&
           (r.project?.planno || "NULL") === planno &&
-          r.sopno === sopno
+          r.sopno === sopno &&
+          (r.service_cocode || "") === service_cocode &&
+          (r.service_empno || "") === service_empno
       );
       if (!reportToUpdate) throw new Error("找不到原始報告");
 
+      // 構建 query parameters，包含服務資訊
+      const queryParams = new URLSearchParams();
+      if (service_cocode) queryParams.append("service_cocode", service_cocode);
+      if (service_empno) queryParams.append("service_empno", service_empno);
+      const queryString = queryParams.toString();
+      const url = `/api/drafts/by-daily-planno-sopno/${daily_no}/${planno}/${sopno}${queryString ? `?${queryString}` : ''}`;
+
       const response = await authFetch(
-        `/api/drafts/by-daily-planno-sopno/${daily_no}/${planno}/${sopno}`,
+        url,
         {
           method: "PUT",
           headers: {
@@ -1293,7 +1330,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                       {/* 右側：按鈕組 */}
                       {(() => {
                         const planno = report.project?.planno || "NULL";
-                        const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                        const serviceCocode = report.service_cocode || "";
+                        const serviceEmpno = report.service_empno || "";
+                        const recordKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
                         return editingRecordKey !== recordKey;
                       })() && (
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -1308,7 +1347,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           >
                             {(() => {
                               const planno = report.project?.planno || "NULL";
-                              const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                              const serviceCocode = report.service_cocode || "";
+                              const serviceEmpno = report.service_empno || "";
+                              const reportKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
                               return generatingAiFor.has(reportKey);
                             })() ? (
                               <>
@@ -1385,7 +1426,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <div className="flex-grow">
                   {(() => {
                     const planno = report.project?.planno || "NULL";
-                    const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                    const serviceCocode = report.service_cocode || "";
+                    const serviceEmpno = report.service_empno || "";
+                    const recordKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
                     return editingRecordKey === recordKey;
                   })() ? (
                     <div className="space-y-4">
@@ -1514,7 +1557,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                         {/* 套用 AI 建議按鈕 - 只在 lg 以下且有 AI 內容時顯示 */}
                         {(() => {
                           const planno = report.project?.planno || "NULL";
-                          const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                          const serviceCocode = report.service_cocode || "";
+                          const serviceEmpno = report.service_empno || "";
+                          const recordKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
                           return (
                             editingRecordKey === recordKey &&
                             isAiViewActive &&
@@ -1571,7 +1616,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 {/* 執行時間顯示 - 右下角（只在非編輯模式顯示） */}
                 {(() => {
                   const planno = report.project?.planno || "NULL";
-                  const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                  const serviceCocode = report.service_cocode || "";
+                  const serviceEmpno = report.service_empno || "";
+                  const recordKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
                   return editingRecordKey !== recordKey;
                 })() && (
                   <div className="absolute bottom-4 right-4 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
@@ -1592,7 +1639,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   </div>
                   {(() => {
                     const planno = report.project?.planno || "NULL";
-                    const reportKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                    const serviceCocode = report.service_cocode || "";
+                    const serviceEmpno = report.service_empno || "";
+                    const reportKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
                     return generatingAiFor.has(reportKey);
                   })() ? (
                     <p className="text-base text-gray-500 italic">
@@ -1619,7 +1668,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               {/* --- Apply AI Suggestion Button (中間浮動按鈕 - 只在 lg 以上顯示) --- */}
               {(() => {
                 const planno = report.project?.planno || "NULL";
-                const recordKey = `${report.daily_no}-${planno}-${report.sopno}`;
+                const serviceCocode = report.service_cocode || "";
+                const serviceEmpno = report.service_empno || "";
+                const recordKey = `${report.daily_no}-${planno}-${report.sopno}-${serviceCocode}-${serviceEmpno}`;
                 return (
                   editingRecordKey === recordKey &&
                   isAiViewActive &&

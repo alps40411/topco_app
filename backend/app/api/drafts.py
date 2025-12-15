@@ -65,11 +65,13 @@ async def update_draft_by_daily_planno_sopno(
     planno: str,
     sopno: str,
     update_data: Dict[str, Any],
+    service_cocode: str = "",
+    service_empno: str = "",
     db: Session = Depends(get_legacy_db)
 ):
-    """根據 daily_no、planno 和 sopno 更新特定的暫存記錄"""
+    """根據 daily_no、planno、sopno、service_cocode 和 service_empno 更新特定的暫存記錄"""
     try:
-        logger.info(f"🔥 UPDATE DRAFT API - 收到更新數據: daily_no={daily_no}, planno='{planno}', sopno={sopno}")
+        logger.info(f"🔥 UPDATE DRAFT API - 收到更新數據: daily_no={daily_no}, planno='{planno}', sopno={sopno}, service_cocode='{service_cocode}', service_empno='{service_empno}'")
         
         # Refactored to use DraftService
         DraftService.update_draft(
@@ -77,10 +79,12 @@ async def update_draft_by_daily_planno_sopno(
             daily_no=daily_no,
             planno=planno,
             sopno=sopno,
-            update_data=update_data
+            update_data=update_data,
+            service_cocode=service_cocode,
+            service_empno=service_empno
         )
-        
-        logger.info(f"🔥 UPDATE DRAFT API - 更新完成: daily_no={daily_no}, planno={planno}, sopno={sopno}")
+
+        logger.info(f"🔥 UPDATE DRAFT API - 更新完成: daily_no={daily_no}, planno={planno}, sopno={sopno}, service=({service_cocode},{service_empno})")
         
         return {
             "message": "暫存記錄更新成功",
