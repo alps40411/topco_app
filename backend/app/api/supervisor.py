@@ -340,32 +340,64 @@ async def get_report_detail_deprecated(
     try:
         if not current_user.employee:
             raise HTTPException(status_code=404, detail="該用戶不是員工")
-        
+
         legacy_db = next(get_legacy_db())
-        
+
         # 查詢 master 基本資訊
         master_sql = text("""
             SELECT daily_no, empno, sop_desc_c, empnamec,
-                   xdate, xtime, status, doc_date
+                   xdate, xtime, status, doc_date, cocode
             FROM jps.tdr_master
             WHERE daily_no = :daily_no
         """)
-        
+
         master_result = legacy_db.execute(master_sql, {"daily_no": report_id})
         master_row = master_result.fetchone()
-        
+
         if not master_row:
             raise HTTPException(status_code=404, detail="找不到指定的日報")
-        
-        # 查詢員工資訊，包含中文部門名稱
-        employee_sql = text("""
-            SELECT e.empno, e.empnamec, e.cocode, e.deptno, d.deptnamec
-            FROM jps."dcd003$master" e
-            LEFT JOIN jps."dcd002$master" d ON e.cocode = d.cocode AND e.deptno = d.deptno
-            WHERE e.empno = :empno
-        """)
-        emp_result = legacy_db.execute(employee_sql, {"empno": master_row[1]})
-        emp_row = emp_result.fetchone()
+
+        # ✅ 使用 SupervisorService 來取得正確的部門資訊（與日報首頁邏輯一致）
+        doc_date = master_row[7]  # doc_date
+        empno = current_user.employee.empno
+        cocode = current_user.employee.cocode or 'A'
+        deptno = current_user.employee.deptno or ''
+
+        # 呼叫 SupervisorService 取得該日期的日報列表
+        daily_reports = SupervisorService.get_daily_homepage_reports(
+            db=legacy_db,
+            empno=empno,
+            cocode=cocode,
+            deptno=deptno,
+            doc_date=doc_date
+        )
+
+        # 從結果中找到對應的日報記錄，取得正確的部門資訊
+        emp_row = None
+        for report in daily_reports:
+            if str(report["id"]) == report_id:
+                # 找到了！使用這筆記錄的員工資訊
+                employee_info = report["employee"]
+                emp_row = (
+                    employee_info["empno"],
+                    employee_info["name"],
+                    employee_info["company_code"],
+                    employee_info["department_no"],  # g_deptno（正確的）
+                    employee_info["department_name"]  # deptnamec（正確的）
+                )
+                break
+
+        # 如果在日報列表中找不到（可能權限問題或其他原因），回退到簡單查詢
+        if not emp_row:
+            logger.warning(f"Report {report_id} not found in daily homepage reports, using fallback query")
+            employee_sql = text("""
+                SELECT e.empno, e.empnamec, e.cocode, e.deptno, d.deptnamec
+                FROM jps."dcd003$master" e
+                LEFT JOIN jps."dcd002$master" d ON e.cocode = d.cocode AND e.deptno = d.deptno
+                WHERE e.empno = :empno
+            """)
+            emp_result = legacy_db.execute(employee_sql, {"empno": master_row[1]})
+            emp_row = emp_result.fetchone()
         
         # 查詢詳細內容（按照您提供的標準查詢）
         details_sql = text("""
