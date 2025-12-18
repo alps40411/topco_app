@@ -304,7 +304,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       if (serviceEmpno) queryParams.append("service_empno", serviceEmpno);
 
       const response = await authFetch(
-        `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?${queryParams.toString()}`,
+        `/api/ai/enhance_one/${report.daily_no}/${planno}/${
+          report.sopno
+        }?${queryParams.toString()}`,
         {
           method: "POST",
           headers: {
@@ -381,11 +383,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           // 構建查詢參數，包含 AI 服務和 service 資訊
           const queryParams = new URLSearchParams();
           queryParams.append("ai_service", selectedAiService);
-          if (serviceCocode) queryParams.append("service_cocode", serviceCocode);
+          if (serviceCocode)
+            queryParams.append("service_cocode", serviceCocode);
           if (serviceEmpno) queryParams.append("service_empno", serviceEmpno);
 
           const response = await authFetch(
-            `/api/ai/enhance_one/${report.daily_no}/${planno}/${report.sopno}?${queryParams.toString()}`,
+            `/api/ai/enhance_one/${report.daily_no}/${planno}/${
+              report.sopno
+            }?${queryParams.toString()}`,
             {
               method: "POST",
               headers: {
@@ -479,7 +484,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setEditWorkItemIds(report.work_item_ids || []);
     setEditServiceCocode(report.service_cocode);
     setEditServiceEmpno(report.service_empno);
-    setEditServiceEmpnamec(report.service_target_name?.match(/^(.+)\(/)?.[1]); // 從 "姓名(工號)" 提取姓名
+
+    const nameMatch = report.service_target_name?.match(/^(.+)\(/);
+    setEditServiceEmpnamec(
+      nameMatch ? nameMatch[1] : report.service_target_name
+    );
     setEditServiceTargetCocode(report.service_target_cocode);
     setEditServiceDeptno(report.service_deptno);
     setEditExecutionTimeMinutes(report.total_execution_time_minutes || 0);
@@ -524,7 +533,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     }
 
     // 從 editingRecordKey 解析出 daily_no, planno, sopno, service_cocode, service_empno
-    const [daily_no, planno, sopno, service_cocode = "", service_empno = ""] = editingRecordKey.split("-");
+    const [daily_no, planno, sopno, service_cocode = "", service_empno = ""] =
+      editingRecordKey.split("-");
 
     const reportToDelete = reports.find(
       (r) =>
@@ -599,7 +609,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     setIsSaving(true);
     try {
       // 從 editingRecordKey 解析出 daily_no, planno, sopno, service_cocode, service_empno
-      const [daily_no, planno, sopno, service_cocode = "", service_empno = ""] = editingRecordKey.split("-");
+      const [daily_no, planno, sopno, service_cocode = "", service_empno = ""] =
+        editingRecordKey.split("-");
 
       const reportToUpdate = reports.find(
         (r) =>
@@ -616,30 +627,29 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       if (service_cocode) queryParams.append("service_cocode", service_cocode);
       if (service_empno) queryParams.append("service_empno", service_empno);
       const queryString = queryParams.toString();
-      const url = `/api/drafts/by-daily-planno-sopno/${daily_no}/${planno}/${sopno}${queryString ? `?${queryString}` : ''}`;
+      const url = `/api/drafts/by-daily-planno-sopno/${daily_no}/${planno}/${sopno}${
+        queryString ? `?${queryString}` : ""
+      }`;
 
-      const response = await authFetch(
-        url,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            content: editContent,
-            files: editFiles,
-            planno: editProjectId?.toString(),
-            sopno: editExecutionWorkId?.toString(),
-            work_item_ids: editWorkItemIds,
-            service_cocode: editServiceCocode,
-            service_empno: editServiceEmpno,
-            service_empnamec: editServiceEmpnamec,
-            service_target_cocode: editServiceTargetCocode,
-            service_deptno: editServiceDeptno,
-            execution_time_minutes: editExecutionTimeMinutes,
-          }),
-        }
-      );
+      const response = await authFetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: editContent,
+          files: editFiles,
+          planno: editProjectId?.toString(),
+          sopno: editExecutionWorkId?.toString(),
+          work_item_ids: editWorkItemIds,
+          service_cocode: editServiceCocode,
+          service_empno: editServiceEmpno,
+          service_empnamec: editServiceEmpnamec,
+          service_target_cocode: editServiceTargetCocode,
+          service_deptno: editServiceDeptno,
+          execution_time_minutes: editExecutionTimeMinutes,
+        }),
+      });
 
       if (!response.ok) throw new Error("更新報告失敗");
 
