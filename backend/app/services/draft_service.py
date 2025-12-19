@@ -679,6 +679,7 @@ class DraftService:
                         SERVICE_EMPNAMEC = COALESCE(:service_empnamec, SERVICE_EMPNAMEC),
                         SERVICE_TARGET_COCODE = COALESCE(:service_target_cocode, SERVICE_TARGET_COCODE),
                         SERVICE_DEPTNO = COALESCE(:service_deptno, SERVICE_DEPTNO),
+                        STATUS = 'A',
                         UPDATED_DATE = :updated_date,
                         UPDATED_TIME = :updated_time
                     WHERE RECORD_ID = :record_id
@@ -757,6 +758,7 @@ class DraftService:
                             WORD_COUNT = CHAR_LENGTH(COALESCE(CONTENT, '') || CASE WHEN COALESCE(CONTENT, '') = '' THEN '' ELSE '\n' END || :new_content),
                             ATT_FILE1 = CASE WHEN :att_file1 = '' THEN ATT_FILE1 ELSE COALESCE(ATT_FILE1, '') || CASE WHEN COALESCE(ATT_FILE1, '') = '' THEN '' ELSE ',' END || :att_file1 END,
                             ATT_FILE2 = CASE WHEN :att_file2 = '' THEN ATT_FILE2 ELSE COALESCE(ATT_FILE2, '') || CASE WHEN COALESCE(ATT_FILE2, '') = '' THEN '' ELSE ',' END || :att_file2 END,
+                            STATUS = 'A',
                             UPDATED_DATE = :updated_date,
                             UPDATED_TIME = :updated_time
                         WHERE RECORD_ID = :record_id
@@ -792,6 +794,7 @@ class DraftService:
                         SERVICE_EMPNO = :new_service_empno, SERVICE_EMPNAMEC = :service_empnamec,
                         SERVICE_TARGET_COCODE = :service_target_cocode, SERVICE_DEPTNO = :service_deptno,
                         EXECUTION_TIME_MINUTES = :execution_time_minutes,
+                        STATUS = 'A',
                         UPDATED_DATE = :updated_date, UPDATED_TIME = :updated_time
                     WHERE RECORD_ID = :record_id
                 """)
@@ -816,8 +819,9 @@ class DraftService:
             raise
 
     @staticmethod
-    def delete_draft_record(db: Session, daily_no: str, planno: str, sopno: str) -> None:
-        """刪除指定的單筆草稿記錄及其相關檔案"""
+    def delete_draft_record(db: Session, daily_no: str, planno: str, sopno: str,
+                            service_cocode: str = "", service_empno: str = "") -> None:
+        """刪除指定的單筆草稿記錄及其相關檔案（使用五個欄位精確定位）"""
         import os
         from pathlib import Path
 
@@ -825,22 +829,26 @@ class DraftService:
             if planno == "NULL":
                 planno = ""
 
-            # 1. 先查詢該記錄的檔案資訊
+            # ✅ 1. 先查詢該記錄的檔案資訊（使用五個欄位精確定位）
             query_sql = text("""
                 SELECT FILES FROM jps.tdr_draft
                 WHERE DAILY_NO = :daily_no
                 AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
                 AND SOPNO = :sopno
+                AND COALESCE(SERVICE_COCODE, '') = COALESCE(:service_cocode, '')
+                AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:service_empno, '')
             """)
 
             result = db.execute(query_sql, {
                 "daily_no": daily_no,
                 "planno": planno,
-                "sopno": sopno
+                "sopno": sopno,
+                "service_cocode": service_cocode,
+                "service_empno": service_empno
             }).fetchone()
 
             if not result:
-                raise ValueError(f"找不到指定的草稿記錄 (daily_no: {daily_no}, planno: {planno}, sopno: {sopno})")
+                raise ValueError(f"找不到指定的草稿記錄 (daily_no: {daily_no}, planno: {planno}, sopno: {sopno}, service: ({service_cocode},{service_empno}))")
 
             # 2. 收集需要刪除的檔案路徑
             files_to_delete = []
@@ -858,23 +866,27 @@ class DraftService:
                 except:
                     logger.warning(f"無法解析檔案 JSON: {result[0]}")
 
-            # 3. 刪除資料庫記錄
+            # ✅ 3. 刪除資料庫記錄（使用五個欄位精確定位）
             delete_sql = text("""
                 DELETE FROM jps.tdr_draft
                 WHERE DAILY_NO = :daily_no
                 AND COALESCE(PLANNO, '') = COALESCE(:planno, '')
                 AND SOPNO = :sopno
+                AND COALESCE(SERVICE_COCODE, '') = COALESCE(:service_cocode, '')
+                AND COALESCE(SERVICE_EMPNO, '') = COALESCE(:service_empno, '')
             """)
 
             db.execute(delete_sql, {
                 "daily_no": daily_no,
                 "planno": planno,
-                "sopno": sopno
+                "sopno": sopno,
+                "service_cocode": service_cocode,
+                "service_empno": service_empno
             })
 
             db.commit()
 
-            logger.info(f"已從資料庫刪除草稿記錄 (daily_no: {daily_no}, planno: {planno}, sopno: {sopno})")
+            logger.info(f"已從資料庫刪除草稿記錄 (daily_no: {daily_no}, planno: {planno}, sopno: {sopno}, service: ({service_cocode},{service_empno}))")
 
             # 4. 刪除實體檔案
             upload_base_dir = Path("uploads")

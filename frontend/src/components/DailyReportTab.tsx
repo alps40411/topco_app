@@ -551,12 +551,18 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
     setIsDeletingDraft(true);
     try {
-      const response = await authFetch(
-        `/api/drafts/${daily_no}/${planno}/${sopno}`,
-        {
-          method: "DELETE",
-        }
-      );
+      // ✅ 構建查詢參數，包含服務資訊（使用五個欄位精確定位）
+      const queryParams = new URLSearchParams();
+      if (service_cocode) queryParams.append("service_cocode", service_cocode);
+      if (service_empno) queryParams.append("service_empno", service_empno);
+      const queryString = queryParams.toString();
+      const url = `/api/drafts/${daily_no}/${planno}/${sopno}${
+        queryString ? `?${queryString}` : ""
+      }`;
+
+      const response = await authFetch(url, {
+        method: "DELETE",
+      });
 
       if (!response.ok) {
         throw new Error("刪除記錄失敗");
@@ -596,9 +602,13 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const saveEdit = async () => {
     if (editingRecordKey === null || !authFetch) return;
 
-    // 驗證必填欄位
+    // ✅ 必填驗證：執行工作、工作項目（工作計畫為非必選）
     if (!editExecutionWorkId) {
       toast.error("請選擇執行工作");
+      return;
+    }
+    if (!editWorkItemIds || editWorkItemIds.length === 0) {
+      toast.error("請選擇工作項目");
       return;
     }
     if (editExecutionTimeMinutes === 0) {
@@ -1006,29 +1016,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   const handleSaveNewRecord = async () => {
     if (!authFetch) return;
-    // 工作計畫現在為非必選項
-    // if (!newRecord.project_id) {
-    //   toast.error("請選擇工作計劃");
-    //   return;
-    // }
+
+    // ✅ 必填驗證：執行工作、工作項目（工作計畫為非必選）
     if (!newRecord.execution_work_id) {
       toast.error("請選擇執行工作");
       return;
     }
-    // 工作項目現在根據執行工作是否有項目來決定是否必選
-    // if (!newRecord.work_item_id) {
-    //   toast.error("請選擇工作項目");
-    //   return;
-    // }
-    // 服務公司和服務對象現在為非必填項目
-    // if (!newRecord.service_company_id) {
-    //   toast.error("請選擇服務公司");
-    //   return;
-    // }
-    // if (!newRecord.service_target_id) {
-    //   toast.error("請選擇服務對象");
-    //   return;
-    // }
+    if (!newRecord.work_item_ids || newRecord.work_item_ids.length === 0) {
+      toast.error("請選擇工作項目");
+      return;
+    }
     if (
       !newRecord.content?.trim() &&
       (!newRecord.files || newRecord.files.length === 0)

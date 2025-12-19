@@ -29,10 +29,19 @@ async def save_draft(
         daily_no = draft_data.get("daily_no")  # 可選，可以是 None
         empno = draft_data.get("empno")
         doc_date = draft_data.get("doc_date")
+        draft_content = draft_data.get("draft_content", {})
 
-        # 只檢查必填欄位 empno 和 doc_date
+        # ✅ 檢查必填欄位：empno, doc_date, sopno, work_item_seq（planno 為非必選）
         if not empno or not doc_date:
             raise HTTPException(status_code=400, detail="缺少必要欄位: empno, doc_date")
+
+        sopno = draft_content.get("sopno")
+        work_item_seq = draft_content.get("work_item_seq", [])
+
+        if not sopno:
+            raise HTTPException(status_code=400, detail="請選擇執行工作 (sopno)")
+        if not work_item_seq or (isinstance(work_item_seq, list) and len(work_item_seq) == 0):
+            raise HTTPException(status_code=400, detail="請選擇工作項目 (work_item_seq)")
 
         # Refactored to use DraftService
         # daily_no 可以是 None，DraftService 會自動處理
@@ -124,21 +133,25 @@ async def delete_draft_record(
     daily_no: str,
     planno: str,
     sopno: str,
+    service_cocode: str = "",
+    service_empno: str = "",
     db: Session = Depends(get_legacy_db)
 ):
-    """刪除指定的單筆草稿記錄及其相關檔案"""
+    """刪除指定的單筆草稿記錄及其相關檔案（使用五個欄位精確定位）"""
     try:
-        logger.info(f"🔥 DELETE DRAFT API - 開始刪除草稿記錄: daily_no={daily_no}, planno={planno}, sopno={sopno}")
+        logger.info(f"🔥 DELETE DRAFT API - 開始刪除草稿記錄: daily_no={daily_no}, planno={planno}, sopno={sopno}, service=({service_cocode},{service_empno})")
 
-        # Refactored to use DraftService
+        # ✅ 使用五個欄位精確定位記錄
         DraftService.delete_draft_record(
             db=db,
             daily_no=daily_no,
             planno=planno,
-            sopno=sopno
+            sopno=sopno,
+            service_cocode=service_cocode,
+            service_empno=service_empno
         )
 
-        logger.info(f"🔥 DELETE DRAFT API - 刪除完成: daily_no={daily_no}, planno={planno}, sopno={sopno}")
+        logger.info(f"🔥 DELETE DRAFT API - 刪除完成: daily_no={daily_no}, planno={planno}, sopno={sopno}, service=({service_cocode},{service_empno})")
 
         return {
             "message": "草稿記錄刪除成功",
