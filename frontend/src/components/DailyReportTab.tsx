@@ -149,6 +149,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const newRecordTempFilesRef = useRef<string[]>([]);
   const [serviceCompanies, setServiceCompanies] = useState<any[]>([]);
   const [serviceTargets, setServiceTargets] = useState<any[]>([]);
+  const [hasWorkItems, setHasWorkItems] = useState<boolean>(true); // 追蹤當前執行工作是否有工作項目（新增記錄用）
+  const [editHasWorkItems, setEditHasWorkItems] = useState<boolean>(true); // 追蹤編輯模式下執行工作是否有工作項目
 
   // 移除未使用的資料同步hook（避免不必要的性能開銷）
 
@@ -607,7 +609,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       toast.error("請選擇執行工作");
       return;
     }
-    if (!editWorkItemIds || editWorkItemIds.length === 0) {
+    // ✅ 只有當該執行工作有工作項目時，才要求必須選擇工作項目
+    if (
+      editHasWorkItems &&
+      (!editWorkItemIds || editWorkItemIds.length === 0)
+    ) {
       toast.error("請選擇工作項目");
       return;
     }
@@ -1022,7 +1028,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       toast.error("請選擇執行工作");
       return;
     }
-    if (!newRecord.work_item_ids || newRecord.work_item_ids.length === 0) {
+    // ✅ 只有當該執行工作有工作項目時，才要求必須選擇工作項目
+    if (
+      hasWorkItems &&
+      (!newRecord.work_item_ids || newRecord.work_item_ids.length === 0)
+    ) {
       toast.error("請選擇工作項目");
       return;
     }
@@ -1482,6 +1492,9 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                               workItemIds?.map((id) => parseInt(id)) || []
                             )
                           }
+                          onWorkItemsAvailabilityChange={(hasItems) =>
+                            setEditHasWorkItems(hasItems)
+                          }
                           onServiceDataLoaded={handleServiceDataLoaded}
                           required={false}
                         />
@@ -1732,6 +1745,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   onProjectChange={handleProjectChange}
                   onExecutionWorkChange={handleExecutionWorkChange}
                   onWorkItemChange={handleWorkItemChange}
+                  onWorkItemsAvailabilityChange={(hasItems) => setHasWorkItems(hasItems)}
                   onServiceDataLoaded={handleServiceDataLoaded}
                   required={false}
                 />

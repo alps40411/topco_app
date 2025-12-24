@@ -40,8 +40,6 @@ async def save_draft(
 
         if not sopno:
             raise HTTPException(status_code=400, detail="請選擇執行工作 (sopno)")
-        if not work_item_seq or (isinstance(work_item_seq, list) and len(work_item_seq) == 0):
-            raise HTTPException(status_code=400, detail="請選擇工作項目 (work_item_seq)")
 
         # Refactored to use DraftService
         # daily_no 可以是 None，DraftService 會自動處理
