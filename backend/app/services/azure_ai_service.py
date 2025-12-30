@@ -81,8 +81,8 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.2,
-            max_tokens=1500,
+            temperature=1,
+            max_completion_tokens=1500,
         )
         ai_content = response.choices[0].message.content
         logger.info(f"Azure OpenAI API call successful, response length: {len(ai_content) if ai_content else 0}")
@@ -93,7 +93,7 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
         logger.error(f"Traceback: {traceback.format_exc()}")
         return f"AI service temporarily unavailable: {str(e)}"
 
-async def get_completion(prompt: str, temperature: float = 0.3, max_tokens: int = 1000) -> str:
+async def get_completion(prompt: str, temperature: float = 1, max_completion_tokens: int = 1000) -> str:
     """
     使用 Azure OpenAI 獲取通用文本完成回應
     """
@@ -108,7 +108,7 @@ async def get_completion(prompt: str, temperature: float = 0.3, max_tokens: int 
                 {"role": "user", "content": prompt}
             ],
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
         )
         ai_content = response.choices[0].message.content
         

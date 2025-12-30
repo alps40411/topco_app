@@ -159,8 +159,8 @@ async def generate_supervisor_reply_suggestions(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.3,
-            max_tokens=1200,
+            temperature=1,
+            max_completion_tokens=1200,
         )
         ai_response = response.choices[0].message.content
         if not ai_response:

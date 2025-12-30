@@ -6,7 +6,6 @@ import type { FileForUpload } from "../App";
 import { getFullFileUrl } from "../utils/urlUtils";
 
 interface AttachedFilesDisplayProps {
-  // 保持 props 名稱與 DataInputTab.tsx 中傳遞的一致
   files?: FileForUpload[];
   content?: string; // 編輯器內容，用於判斷圖片是否已在編輯器中
 }

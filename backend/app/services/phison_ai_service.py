@@ -155,7 +155,7 @@ async def get_phison_enhanced_report(
     payload = {
         "content": user_prompt,
         "maxTokens": 1500,
-        "temperature": 0.2  # 與 Azure OpenAI 保持一致
+        "temperature": 1  # 與 Azure OpenAI 保持一致
     }
 
     headers = {

@@ -99,12 +99,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
 
-  // ✅ 刷新寫入狀態的函數（改用 dates/range）
+  // ✅ 請求去重：記錄最後一次請求的時間戳
+  const lastFetchTimeRef = React.useRef<number>(0);
+  const fetchCooldown = 1000; // 1秒內不重複請求
+
+  // ✅ 刷新寫入狀態的函數（改用 dates/range + 請求去重）
   const refreshWritingStatus = useCallback(
     async (docDate?: string) => {
       if (!token || !user?.employee) return;
 
+      // ✅ 請求去重：如果距離上次請求不到 1 秒，則跳過
+      const now = Date.now();
+      if (now - lastFetchTimeRef.current < fetchCooldown) {
+        console.log("⏭️ 跳過重複的 dates/range 請求（請求間隔過短）");
+        return;
+      }
+      lastFetchTimeRef.current = now;
+
       try {
+        console.log("🔄 調用 /api/dates/range");
         const response = await fetch(buildApiUrl("/api/dates/range"), {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -125,19 +138,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           setWritingStatus(status);
         }
-      } catch (error) {}
+      } catch (error) {
+        console.error("取得日期範圍失敗:", error);
+      }
     },
     [token, user?.employee]
   );
 
-  // ✅ 只在登入後檢查寫入狀態
+  // ✅ 只在登入後檢查寫入狀態（移除 refreshWritingStatus 依賴，避免循環依賴）
   useEffect(() => {
     if (token && user) {
       refreshWritingStatus(); // ✅ 載入初始寫入狀態
     } else {
       setWritingStatus(null);
     }
-  }, [token, user, refreshWritingStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user]); // ✅ 只依賴 token 和 user，避免循環依賴
 
   const login = useCallback((newToken: string, newUser: User) => {
     setToken(newToken);

@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# 全局緩存
+# 全局緩存 - 10 秒快取
 _date_cache: Dict[str, Dict[str, Any]] = {}
 _cache_timeout = 5 * 60  # 5分鐘緩存
 
@@ -43,7 +43,7 @@ class DailyDateService:
 
     def get_daily_date_range(self, cocode: str, empno: str) -> List[Dict[str, Any]]:
         """
-        取得員工可填寫日報的日期範圍（帶緩存）
+        取得員工可填寫日報的日期範圍（10 秒快取）
 
         Args:
             cocode: 公司別
@@ -59,14 +59,14 @@ class DailyDateService:
         # 檢查緩存
         if cache_key in _date_cache:
             cached_data = _date_cache[cache_key]
-            if current_time - cached_data["timestamp"] < _cache_timeout:
-                logger.info(f"使用緩存的日期數據: {cache_key}")
+            cache_age = current_time - cached_data["timestamp"]
+            if cache_age < _cache_timeout:
+                
                 return cached_data["data"]
-            else:
-                logger.info(f"緩存已過期，重新獲取: {cache_key}")
+            
 
         try:
-            logger.info(f"調用 GetWritableDate API: cocode={cocode}, empno={empno}")
+            
 
             # 準備 API 請求
             payload = {
@@ -88,7 +88,6 @@ class DailyDateService:
                 "timestamp": current_time
             }
 
-            logger.info(f"日期數據已緩存: {cache_key}")
             return date_data
 
         except httpx.TimeoutException:

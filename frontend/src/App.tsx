@@ -291,7 +291,6 @@ function App() {
   // 監聽 URL 參數變化並同步狀態
   useEffect(() => {
     const tab = searchParams.get("tab") as
-      | "input"
       | "daily"
       | "supervisor"
       | "ai"
