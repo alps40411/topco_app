@@ -654,9 +654,15 @@ async def get_report_detail_deprecated(
                 "work_item_name": "",
                 "total_execution_time_minutes": 0
             }],
-            "rating": 0
+            "rating": 0,
+            "navigation": SupervisorService.get_report_navigation(
+                db=legacy_db,
+                current_daily_no=report_id,
+                cocode=master_row[8],  # cocode
+                empno=master_row[1]    # empno
+            )
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting report detail: {str(e)}")
         raise HTTPException(status_code=500, detail="取得日報詳情失敗")

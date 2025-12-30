@@ -1,7 +1,7 @@
 // frontend/src/components/EmployeeDetailTab.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, ArrowRight, Star } from "lucide-react";
 import type { DailyReport } from "../App";
 import { getProjectColors } from "../utils/colorUtils";
 import { useAuth } from "../hooks/useAuth";
@@ -39,6 +39,11 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
     empno: string;
     empname: string;
   } | null>(null);
+  // ✅ 新增: 導航信息狀態
+  const [navigationInfo, setNavigationInfo] = useState<{
+    previous_report_id: number | null;
+    next_report_id: number | null;
+  } | null>(null);
   const { authFetch } = useAuth();
 
   // 從 URL 獲取 status 和 replyid 參數（從郵件進入時使用）
@@ -63,6 +68,11 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           });
         }
 
+        // ✅ 提取導航信息
+        if (specificReport.navigation) {
+          setNavigationInfo(specificReport.navigation);
+        }
+
         // Fetch the detailed approval status for this specific report
         const approvalResponse = await authFetch(
           `/api/supervisor/${reportId}/approvals`
@@ -84,6 +94,26 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       setIsLoading(false);
     }
   }, [reportId, authFetch]);
+
+  // ✅ 導航處理函數
+  const handleNavigate = useCallback(
+    (newReportId: number) => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const dateParam = searchParams.get("date");
+      const employeeId = reportDetail?.employee.id;
+
+      // 構建新的 URL
+      const params = new URLSearchParams();
+      params.set("tab", "supervisor");
+      if (dateParam) params.set("date", dateParam);
+      if (employeeId) params.set("employee", employeeId);
+      params.set("report", newReportId.toString());
+
+      // 更新 URL（組件會因 key 變化而重新掛載）
+      window.location.href = `?${params.toString()}`;
+    },
+    [reportDetail]
+  );
 
   useEffect(() => {
     fetchReportDetails();
@@ -141,12 +171,26 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       {/* 大螢幕：標題列（標題和平均評分同一行） */}
       <div className="hidden md:flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <button
-            onClick={onBack}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 flex-shrink-0"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+          {/* ✅ 導航按鈕組 */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() =>
+                navigationInfo?.previous_report_id &&
+                handleNavigate(navigationInfo.previous_report_id)
+              }
+              disabled={!navigationInfo?.previous_report_id}
+              className={`p-2 rounded-lg flex-shrink-0 transition-colors ${
+                navigationInfo?.previous_report_id
+                  ? "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  : "text-gray-300 cursor-not-allowed"
+              }`}
+              title={
+                navigationInfo?.previous_report_id ? "上一篇" : "已是第一篇"
+              }
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          </div>
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900">
               {String(reportDetail.employee.id).padStart(5, "0")}{" "}
@@ -157,6 +201,23 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
               {reportDetail.employee.department_name ||
                 reportDetail.employee.department_no}
             </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() =>
+                navigationInfo?.next_report_id &&
+                handleNavigate(navigationInfo.next_report_id)
+              }
+              disabled={!navigationInfo?.next_report_id}
+              className={`p-2 rounded-lg flex-shrink-0 transition-colors ${
+                navigationInfo?.next_report_id
+                  ? "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  : "text-gray-300 cursor-not-allowed"
+              }`}
+              title={navigationInfo?.next_report_id ? "下一篇" : "已是最後一篇"}
+            >
+              <ArrowRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
         {/* 平均評分 - 右上角 */}
@@ -186,14 +247,25 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
       {/* 小螢幕：標題列（垂直佈局） */}
       <div className="md:hidden flex flex-col gap-3 mb-4">
-        {/* 返回按鈕 + 標題 */}
+        {/* 導航按鈕 + 標題 */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 flex-shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+          {/* ✅ 導航按鈕組 */}
+          <div className="flex gap-1">
+            <button
+              onClick={() =>
+                navigationInfo?.previous_report_id &&
+                handleNavigate(navigationInfo.previous_report_id)
+              }
+              disabled={!navigationInfo?.previous_report_id}
+              className={`p-1.5 rounded-lg flex-shrink-0 transition-colors ${
+                navigationInfo?.previous_report_id
+                  ? "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  : "text-gray-300 cursor-not-allowed"
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base sm:text-lg font-bold text-gray-900 truncate">
               {String(reportDetail.employee.id).padStart(5, "0")}{" "}
@@ -206,6 +278,22 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             <div className="text-xs text-gray-500 mt-0.5">
               {formatDate(reportDetail.date)}
             </div>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() =>
+                navigationInfo?.next_report_id &&
+                handleNavigate(navigationInfo.next_report_id)
+              }
+              disabled={!navigationInfo?.next_report_id}
+              className={`p-1.5 rounded-lg flex-shrink-0 transition-colors ${
+                navigationInfo?.next_report_id
+                  ? "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  : "text-gray-300 cursor-not-allowed"
+              }`}
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
 

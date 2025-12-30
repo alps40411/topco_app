@@ -176,6 +176,59 @@ class SupervisorService:
             raise
 
     @staticmethod
+    def get_report_navigation(
+        db: Session,
+        current_daily_no: str,
+        cocode: str,
+        empno: str
+    ) -> Dict[str, Optional[int]]:
+        """獲取日報的上一篇/下一篇導航信息
+
+        Args:
+            db: 資料庫 Session
+            current_daily_no: 當前日報編號
+            cocode: 公司代碼
+            empno: 員工編號
+
+        Returns:
+            {"previous_report_id": int|None, "next_report_id": int|None}
+        """
+        try:
+            navigation_sql = text("""
+                WITH navigation AS (
+                    SELECT
+                        daily_no,
+                        LAG(daily_no) OVER (ORDER BY doc_date, daily_no) AS prev_id,
+                        LEAD(daily_no) OVER (ORDER BY doc_date, daily_no) AS next_id
+                    FROM tdr_master
+                    WHERE cocode = :cocode
+                      AND empno = :empno
+                      AND status = 'N'
+                      AND leave_hr IS NULL
+                )
+                SELECT prev_id, next_id
+                FROM navigation
+                WHERE daily_no = :current_daily_no
+            """)
+
+            result = db.execute(navigation_sql, {
+                "current_daily_no": current_daily_no,
+                "cocode": cocode,
+                "empno": empno
+            }).fetchone()
+
+            if result:
+                return {
+                    "previous_report_id": int(result[0]) if result[0] else None,
+                    "next_report_id": int(result[1]) if result[1] else None
+                }
+            return {"previous_report_id": None, "next_report_id": None}
+
+        except Exception as e:
+            logger.error(f"Error getting navigation: {str(e)}")
+            return {"previous_report_id": None, "next_report_id": None}
+
+    @staticmethod
     def get_forwarded_reports(
         db: Session,
         empno: str,

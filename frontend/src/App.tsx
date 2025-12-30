@@ -108,6 +108,10 @@ export interface DailyReport {
   employee: EmployeeSummary;
   comments_count?: number;
   reply_count?: number;
+  navigation?: {
+    previous_report_id: number | null;
+    next_report_id: number | null;
+  };
 }
 export interface Employee {
   id: number;
