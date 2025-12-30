@@ -16,7 +16,7 @@ def _build_client() -> Optional[AsyncAzureOpenAI]:
 
     return AsyncAzureOpenAI(
         api_key=settings.AZURE_OPENAI_KEY,
-        api_version="2024-02-01",
+        api_version="2025-04-01-preview",
         azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
         timeout=60.0,  # 設置 60 秒超時
         max_retries=2,  # 最多重試 2 次
@@ -84,6 +84,7 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
             temperature=1,
             max_completion_tokens=1500,
         )
+        print(response)
         ai_content = response.choices[0].message.content
         logger.info(f"Azure OpenAI API call successful, response length: {len(ai_content) if ai_content else 0}")
         return ai_content if ai_content else "Unable to get content from AI service."

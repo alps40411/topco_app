@@ -1505,6 +1505,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                         <ServiceSelector
                           selectedCompanyId={editServiceCocode}
                           selectedTargetId={editServiceEmpno}
+                          selectedTargetCocode={editServiceTargetCocode}
                           onCompanyChange={(cocode, company) => {
                             setEditServiceCocode(cocode);
                           }}
@@ -1754,6 +1755,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 <ServiceSelector
                   selectedCompanyId={newRecord.service_cocode}
                   selectedTargetId={newRecord.service_empno}
+                  selectedTargetCocode={newRecord.service_target_cocode}
                   onCompanyChange={(cocode, company) =>
                     setNewRecord((prev) => ({
                       ...prev,

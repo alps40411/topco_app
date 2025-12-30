@@ -22,6 +22,7 @@ export interface ServiceTarget {
 interface ServiceSelectorProps {
   selectedCompanyId?: string;
   selectedTargetId?: string;
+  selectedTargetCocode?: string; // 服務對象所屬公司代碼
   onCompanyChange: (companyId?: string, company?: ServiceCompany) => void;
   onTargetChange: (targetId?: string, target?: ServiceTarget) => void;
   serviceCompanies?: ServiceCompany[];
@@ -33,6 +34,7 @@ interface ServiceSelectorProps {
 const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedCompanyId,
   selectedTargetId,
+  selectedTargetCocode,
   onCompanyChange,
   onTargetChange,
   serviceCompanies = [],
@@ -47,26 +49,67 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
   // 將完整資料傳遞給 SearchableDropdown，支援多欄位搜尋和顯示
   const targetOptions = serviceTargets.map((target, index) => ({
-    id: target.empno || `target-${index}`,
+    id:
+      target.cocode && target.empno
+        ? `${target.cocode}_${target.empno}` // 使用組合鍵避免 ID 重複
+        : `target-${index}`,
     name: target.empnamec || target.empno,
     // 新增額外資料以支援多欄位搜尋和顯示
     empno: target.empno,
     empnamec: target.empnamec,
     coabbv: target.coabbv,
     deptabbv: target.deptabbv,
+    cocode: target.cocode,
+    deptno: target.deptno,
   }));
 
   const handleCompanyChange = (companyId?: string | number) => {
     const id = companyId?.toString();
-    const company = serviceCompanies.find(c => c.cocode === id || c.id === id);
+    const company = serviceCompanies.find(
+      (c) => c.cocode === id || c.id === id
+    );
     onCompanyChange(id, company);
   };
 
   const handleTargetChange = (targetId?: string | number) => {
     const id = targetId?.toString();
-    const target = serviceTargets.find(t => t.empno === id);
-    onTargetChange(id, target);
+
+    if (!id) {
+      onTargetChange(undefined, undefined);
+      return;
+    }
+
+    // 解析組合鍵 "cocode_empno"
+    const [cocode, empno] = id.split("_");
+    const target = serviceTargets.find(
+      (t) => t.cocode === cocode && t.empno === empno
+    );
+
+    onTargetChange(target?.empno, target);
   };
+
+  // 將 selectedTargetId（empno）轉換為組合鍵格式
+  const computedSelectedTargetId = React.useMemo(() => {
+    if (!selectedTargetId) return undefined;
+
+    // 優先使用 selectedTargetCocode（服務對象所屬公司）來構建組合鍵
+    if (selectedTargetCocode) {
+      const exists = serviceTargets.some(
+        (t) => t.cocode === selectedTargetCocode && t.empno === selectedTargetId
+      );
+      if (exists) {
+        return `${selectedTargetCocode}_${selectedTargetId}`;
+      }
+    }
+
+    // Fallback：找到第一個匹配的員工
+    const target = serviceTargets.find((t) => t.empno === selectedTargetId);
+    if (target?.cocode) {
+      return `${target.cocode}_${selectedTargetId}`;
+    }
+
+    return selectedTargetId;
+  }, [selectedTargetId, selectedTargetCocode, serviceTargets]);
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -87,12 +130,12 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         label="服務對象"
         placeholder="請選擇服務對象"
         options={targetOptions}
-        selectedValue={selectedTargetId}
+        selectedValue={computedSelectedTargetId}
         onSelectionChange={handleTargetChange}
         isLoading={false}
         required={required}
         enableMultiFieldSearch={true}
-        searchFields={['empno', 'empnamec', 'coabbv', 'deptabbv']}
+        searchFields={["empno", "empnamec", "coabbv", "deptabbv"]}
         displayTemplate="table"
         maxVisibleItems={8}
       />
