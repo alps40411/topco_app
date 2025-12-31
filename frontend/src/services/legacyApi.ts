@@ -535,8 +535,18 @@ export class LegacyApi {
       // 新 API 返回格式：{ success: true, data: {...} }
       const data = result.data || result;
 
-      // 如果是新 API 格式（有 projects 和 execution_works），轉換為舊格式
-      if (data.projects && data.execution_works) {
+      // 檢測並轉換新的正規化格式
+      if (data.execution_works && typeof data.execution_works === 'object' &&
+          !Array.isArray(data.execution_works)) {
+        // 新格式：execution_works 是字典
+        console.log('[LegacyApi] 檢測到新的正規化格式，進行轉換...');
+
+        return this.convertNormalizedFormat(data);
+      }
+
+      // 舊格式：execution_works 是陣列或不存在
+      if (data.projects && (Array.isArray(data.execution_works) || data.basic_execution_works)) {
+        console.log('[LegacyApi] 使用舊格式');
         return {
           work_plans: data.projects || [],
           basic_execution_works: data.basic_execution_works || data.execution_works || [],
@@ -546,12 +556,98 @@ export class LegacyApi {
         };
       }
 
-      // 舊 API 格式直接返回
+      // 直接返回
       return data;
     } catch (error) {
       console.error("取得工作資料失敗:", error);
       throw error;
     }
+  }
+
+  /**
+   * 將新的正規化格式轉換為前端期望的舊格式
+   *
+   * 新格式結構：
+   * {
+   *   execution_works: { [sopno]: ExecutionWork },
+   *   basic_execution_sopnos: string[],
+   *   project_execution_mapping: { [planno]: string[] }
+   * }
+   *
+   * 舊格式結構：
+   * {
+   *   basic_execution_works: ExecutionWork[],
+   *   project_execution_works: { [planno]: ExecutionWork[] }
+   * }
+   */
+  private static convertNormalizedFormat(data: any): {
+    work_plans: any[];
+    basic_execution_works: any[];
+    project_execution_works: { [key: string]: any[] };
+    service_companies: any[];
+    service_targets: any[];
+  } {
+    const executionWorksDict = data.execution_works || {};
+    const basicSopnos = data.basic_execution_sopnos || [];
+    const projectMapping = data.project_execution_mapping || {};
+
+    // 1. 轉換基本執行工作（使用 sopno 參照）
+    const basic_execution_works = basicSopnos
+      .map((sopno: string) => {
+        const work = executionWorksDict[sopno];
+        if (!work) {
+          console.warn(`[LegacyApi] 警告：基本執行工作 sopno=${sopno} 在 execution_works 中不存在`);
+          return null;
+        }
+        return work;
+      })
+      .filter((work: any) => work !== null); // 過濾掉不存在的
+
+    // 2. 轉換專案執行工作映射（使用 sopno 參照）
+    const project_execution_works: { [key: string]: any[] } = {};
+
+    for (const [planno, sopnos] of Object.entries(projectMapping)) {
+      if (!Array.isArray(sopnos)) {
+        console.warn(`[LegacyApi] 警告：專案 ${planno} 的 sopnos 不是陣列:`, sopnos);
+        continue;
+      }
+
+      project_execution_works[planno] = sopnos
+        .map((sopno: string) => {
+          const work = executionWorksDict[sopno];
+          if (!work) {
+            console.warn(`[LegacyApi] 警告：專案 ${planno} 的執行工作 sopno=${sopno} 在 execution_works 中不存在`);
+            return null;
+          }
+          return work;
+        })
+        .filter((work: any) => work !== null); // 過濾掉不存在的
+    }
+
+    // 3. 記錄轉換統計
+    const totalExecutionWorks = Object.keys(executionWorksDict).length;
+    const basicCount = basic_execution_works.length;
+    const projectCount = Object.keys(project_execution_works).length;
+
+    console.log(`[LegacyApi] 格式轉換完成:
+      - 執行工作字典: ${totalExecutionWorks} 個
+      - 基本執行工作: ${basicCount} 個 (sopnos: ${basicSopnos.length})
+      - 專案執行工作: ${projectCount} 個專案
+    `);
+
+    // 檢查是否有遺失的 sopno
+    const missingSopnos = basicSopnos.filter((sopno: string) => !executionWorksDict[sopno]);
+    if (missingSopnos.length > 0) {
+      console.error(`[LegacyApi] 錯誤：有 ${missingSopnos.length} 個基本執行工作的 sopno 在字典中找不到:`, missingSopnos);
+    }
+
+    return {
+      work_plans: data.projects || [],
+      basic_execution_works,
+      project_execution_works,
+      service_companies: data.service_companies || [],
+      service_targets: data.service_targets || []
+    };
   }
 
   /**
