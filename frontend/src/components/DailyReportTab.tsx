@@ -1461,8 +1461,8 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                         </span>
                       </button>
 
-                      {/* 級聯工作選擇器 - 預設隱藏 */}
-                      {!isFocusMode && (
+                      {/* 級聯工作選擇器 - 預設隱藏但始終渲染以確保 editHasWorkItems 更新 */}
+                      <div className={isFocusMode ? "hidden" : ""}>
                         <CascadingWorkSelector
                           selectedProjectId={editProjectId?.toString()}
                           selectedExecutionWorkId={editExecutionWorkId?.toString()}
@@ -1498,10 +1498,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           onServiceDataLoaded={handleServiceDataLoaded}
                           required={false}
                         />
-                      )}
+                      </div>
 
                       {/* 服務選擇器 - 預設隱藏 */}
-                      {!isFocusMode && (
+                      <div className={isFocusMode ? "hidden" : ""}>
                         <ServiceSelector
                           selectedCompanyId={editServiceCocode}
                           selectedTargetId={editServiceEmpno}
@@ -1521,10 +1521,10 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           serviceTargets={serviceTargets}
                           required={false}
                         />
-                      )}
+                      </div>
 
                       {/* 執行時間選擇器 - 預設隱藏 */}
-                      {!isFocusMode && (
+                      <div className={isFocusMode ? "hidden" : ""}>
                         <ExecutionTimeSelector
                           totalMinutes={editExecutionTimeMinutes}
                           onChange={(minutes) =>
@@ -1532,7 +1532,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           }
                           required
                         />
-                      )}
+                      </div>
 
                       {/* 內容編輯器 - 永遠顯示 */}
                       <div>
