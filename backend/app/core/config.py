@@ -57,6 +57,18 @@ class Settings(BaseSettings):
     WFINBOX_API_URL: str = "http://10.129.1.98/CommonApi/EIP/ChangeWFINBOX"
     MYREPORT_GET_WRITABLE_DATE_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetWritableDate"
     MYREPORT_GET_FORWARD_LIST_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetForwardList"
+    # 週報列表 API（可在 .env 中配置，預設使用測試環境）
+    WEEKLY_REPORT_LIST_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetWeeklyReportList"
+    # 逾期應收帳款 API
+    OVERDUE_AR_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetOverdueAR"
+    # 營收達成率 API
+    REVENUE_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetRevenue"
+    # 提交週報 API
+    SUBMIT_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/SubmitWeeklyReport"
+    # 週報詳情 API
+    SHOW_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/ShowWeeklyReport"
+    # 回覆週報 API
+    REPLY_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/ReplyWeeklyReport"
 
 
 

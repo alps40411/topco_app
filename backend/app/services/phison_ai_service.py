@@ -213,6 +213,122 @@ async def get_phison_enhanced_report(
         logger.error(f"Phison AI 處理失敗: {str(e)}")
         raise
 
+async def get_phison_weekly_report(
+    original_content: str,
+    job_item: str,
+    subject: str,
+    reference_texts: List[str] = []
+) -> str:
+    """
+    使用 Phison LLM API 將週報內容潤飾成專業格式（週報專用）
+
+    Args:
+        original_content: 原始週報內容（純文字）
+        job_item: 工作項目名稱
+        subject: 週報主題
+        reference_texts: 參考資料文字列表
+
+    Returns:
+        潤飾後的週報內容
+    """
+    logger.info(f"開始使用 Phison AI 生成週報內容，工作項目: {job_item}")
+
+    # 取得 token
+    token = await _get_phison_token()
+    if not token:
+        raise ConnectionError(f"無法連接到 Phison AI 服務 ({settings.PHISON_API_URL})，請檢查服務狀態或切換到 Azure OpenAI 服務")
+
+    # 週報專用 prompt（簡化版，避免過長）
+    system_instruction = (
+        "你是專業的商業報告助理，專門撰寫週報內容。\n"
+        "請將使用者提供的零散筆記轉換為專業、清晰的週報內容。\n\n"
+        "原則：\n"
+        "1. 只基於提供的內容進行潤飾，不添加未提及的細節\n"
+        "2. 使用專業、正式的商業語言，結構清晰\n"
+        "3. 簡明扼要，適當分段\n"
+    )
+
+    # 組合參考資料
+    reference_section = ""
+    if reference_texts:
+        combined_references = "\n\n".join(reference_texts[:3])  # 最多3個參考
+        if len(combined_references) > 1000:
+            combined_references = combined_references[:1000]
+        reference_section = f"\n\n參考資料：{combined_references}"
+
+    user_prompt = (
+        f"{system_instruction}\n\n"
+        f"工作項目：{job_item}\n"
+        f"主題：{subject}\n\n"
+        f"請潤飾以下內容：\n{original_content}"
+        f"{reference_section}"
+    )
+
+    # 呼叫 Phison Chat API
+    chat_url = f"{settings.PHISON_API_URL}/api/Chat"
+    payload = {
+        "content": user_prompt,
+        "maxTokens": 1500,
+        "temperature": 0.2
+    }
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        logger.info(f"調用 Phison Chat API (週報): {chat_url}")
+        logger.info(f"Prompt 長度: {len(user_prompt)} 字符")
+        
+        # 跳過 SSL 證書驗證
+        import ssl
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.post(
+                chat_url,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"Phison Chat API 失敗: {response.status}")
+                    logger.error(f"錯誤內容: {error_text[:500]}")
+                    raise Exception(f"Phison AI 服務回應錯誤 (HTTP {response.status})")
+
+                # 解析 Phison API 回應格式
+                result = await response.json()
+
+                if isinstance(result, dict):
+                    # 嘗試從 choices[0].message.content 提取
+                    if "choices" in result and len(result["choices"]) > 0:
+                        message = result["choices"][0].get("message", {})
+                        ai_content = message.get("content", "")
+                    # 備用: 直接從 content 或 result 提取
+                    elif "content" in result:
+                        ai_content = result["content"]
+                    elif "result" in result:
+                        ai_content = result["result"]
+                    else:
+                        ai_content = str(result)
+                else:
+                    ai_content = str(result)
+
+                logger.info(f"Phison AI 潤飾成功，回應長度: {len(ai_content)}")
+                return ai_content
+
+    except aiohttp.ClientError as e:
+        logger.error(f"Phison Chat API 請求失敗: {str(e)}")
+        raise Exception(f"無法連接到 Phison AI 服務: {str(e)}")
+    except Exception as e:
+        logger.error(f"Phison AI 處理失敗: {str(e)}")
+        raise
+
 
 def clear_token_cache():
     """

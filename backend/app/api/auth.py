@@ -11,6 +11,7 @@ from app.schemas.user import LoginResponse, User as UserSchema
 from app.schemas.employee import EmployeeForUser
 from app.core.security import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.core.sso import get_sso_headers_with_mock, SSOHeaders
+from app.core.deps import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Authentication"])
@@ -163,3 +164,12 @@ async def login_for_access_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication service error"
         )
+
+@router.get("/me", response_model=UserSchema)
+async def get_current_user_info(
+    current_user: UserSchema = Depends(get_current_user)
+):
+    """
+    獲取當前登入用戶資訊 - 用於驗證 token 是否有效
+    """
+    return current_user

@@ -46,6 +46,8 @@ class EmployeeForUser(BaseModel):
     deptabbv: Optional[str] = None    # 部門簡稱
     cocode: Optional[str] = None      # 公司代碼
     deptno: Optional[str] = None      # 部門代碼
+    g_deptno: Optional[str] = None    # 歸屬部門代碼
+    department_name: Optional[str] = None # 部門名稱
 
     class Config:
         from_attributes = True

@@ -107,10 +107,17 @@ async def get_current_user(
 
     user_sql = text("""
         SELECT a.empno, a.empnamec, a.cocode, a.deptno, a.dutyscript,
-               a.mailbox, a.pass, b.deptabbv, a.adm_rank, a.sop_role
+               a.mailbox, a.pass, b.deptabbv, a.adm_rank, a.sop_role,
+               a.g_deptno
         FROM jps.dcd003$master a
         LEFT JOIN jps.dcd002$master b ON a.cocode = b.cocode AND a.deptno = b.deptno
         WHERE a.empno = :empno AND a.cocode = :cocode
+    """)
+
+    dept_sql = text("""
+        SELECT deptnamec
+        FROM jps.dcd002$master
+        WHERE cocode = :cocode AND deptno = :deptno
     """)
 
     result = legacy_db.execute(user_sql, {"empno": empno, "cocode": query_cocode})
@@ -118,6 +125,9 @@ async def get_current_user(
 
     if not user_row:
         raise credentials_exception
+    
+    dept_result = legacy_db.execute(dept_sql, {"cocode": query_cocode, "deptno": user_row[3]})
+    dept_row = dept_result.fetchone()
 
     # 創建用戶物件，確保格式與認證 API 一致
     user = UserSchema(
@@ -134,6 +144,8 @@ async def get_current_user(
             deptabbv=user_row[7] or "",      # deptabbv from join
             cocode=user_row[2] or "",      # cocode
             deptno=user_row[3] or "",       # deptno
+            g_deptno=user_row[10] or "",    # g_deptno
+            department_name=dept_row[0] or "", # deptname
         )
     )
 

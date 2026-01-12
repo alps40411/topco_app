@@ -22,6 +22,83 @@ def _build_client() -> Optional[AsyncAzureOpenAI]:
         max_retries=2,  # 最多重試 2 次
     )
 
+async def get_ai_enhanced_weekly_report(
+    original_content: str,
+    job_item: str,
+    subject: str,
+    reference_texts: List[str] = []
+) -> str:
+    """
+    使用 Azure OpenAI 將週報內容潤飾成專業格式
+    
+    Args:
+        original_content: 原始週報內容
+        job_item: 工作項目名稱
+        subject: 週報主題
+        reference_texts: 參考資料文字列表 (從附件提取)
+    
+    Returns:
+        潤飾後的週報內容
+    """
+    system_prompt = (
+        "你是一位專業的商業報告助理，專門協助撰寫週報內容。\n"
+        "你的任務是將使用者提供的零散筆記或草稿，轉換為專業、清晰、結構化的週報內容。\n\n"
+        "請遵守以下原則：\n\n"
+        "1. **真實性原則**：\n"
+        "   - 只基於提供的內容進行潤飾和重組\n"
+        "   - 不添加原內容中未提及的具體細節\n"
+        "   - 保持原意，只改進表達方式\n\n"
+        "2. **專業性原則**：\n"
+        "   - 使用專業、正式的商業語言\n"
+        "   - 結構清晰，條理分明\n"
+        "   - 突出重點和關鍵成果\n\n"
+        "3. **簡潔性原則**：\n"
+        "   - 避免冗長和重複\n"
+        "   - 每個要點簡明扼要\n"
+        "   - 適當使用列表和分段\n\n"
+        "輸出格式要求：\n"
+        "- 使用純文字格式\n"
+        "- 如果內容有多個要點，使用列表呈現\n"
+        "- 適當分段，提升可讀性\n"
+    )
+    
+    # 構建參考資料部分
+    reference_section = ""
+    if reference_texts:
+        combined_references = "\n\n".join(reference_texts)
+        reference_section = f"\n\n<參考資料>\n{combined_references}\n</參考資料>"
+    
+    # 構建 user prompt
+    user_prompt = (
+        f"請為「{job_item}」這個工作項目，潤飾以下週報內容：\n\n"
+        f"主題：{subject}\n\n"
+        f"<原始內容>\n{original_content}\n</原始內容>"
+        f"{reference_section}"
+    )
+    
+    logger.info(f"調用 Azure OpenAI 生成週報，工作項目: {job_item}")
+    client = _build_client()
+    if client is None:
+        logger.error("Azure OpenAI client not configured")
+        return "AI service not available."
+    
+    try:
+        response = await client.chat.completions.create(
+            model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+        )
+        ai_content = response.choices[0].message.content
+        logger.info(f"Azure OpenAI 週報潤飾成功，回應長度: {len(ai_content) if ai_content else 0}")
+        return ai_content if ai_content else "Unable to get content from AI service."
+    except Exception as e:
+        logger.error(f"Azure OpenAI API call failed: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return f"AI service temporarily unavailable: {str(e)}"
+
 async def get_ai_enhanced_report(original_content: str, project_name: str, reference_texts: List[str] = []) -> str:
     """
     使用 Azure OpenAI 將報告內容潤飾成專業格式，並參考附加文件內容。
