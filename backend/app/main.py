@@ -6,9 +6,15 @@ from starlette.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from typing import Dict
 import time
+import logging
 
 # --- 引入所有需要的 API 路由 ---
 from app.api import supervisor, auth, reviews, users, drafts, ai, work_data, dates, records, weekly
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s - %(message)s'
+)
 
 app = FastAPI(
     title="TSC 業務日誌 API",

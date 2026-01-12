@@ -1,0 +1,271 @@
+/* Custom CKEditor 5 Styles */
+/* 使用 19px 作為統一字體大小 */
+
+/* CKEditor 容器樣式 */
+.ckeditor-wrapper {
+  @apply bg-white;
+}
+
+/* 編輯器主要容器 */
+.ckeditor-wrapper .ck.ck-editor {
+  @apply w-full;
+}
+
+/* 工具列樣式 */
+.ckeditor-wrapper .ck.ck-toolbar {
+  background: #f8f9fa !important;
+  border-top-left-radius: 0.5rem !important;
+  border-top-right-radius: 0.5rem !important;
+  border-color: #d1d5db !important;
+  padding: 0.5rem !important;
+}
+
+/* 編輯區域容器 */
+.ckeditor-wrapper .ck.ck-editor__main {
+  min-height: 300px;
+}
+
+/* 編輯器內容區域 */
+.ckeditor-wrapper .ck.ck-content {
+  @apply min-h-[300px] p-3 text-base leading-relaxed break-words;
+  font-size: 19px !important;
+  font-family: "微軟正黑體", "Microsoft JhengHei", sans-serif !important;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  border-bottom-left-radius: 0.5rem !important;
+  border-bottom-right-radius: 0.5rem !important;
+  border-color: #d1d5db !important;
+}
+
+/* 編輯器聚焦狀態 */
+.ckeditor-wrapper .ck.ck-editor__editable:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* placeholder 樣式 */
+.ckeditor-wrapper .ck.ck-placeholder::before {
+  color: #9ca3af !important;
+  font-style: normal !important;
+  font-size: 19px !important;
+}
+
+/* 限制編輯器內和預覽區的圖片寬度 */
+.ckeditor-wrapper .ck-content img,
+.prose img,
+div[dangerouslySetInnerHTML] img,
+[class*="prose"] img {
+  max-width: 80%;
+  height: auto;
+  display: block;
+  margin: 1rem 0;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* 移動設備上圖片佔據更多空間 */
+@media (max-width: 768px) {
+  .ckeditor-wrapper .ck-content img,
+  .prose img,
+  div[dangerouslySetInnerHTML] img,
+  [class*="prose"] img {
+    max-width: 90%;
+  }
+}
+
+/* 強制文字斷行，防止長 URL 或連續文字撐破容器 */
+.ckeditor-wrapper .ck-content p,
+.ckeditor-wrapper .ck-content a,
+.prose p,
+.prose a,
+div[dangerouslySetInnerHTML] p,
+div[dangerouslySetInnerHTML] a,
+[class*="prose"] p,
+[class*="prose"] a {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* 處理超連結顯示（排除包含圖片的連結） */
+.ckeditor-wrapper .ck-content a:not(:has(img)),
+.prose a:not(:has(img)),
+div[dangerouslySetInnerHTML] a:not(:has(img)),
+[class*="prose"] a:not(:has(img)) {
+  max-width: 100%;
+  display: inline-block;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 連結 hover 效果 */
+.ckeditor-wrapper .ck-content a:not(:has(img)):hover,
+.prose a:not(:has(img)):hover,
+div[dangerouslySetInnerHTML] a:not(:has(img)):hover,
+[class*="prose"] a:not(:has(img)):hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* 列表樣式 - 確保有序和無序列表能正確顯示 */
+.ckeditor-wrapper .ck-content ol,
+.ckeditor-wrapper .ck-content ul,
+.prose ol,
+.prose ul,
+div[dangerouslySetInnerHTML] ol,
+div[dangerouslySetInnerHTML] ul,
+[class*="prose"] ol,
+[class*="prose"] ul {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.ckeditor-wrapper .ck-content ol,
+.prose ol,
+div[dangerouslySetInnerHTML] ol,
+[class*="prose"] ol {
+  list-style-type: decimal;
+}
+
+.ckeditor-wrapper .ck-content ul,
+.prose ul,
+div[dangerouslySetInnerHTML] ul,
+[class*="prose"] ul {
+  list-style-type: disc;
+}
+
+.ckeditor-wrapper .ck-content li,
+.prose li,
+div[dangerouslySetInnerHTML] li,
+[class*="prose"] li {
+  display: list-item;
+  margin: 0.25rem 0;
+}
+
+/* 標題樣式 */
+.ckeditor-wrapper .ck-content h1,
+.prose h1,
+div[dangerouslySetInnerHTML] h1,
+[class*="prose"] h1 {
+  font-size: 30px;
+  font-weight: bold;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.ckeditor-wrapper .ck-content h2,
+.prose h2,
+div[dangerouslySetInnerHTML] h2,
+[class*="prose"] h2 {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.ckeditor-wrapper .ck-content h3,
+.prose h3,
+div[dangerouslySetInnerHTML] h3,
+[class*="prose"] h3 {
+  font-size: 22px;
+  font-weight: bold;
+  margin: 1rem 0 0.5rem 0;
+}
+
+/* 段落間距 */
+.ckeditor-wrapper .ck-content p,
+.prose p,
+div[dangerouslySetInnerHTML] p,
+[class*="prose"] p {
+  margin: 0.5rem 0;
+  line-height: 1.5em;
+}
+
+/* 粗體樣式 */
+.ckeditor-wrapper .ck-content strong,
+.prose strong,
+div[dangerouslySetInnerHTML] strong,
+[class*="prose"] strong {
+  font-weight: bold;
+}
+
+/* 斜體樣式 */
+.ckeditor-wrapper .ck-content em,
+.prose em,
+div[dangerouslySetInnerHTML] em,
+[class*="prose"] em {
+  font-style: italic;
+}
+
+/* 底線樣式 */
+.ckeditor-wrapper .ck-content u,
+.prose u,
+div[dangerouslySetInnerHTML] u,
+[class*="prose"] u {
+  text-decoration: underline;
+}
+
+/* 刪除線樣式 */
+.ckeditor-wrapper .ck-content s,
+.prose s,
+div[dangerouslySetInnerHTML] s,
+[class*="prose"] s {
+  text-decoration: line-through;
+}
+
+/* 禁用狀態樣式 */
+.ckeditor-wrapper .ck.ck-editor__editable:not(.ck-editor__nested-editable).ck-read-only {
+  background-color: #f3f4f6 !important;
+  cursor: not-allowed;
+}
+
+/* 工具列按鈕樣式調整 */
+.ckeditor-wrapper .ck.ck-toolbar__separator {
+  background-color: #d1d5db !important;
+}
+
+.ckeditor-wrapper .ck.ck-button:hover:not(.ck-disabled) {
+  background-color: #e5e7eb !important;
+}
+
+.ckeditor-wrapper .ck.ck-button.ck-on {
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+}
+
+/* 下拉選單樣式 */
+.ckeditor-wrapper .ck.ck-dropdown__panel {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* 字體大小下拉選單 */
+.ckeditor-wrapper .ck-fontsize-option {
+  min-width: 4rem;
+}
+
+/* 字體家族下拉選單 */
+.ckeditor-wrapper .ck-fontfamily-option {
+  min-width: 8rem;
+}
+
+/* 確保所有內容使用正確的字體 */
+.ckeditor-wrapper .ck-content,
+.ckeditor-wrapper .ck-content * {
+  font-family: inherit;
+}
+
+/* 工具提示樣式 */
+.ckeditor-wrapper .ck.ck-tooltip {
+  z-index: 9999;
+}
+
+/* 確保編輯器在小螢幕上也能正常顯示 */
+@media (max-width: 640px) {
+  .ckeditor-wrapper .ck.ck-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .ckeditor-wrapper .ck.ck-content {
+    min-height: 200px;
+  }
+}

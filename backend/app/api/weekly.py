@@ -1001,7 +1001,7 @@ async def get_revenue(
                 )
 
             result = response.json()
-            logger.info(f"CommonAPI 返回成功，資料筆數: {len(result.get('ResponseData', []))}")
+            # logger.info(f"CommonAPI 返回成功，資料筆數: {len(result.get('ResponseData', []))}")
 
             return result
 
@@ -1112,14 +1112,15 @@ async def submit_weekly_report(
             "empname": empname,
             "status": "N",  # S = Submitted
             "change": "N",  # N = New
-            "oldWeeklyNo": 0.0,
-            "varWeeklyNo": float(weekly_no),
+            "WeeklyNo": int(weekly_no),
             "year": str(year),
             "sdate": sdate,
             "edate": edate,
             "end_date": edate,
             "week_no": str(week_no),
-            "details": content_list  # 改為陣列，支援多筆 draft
+            "details": content_list, # 改為陣列，支援多筆 draft
+            "classify": True,
+            "emergency": False
         }
 
         # 調用 CommonAPI
@@ -1558,7 +1559,7 @@ async def reply_weekly_report(
         }
 
         logger.info(f"調用 CommonAPI 回覆週報: {settings.REPLY_WEEKLY_REPORT_API_URL}")
-        logger.debug(f"請求參數: {commonapi_request}")
+        logger.info(f"請求參數: {commonapi_request}")
 
         # 5. 調用 CommonAPI
         async with httpx.AsyncClient(timeout=30.0) as client:
