@@ -54,6 +54,7 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   const [forwardedReports, setForwardedReports] = useState<WeeklyReport[]>([]);
   const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [editableStatus, setEditableStatus] = useState<Record<string, { can_edit: boolean; can_delete: boolean }>>({});
 
   const { authFetch, user } = useAuth();
   const navigate = useNavigate();
@@ -87,6 +88,26 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
     }
   }, [user]);
 
+  // 檢查週報是否可編輯/刪除
+  const checkReportEditable = async (weeklyNo: string) => {
+    try {
+      const response = await authFetch(
+        `/api/weekly/can-submit?weekly_no=${weeklyNo}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          can_edit: data.can_edit === true,
+          can_delete: data.can_delete === true,
+        };
+      }
+      return { can_edit: false, can_delete: false };
+    } catch (error) {
+      console.error("檢查可編輯狀態失敗:", error);
+      return { can_edit: false, can_delete: false };
+    }
+  };
+
   // 載入週報列表
   useEffect(() => {
     const loadReports = async () => {
@@ -109,6 +130,28 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
           })
         );
         setForwardedReports(markedForwardedReports);
+
+        // 檢查所有唯一週報編號的可編輯狀態
+        const allReports = [
+          ...(data.subordinate_reports || []),
+          ...(data.forwarded_reports || []),
+        ];
+        const uniqueWeeklyNos = [
+          ...new Set(allReports.map((r) => r.id.toString()).filter((id) => id)),
+        ];
+
+        const statusPromises = uniqueWeeklyNos.map(async (weeklyNo) => {
+          const status = await checkReportEditable(weeklyNo);
+          return [weeklyNo, status];
+        });
+
+        const statusResults = await Promise.all(statusPromises);
+        const statusMap: Record<string, { can_edit: boolean; can_delete: boolean }> = {};
+        statusResults.forEach(([weeklyNo, status]) => {
+          statusMap[weeklyNo as string] = status as { can_edit: boolean; can_delete: boolean };
+        });
+
+        setEditableStatus(statusMap);
       } catch (error) {
         console.error("載入週報列表失敗:", error);
         toast.error("載入週報列表失敗");
@@ -121,6 +164,43 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
 
     loadReports();
   }, [selectedYear, selectedWeek, authFetch]);
+
+  // 處理刪除週報
+  const handleDeleteReport = async (reportId: number, reportYear: number, reportWeek: number) => {
+    if (!window.confirm("確定要刪除這份週報嗎？")) {
+      return;
+    }
+
+    try {
+      const response = await authFetch(`/api/weekly/report/${reportId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast.success("週報刪除成功");
+        // 重新載入當前週次的週報列表
+        const data = await WeeklyReportApi.getWeeklyReports(
+          selectedYear,
+          selectedWeek,
+          authFetch
+        );
+        setSubordinateReports(data.subordinate_reports || []);
+        setForwardedReports(data.forwarded_reports || []);
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || "刪除週報失敗");
+      }
+    } catch (error) {
+      console.error("刪除週報失敗:", error);
+      toast.error("刪除週報失敗");
+    }
+  };
+
+  // 處理編輯週報 - 跳轉到 WeeklyReportTab
+  const handleEditReport = () => {
+    // 跳轉到週報編輯頁面
+    navigate(`?tab=weekly`);
+  };
 
   // 處理週次變更 - 使用 useCallback 避免不必要的重新渲染
   const handleWeekChange = useCallback((year: number, week: number) => {
@@ -356,7 +436,45 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
           {renderContentStatus(report)}
         </td>
         <td className="px-1 sm:px-2 md:px-3 py-2.5 text-center whitespace-nowrap">
-          {/* 週報暫時不提供編輯/刪除功能 */}
+          {(() => {
+            const isOwnReport = currentUserEmpno === report.employee.empno;
+            const reportId = report.id.toString();
+            const canEdit = editableStatus[reportId]?.can_edit || false;
+            const canDelete = editableStatus[reportId]?.can_delete || false;
+
+            return isOwnReport && (canEdit || canDelete) && (
+              <div className="flex items-center justify-center gap-2">
+                {canEdit && (
+                  <button
+                    onClick={handleEditReport}
+                    className="hover:opacity-75 transition-opacity"
+                    title="編輯週報"
+                  >
+                    <img
+                      src="/MyReportAI/edit.png"
+                      alt="編輯"
+                      className="w-5 h-5"
+                    />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={() =>
+                      handleDeleteReport(report.id, report.year, report.week)
+                    }
+                    className="hover:opacity-75 transition-opacity"
+                    title="刪除週報"
+                  >
+                    <img
+                      src="/MyReportAI/delete.png"
+                      alt="刪除"
+                      className="w-5 h-5"
+                    />
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </td>
       </tr>
     );

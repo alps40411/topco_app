@@ -89,20 +89,26 @@ async def check_can_submit(
             has_replies = reply_result[0] > 0 if reply_result else False
 
         # 3. 決定最終結果
+        # 週報系統權限規則：
+        # - can_edit: 只要未被回覆就可編輯（無時間限制）
+        # - can_delete: 只要未被回覆就可刪除（無時間限制）
+        # - can_submit: 需在時間範圍內且未被回覆
+        can_edit = not has_replies
+        can_delete = not has_replies
         can_submit = in_time_window and not has_replies
-        can_edit = in_time_window and not has_replies
 
         # 4. 生成原因說明
         if has_replies:
-            reason = "此週報已被主管審閱，無法再修改"
+            reason = "此週報已被主管審閱，無法再修改或刪除"
         elif not in_time_window:
-            reason = f"不在提交時間範圍內（週五 17:00 ~ 週一 08:30），下次可提交時間：{next_submit_time}"
+            reason = f"不在提交時間範圍內（週五 17:00 ~ 週一 08:30），但仍可編輯。下次可提交時間：{next_submit_time}"
         else:
-            reason = "可以提交週報"
+            reason = "可以編輯、刪除和提交週報"
 
         return {
             "can_submit": True,
-            "can_edit": True,
+            "can_edit": can_edit,
+            "can_delete": can_delete,
             "reason": reason,
             "next_submit_time": next_submit_time,
             "has_replies": has_replies
@@ -1604,3 +1610,87 @@ async def reply_weekly_report(
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"回覆週報失敗: {str(e)}")
+
+
+@router.delete("/report/{weekly_no}")
+async def delete_weekly_report(
+    weekly_no: str,
+    current_user: UserSchema = Depends(get_current_user)
+):
+    """
+    刪除週報 - 轉發到 CommonAPI
+
+    Args:
+        weekly_no: 週報編號
+        current_user: 當前登入使用者
+
+    Returns:
+        刪除結果
+
+    業務規則：
+    1. 只能刪除自己的週報
+    2. 已被主管回覆的週報不能刪除（由 CommonAPI 檢查）
+    """
+    import httpx
+    from app.core.config import settings
+
+    try:
+        empno = current_user.employee.empno
+        cocode = current_user.employee.cocode or "A"
+
+        logger.info(f"刪除週報: weekly_no={weekly_no}, empno={empno}, cocode={cocode}")
+
+        # 準備 CommonAPI 請求參數
+        request_data = {
+            "cocode": cocode,
+            "empno": empno,
+            "weekly_no": int(weekly_no)
+        }
+
+        # 調用 CommonAPI 刪除週報
+        commonapi_url = settings.DELETE_WEEKLY_REPORT_API_URL
+        logger.info(f"調用 CommonAPI 刪除週報: {commonapi_url}")
+        logger.info(f"請求參數: {request_data}")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                commonapi_url,
+                json=request_data,
+                headers={"Content-Type": "application/json"}
+            )
+
+            logger.info(f"CommonAPI 回應狀態: {response.status_code}")
+
+            if response.status_code != 200:
+                logger.error(f"CommonAPI 回應錯誤: {response.text}")
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"CommonAPI 回應錯誤: {response.text}"
+                )
+
+            result = response.json()
+            logger.info(f"CommonAPI 回應: ResponseNo={result.get('ResponseNo')}, ResponseNa={result.get('ResponseNa')}")
+
+            # 檢查 CommonAPI 回傳的狀態
+            if result.get("ResponseNo") != "0000":
+                logger.warning(f"CommonAPI 回傳錯誤: {result.get('ResponseNa')}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=result.get("ResponseNa", "刪除週報失敗")
+                )
+
+            return result
+
+    except httpx.TimeoutException:
+        logger.error("CommonAPI 請求超時")
+        raise HTTPException(status_code=504, detail="請求超時")
+    except httpx.RequestError as e:
+        logger.error(f"CommonAPI 請求錯誤: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"請求錯誤: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"刪除週報失敗: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"刪除週報失敗: {str(e)}")

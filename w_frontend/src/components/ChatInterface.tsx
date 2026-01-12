@@ -130,22 +130,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       setHasSubmittedReview(false);
     }
   }, [approvals, user]);
-
-  // 檢查當前用戶是否為此報告的主管
-  const isReportSupervisor =
-    user?.employee?.empno && approvals && Array.isArray(approvals)
-      ? approvals.some(
-          (approval) => approval.supervisor_empno === user.employee.empno
-        )
-      : false;
-
-  // 檢查當前用戶是否為此報告的作者（使用 empno 比對）
   const isReportAuthor =
     user?.employee?.empno && reportOwnerEmpno
       ? user.employee.empno === reportOwnerEmpno
       : false;
+  // 檢查當前用戶是否為此報告的主管
+  // ✅ 修改邏輯：如果是審核名單中的人，或者是有主管權限且非作者本人，都視為主管
+  const isReportSupervisor =
+    (user?.employee?.empno && approvals && Array.isArray(approvals)
+      ? approvals.some(
+        (approval) => approval.supervisor_empno === user.employee.empno
+      )
+      : false) ||
+    (user?.is_supervisor && !isReportAuthor);
 
-  // ✅ 移除 fetchReportAuthor 函數，直接使用傳入的 reportAuthor
+
 
   // 建構回應目標列表
   const buildReplyTargets = useCallback(
@@ -254,7 +253,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // ✅ 週報系統：當 initialComments 變化時更新 comments 和 replyTargets
   useEffect(() => {
-    if (initialComments && initialComments.length > 0) {
+    // ✅ 修正：即使沒有留言，也要調用 buildReplyTargets，這樣至少會包含報告作者
+    if (initialComments) {
       setComments(initialComments);
       buildReplyTargets(initialComments);
     }
@@ -284,11 +284,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         reportId.toString(), // weekly_no
         finalMessage, // reply_memo
         null, // score (一般回覆不傳評分)
-        selectedReplyTargets.filter(
-          (target) =>
-            target &&
-            target !== String(user?.employee?.empno).padStart(5, "0")
-        ), // to_users (過濾掉空值和自己)
+        selectedReplyTargets.filter((target) => target), // to_users (過濾掉空值)
         forwardEmpnos, // forward_users
         authFetch
       );
@@ -307,11 +303,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         if (webType === "EIP") {
           window.location.href = "../TopcoWebCore/InBox";
         } else {
-          // ✅ 保留當前選擇的日期
-          const dateParam = urlParams.get("date");
-          const url = dateParam
-            ? `?tab=supervisor&date=${dateParam}`
-            : "?tab=supervisor";
+          // ✅ 週報系統：保留當前選擇的年份和週次
+          const yearParam = urlParams.get("year");
+          const weekParam = urlParams.get("week");
+          const url =
+            yearParam && weekParam
+              ? `?tab=weeklyList&year=${yearParam}&week=${weekParam}`
+              : "?tab=weeklyList";
           navigate(url);
         }
       } else {
@@ -353,11 +351,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         reportId.toString(), // weekly_no
         finalComment, // reply_memo
         selectedRating, // score (主管評分)
-        selectedReplyTargets.filter(
-          (target) =>
-            target &&
-            target !== String(user?.employee?.empno).padStart(5, "0")
-        ), // to_users (過濾掉空值和自己)
+        selectedReplyTargets.filter((target) => target), // to_users (過濾掉空值)
         forwardEmpnos, // forward_users
         authFetch
       );
@@ -382,10 +376,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           window.location.href = "../TopcoWebCore/InBox";
         } else {
           // ✅ 保留當前選擇的日期
-          const dateParam = urlParams.get("date");
-          const url = dateParam
-            ? `?tab=supervisor&date=${dateParam}`
-            : "?tab=supervisor";
+          const yearParam = urlParams.get("year");
+          const weekParam = urlParams.get("week");
+          const url =
+            yearParam && weekParam
+              ? `?tab=weeklyList&year=${yearParam}&week=${weekParam}`
+              : "?tab=weeklyList";
           navigate(url);
         }
       } else {
@@ -419,10 +415,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           window.location.href = "../TopcoWebCore/InBox";
         } else {
           // ✅ 保留當前選擇的日期
-          const dateParam = urlParams.get("date");
-          const url = dateParam
-            ? `?tab=supervisor&date=${dateParam}`
-            : "?tab=supervisor";
+          const yearParam = urlParams.get("year");
+          const weekParam = urlParams.get("week");
+          const url =
+            yearParam && weekParam
+              ? `?tab=weeklyList&year=${yearParam}&week=${weekParam}`
+              : "?tab=weeklyList";
           navigate(url);
         }
       } else {
@@ -836,11 +834,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         type="button"
                         onClick={() => setSelectedRating(option.value)}
                         className={`px-4 py-2 text-sm font-medium border transition-colors
-                            ${
-                              selectedRating === option.value
-                                ? "bg-blue-500 text-white border-blue-500 z-10"
-                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                            }
+                            ${selectedRating === option.value
+                            ? "bg-blue-500 text-white border-blue-500 z-10"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                          }
                             ${option.value === 1 ? "rounded-l-lg" : ""}
                             ${option.value === 5 ? "rounded-r-lg" : ""}
                           `}

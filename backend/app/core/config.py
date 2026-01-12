@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     SHOW_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/ShowWeeklyReport"
     # 回覆週報 API
     REPLY_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/ReplyWeeklyReport"
+    # 刪除週報 API
+    DELETE_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/DeleteWeeklyReport"
 
 
 
