@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // 重新載入到根路徑，讓 ProtectedRoute 處理導航到登入頁
     // 使用根路徑避免 404 錯誤（SPA 不應該直接訪問 /login）
-    window.location.replace("/MyReportAI/");
+    window.location.replace("/MyReportAI_Weekly/");
   }, []);
 
   const isAuthenticated = !isLoading && !!token;
@@ -122,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setToken(null);
           setUser(null);
           // 使用 replace 導航到登入頁，避免 404
-          window.location.replace("/MyReportAI/");
+          window.location.replace("/MyReportAI_Weekly/");
         } else {
           // 一般的 session 過期
           logout();

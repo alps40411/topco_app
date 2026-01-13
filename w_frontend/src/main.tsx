@@ -62,7 +62,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 const AppWithAuth = () => {
   return (
     <AuthProvider>
-      <Router basename="/MyReportAI/">
+      <Router basename="/MyReportAI_Weekly/">
         <Routes>
           <Route path="login" element={<LoginPage />} />
 

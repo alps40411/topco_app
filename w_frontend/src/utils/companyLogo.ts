@@ -7,7 +7,7 @@
  */
 export function getCompanyLogo(cocode: string | undefined): string {
   // 預設 logo (如果沒有 cocode 或找不到對應的 logo)
-  const defaultLogo = "/MyReportAI/top_logoA.jpg";
+  const defaultLogo = "/MyReportAI_Weekly/top_logoA.jpg";
 
   if (!cocode) {
     return defaultLogo;
@@ -18,7 +18,7 @@ export function getCompanyLogo(cocode: string | undefined): string {
 
   // 根據 cocode 映射到對應的 logo 檔案
   // 規則: top_logo{COCODE}.jpg
-  const logoPath = `/MyReportAI/top_logo${normalizedCocode}.jpg`;
+  const logoPath = `/MyReportAI_Weekly/top_logo${normalizedCocode}.jpg`;
 
   return logoPath;
 }

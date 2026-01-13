@@ -36,13 +36,13 @@ const AiServiceSelector: React.FC<AiServiceSelectorProps> = ({
     {
       value: "aoai",
       label: "Azure OpenAI",
-      logo: "/MyReportAI/Microsoft_Azure.png",
+      logo: "/MyReportAI_Weekly/Microsoft_Azure.png",
       badge: "推薦",
     },
     {
       value: "phison",
       label: "Phison LLM",
-      logo: "/MyReportAI/phison.png",
+      logo: "/MyReportAI_Weekly/phison.png",
     },
   ];
 
@@ -132,11 +132,7 @@ const AiServiceSelector: React.FC<AiServiceSelectorProps> = ({
                 text-sm text-left whitespace-nowrap
                 hover:bg-gray-50
                 transition-colors duration-150
-                ${
-                  service.value === selectedService
-                    ? "bg-purple-50"
-                    : ""
-                }
+                ${service.value === selectedService ? "bg-purple-50" : ""}
               `}
             >
               {/* 選中勾勾 (固定寬度) */}

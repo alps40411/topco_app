@@ -48,12 +48,12 @@ const LoginPage: React.FC = () => {
           const savedRedirect = sessionStorage.getItem("redirect_after_login");
           const currentSearch = window.location.search;
 
-          let redirectUrl = "/MyReportAI/?tab=supervisor";
+          let redirectUrl = "/MyReportAI_Weekly/?tab=supervisor";
           if (savedRedirect) {
-            redirectUrl = `/MyReportAI/${savedRedirect}`;
+            redirectUrl = `/MyReportAI_Weekly/${savedRedirect}`;
             sessionStorage.removeItem("redirect_after_login");
           } else if (currentSearch) {
-            redirectUrl = `/MyReportAI/${currentSearch}`;
+            redirectUrl = `/MyReportAI_Weekly/${currentSearch}`;
           }
 
           window.location.href = redirectUrl;
@@ -98,12 +98,12 @@ const LoginPage: React.FC = () => {
       const savedRedirect = sessionStorage.getItem("redirect_after_login");
       const currentSearch = window.location.search;
 
-      let redirectUrl = "/MyReportAI/?tab=weeklyList";
+      let redirectUrl = "/MyReportAI_Weekly/?tab=weeklyList";
       if (savedRedirect) {
-        redirectUrl = `/MyReportAI/${savedRedirect}`;
+        redirectUrl = `/MyReportAI_Weekly/${savedRedirect}`;
         sessionStorage.removeItem("redirect_after_login");
       } else if (currentSearch) {
-        redirectUrl = `/MyReportAI/${currentSearch}`;
+        redirectUrl = `/MyReportAI_Weekly/${currentSearch}`;
       }
 
       window.location.href = redirectUrl;
@@ -141,12 +141,12 @@ const LoginPage: React.FC = () => {
       const savedRedirect = sessionStorage.getItem("redirect_after_login");
       const currentSearch = window.location.search;
 
-      let redirectUrl = "/MyReportAI/?tab=weeklyList";
+      let redirectUrl = "/MyReportAI_Weekly/?tab=weeklyList";
       if (savedRedirect) {
-        redirectUrl = `/MyReportAI/${savedRedirect}`;
+        redirectUrl = `/MyReportAI_Weekly/${savedRedirect}`;
         sessionStorage.removeItem("redirect_after_login");
       } else if (currentSearch) {
-        redirectUrl = `/MyReportAI/${currentSearch}`;
+        redirectUrl = `/MyReportAI_Weekly/${currentSearch}`;
       }
 
       window.location.href = redirectUrl;

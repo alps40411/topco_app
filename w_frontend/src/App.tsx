@@ -150,17 +150,11 @@ export interface User {
   employee?: EmployeeForUser;
 }
 function App() {
-  const {
-    user,
-    logout,
-    authFetch,
-  } = useAuth(); // ✅ 從 AuthContext 獲取全域狀態
+  const { user, logout, authFetch } = useAuth(); // ✅ 從 AuthContext 獲取全域狀態
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<
-    "weekly" | "weeklyList"
-  >("weekly"); // ✅ 預設為週報編輯
+  const [activeTab, setActiveTab] = useState<"weekly" | "weeklyList">("weekly"); // ✅ 預設為週報編輯
 
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeInList | null>(null);
@@ -180,7 +174,10 @@ function App() {
       if (tab === "weeklyList") {
         const yearParam = searchParams.get("year");
         const weekParam = searchParams.get("week");
-        const url = yearParam && weekParam ? `?tab=${tab}&year=${yearParam}&week=${weekParam}` : `?tab=${tab}`;
+        const url =
+          yearParam && weekParam
+            ? `?tab=${tab}&year=${yearParam}&week=${weekParam}`
+            : `?tab=${tab}`;
         navigate(url, { replace: false });
       } else {
         // 切換到週報編輯時，不帶參數
@@ -249,10 +246,7 @@ function App() {
 
   // ✅ 週報系統：監聽 URL 參數變化並同步狀態
   useEffect(() => {
-    const tab = searchParams.get("tab") as
-      | "weekly"
-      | "weeklyList"
-      | null;
+    const tab = searchParams.get("tab") as "weekly" | "weeklyList" | null;
     const reportParam = searchParams.get("report");
     const employeeParam = searchParams.get("employee");
 
@@ -338,7 +332,7 @@ function App() {
                   alt="業務日誌"
                   className="w-40 h-13 rounded-lg object-contain"
                   onError={(e) => {
-                    e.currentTarget.src = "/MyReportAI/top_logoA.jpg";
+                    e.currentTarget.src = "/MyReportAI_Weekly/top_logoA.jpg";
                     console.log("圖片載入失敗，使用預設 logo");
                   }}
                 />
@@ -409,7 +403,7 @@ function App() {
                     alt="業務日誌"
                     className="w-32 sm:w-36 h-11 sm:h-12 rounded-lg object-contain"
                     onError={(e) => {
-                      e.currentTarget.src = "/MyReportAI/top_logoA.jpg";
+                      e.currentTarget.src = "/MyReportAI_Weekly/top_logoA.jpg";
                       console.log("圖片載入失敗，使用預設 logo");
                     }}
                   />

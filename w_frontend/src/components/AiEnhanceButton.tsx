@@ -38,13 +38,13 @@ const AiEnhanceButton: React.FC<AiEnhanceButtonProps> = ({
     {
       value: "aoai",
       label: "Azure OpenAI",
-      logo: "/MyReportAI/Microsoft_Azure.png",
+      logo: "/MyReportAI_Weekly/Microsoft_Azure.png",
       badge: "推薦",
     },
     {
       value: "phison",
       label: "Phison LLM",
-      logo: "/MyReportAI/phison.png",
+      logo: "/MyReportAI_Weekly/phison.png",
     },
   ];
 
@@ -109,7 +109,9 @@ const AiEnhanceButton: React.FC<AiEnhanceButtonProps> = ({
           {/* 文字 */}
           {children || (
             <>
-              <span className="hidden sm:inline whitespace-nowrap">潤飾全部</span>
+              <span className="hidden sm:inline whitespace-nowrap">
+                潤飾全部
+              </span>
               <span className="sm:hidden whitespace-nowrap">潤飾</span>
             </>
           )}

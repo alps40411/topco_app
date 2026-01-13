@@ -54,7 +54,9 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   const [forwardedReports, setForwardedReports] = useState<WeeklyReport[]>([]);
   const [currentUserEmpno, setCurrentUserEmpno] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [editableStatus, setEditableStatus] = useState<Record<string, { can_edit: boolean; can_delete: boolean }>>({});
+  const [editableStatus, setEditableStatus] = useState<
+    Record<string, { can_edit: boolean; can_delete: boolean }>
+  >({});
 
   const { authFetch, user } = useAuth();
   const navigate = useNavigate();
@@ -146,9 +148,15 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
         });
 
         const statusResults = await Promise.all(statusPromises);
-        const statusMap: Record<string, { can_edit: boolean; can_delete: boolean }> = {};
+        const statusMap: Record<
+          string,
+          { can_edit: boolean; can_delete: boolean }
+        > = {};
         statusResults.forEach(([weeklyNo, status]) => {
-          statusMap[weeklyNo as string] = status as { can_edit: boolean; can_delete: boolean };
+          statusMap[weeklyNo as string] = status as {
+            can_edit: boolean;
+            can_delete: boolean;
+          };
         });
 
         setEditableStatus(statusMap);
@@ -166,7 +174,11 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   }, [selectedYear, selectedWeek, authFetch]);
 
   // 處理刪除週報
-  const handleDeleteReport = async (reportId: number, reportYear: number, reportWeek: number) => {
+  const handleDeleteReport = async (
+    reportId: number,
+    reportYear: number,
+    reportWeek: number
+  ) => {
     if (!window.confirm("確定要刪除這份週報嗎？")) {
       return;
     }
@@ -203,13 +215,16 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   };
 
   // 處理週次變更 - 使用 useCallback 避免不必要的重新渲染
-  const handleWeekChange = useCallback((year: number, week: number) => {
-    setSelectedYear(year);
-    setSelectedWeek(week);
+  const handleWeekChange = useCallback(
+    (year: number, week: number) => {
+      setSelectedYear(year);
+      setSelectedWeek(week);
 
-    // 更新 URL 參數
-    navigate(`?tab=weeklyList&year=${year}&week=${week}`, { replace: true });
-  }, [navigate]);
+      // 更新 URL 參數
+      navigate(`?tab=weeklyList&year=${year}&week=${week}`, { replace: true });
+    },
+    [navigate]
+  );
 
   // 按公司分組週報
   const groupReportsByCompany = (reports: WeeklyReport[]) => {
@@ -232,10 +247,17 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   };
 
   // 格式化日期範圍 YYYYMMDD -> YYYY-MM-DD
-  const formatDateRange = (startDate: string, endDate: string, week: number) => {
+  const formatDateRange = (
+    startDate: string,
+    endDate: string,
+    week: number
+  ) => {
     const formatDate = (dateStr: string) => {
       if (!dateStr || dateStr.length !== 8) return "";
-      return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+      return `${dateStr.substring(0, 4)}-${dateStr.substring(
+        4,
+        6
+      )}-${dateStr.substring(6, 8)}`;
     };
 
     const start = formatDate(startDate);
@@ -254,7 +276,7 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
       return (
         <div className="flex items-center justify-center gap-0.5">
           <img
-            src="/MyReportAI/isforward.png"
+            src="/MyReportAI_Weekly/isforward.png"
             alt="轉寄給我"
             className="w-6 h-6 flex-shrink-0"
           />
@@ -267,7 +289,7 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
       return (
         <div className="flex items-center justify-center gap-0.5">
           <img
-            src="/MyReportAI/forward.png"
+            src="/MyReportAI_Weekly/forward.png"
             alt="我轉寄的"
             className="w-6 h-6 flex-shrink-0"
           />
@@ -289,7 +311,7 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
       // 只有自己回應
       return (
         <img
-          src="/MyReportAI/purple_heart.gif"
+          src="/MyReportAI_Weekly/purple_heart.gif"
           alt="自己回應"
           className="w-6 h-6"
         />
@@ -298,7 +320,7 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
       // 只有別人回應
       return (
         <img
-          src="/MyReportAI/red_heart.gif"
+          src="/MyReportAI_Weekly/red_heart.gif"
           alt="有人回應"
           className="w-6 h-6"
         />
@@ -306,7 +328,11 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
     } else if (replyCount > replierCount) {
       // 雙方都有回應
       return (
-        <img src="/MyReportAI/hearts.gif" alt="雙方回應" className="w-6 h-6" />
+        <img
+          src="/MyReportAI_Weekly/hearts.gif"
+          alt="雙方回應"
+          className="w-6 h-6"
+        />
       );
     }
 
@@ -323,21 +349,21 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
       <div className="flex items-center justify-center gap-0.5">
         {hasMyAsk && (
           <img
-            src="/MyReportAI/my_ask.png"
+            src="/MyReportAI_Weekly/my_ask.png"
             alt="我的提問"
             className="w-4 h-4 flex-shrink-0"
           />
         )}
         {hasOtherAsk && (
           <img
-            src="/MyReportAI/other_ask.png"
+            src="/MyReportAI_Weekly/other_ask.png"
             alt="他人提問"
             className="w-4 h-4 flex-shrink-0"
           />
         )}
         {hasAttachments && (
           <img
-            src="/MyReportAI/attached.gif"
+            src="/MyReportAI_Weekly/attached.gif"
             alt="有附件"
             className="w-4 h-4 flex-shrink-0"
             title="此週報包含附件"
@@ -360,7 +386,11 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
 
   // 渲染單一週報行
   const renderReportRow = (report: WeeklyReport) => {
-    const weeklyPeriod = formatDateRange(report.start_date, report.end_date, report.week);
+    const weeklyPeriod = formatDateRange(
+      report.start_date,
+      report.end_date,
+      report.week
+    );
 
     return (
       <tr key={report.id} className="hover:bg-gray-50">
@@ -407,7 +437,9 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
         {/* 部門列 - 只在md及以上顯示 */}
         <td className="hidden md:table-cell px-2 sm:px-3 md:px-4 py-2">
           <div className="text-sm md:text-base text-gray-700 truncate">
-            <span className="truncate block">{report.employee.department_name}</span>
+            <span className="truncate block">
+              {report.employee.department_name}
+            </span>
           </div>
         </td>
         {/* 週報(週期)列 - 只在md及以上顯示 */}
@@ -442,37 +474,40 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
             const canEdit = editableStatus[reportId]?.can_edit || false;
             const canDelete = editableStatus[reportId]?.can_delete || false;
 
-            return isOwnReport && (canEdit || canDelete) && (
-              <div className="flex items-center justify-center gap-2">
-                {canEdit && (
-                  <button
-                    onClick={handleEditReport}
-                    className="hover:opacity-75 transition-opacity"
-                    title="編輯週報"
-                  >
-                    <img
-                      src="/MyReportAI/edit.png"
-                      alt="編輯"
-                      className="w-5 h-5"
-                    />
-                  </button>
-                )}
-                {canDelete && (
-                  <button
-                    onClick={() =>
-                      handleDeleteReport(report.id, report.year, report.week)
-                    }
-                    className="hover:opacity-75 transition-opacity"
-                    title="刪除週報"
-                  >
-                    <img
-                      src="/MyReportAI/delete.png"
-                      alt="刪除"
-                      className="w-5 h-5"
-                    />
-                  </button>
-                )}
-              </div>
+            return (
+              isOwnReport &&
+              (canEdit || canDelete) && (
+                <div className="flex items-center justify-center gap-2">
+                  {canEdit && (
+                    <button
+                      onClick={handleEditReport}
+                      className="hover:opacity-75 transition-opacity"
+                      title="編輯週報"
+                    >
+                      <img
+                        src="/MyReportAI_Weekly/edit.png"
+                        alt="編輯"
+                        className="w-5 h-5"
+                      />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={() =>
+                        handleDeleteReport(report.id, report.year, report.week)
+                      }
+                      className="hover:opacity-75 transition-opacity"
+                      title="刪除週報"
+                    >
+                      <img
+                        src="/MyReportAI_Weekly/delete.png"
+                        alt="刪除"
+                        className="w-5 h-5"
+                      />
+                    </button>
+                  )}
+                </div>
+              )
             );
           })()}
         </td>
