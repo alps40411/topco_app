@@ -1,6 +1,6 @@
 // frontend/src/components/RichTextEditor.tsx
 
-import React, { useRef, useCallback, useMemo, useEffect } from "react";
+import React, { useRef, useCallback, useMemo, useEffect, useState } from "react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import "../styles/quill-custom.css";
@@ -8,13 +8,19 @@ import { useAuth } from "../hooks/useAuth";
 import { toast } from "react-hot-toast";
 import type { FileForUpload } from "../App";
 import { getFullFileUrl } from "../utils/urlUtils";
+import { FileTypeModal } from "./FileTypeModal";
 
-// 在模組載入時註冊 paperclip 圖示（只執行一次）
+// 在模組載入時註冊自定義圖示（只執行一次）
 const icons = ReactQuill.Quill.import("ui/icons");
 if (!icons["paperclip"]) {
   icons[
     "paperclip"
   ] = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.59a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`;
+}
+if (!icons["fileinfo"]) {
+  icons[
+    "fileinfo"
+  ] = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`;
 }
 
 interface RichTextEditorProps {
@@ -47,6 +53,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const handleImageUploadRef = useRef<() => void>();
   const handlePaperclipUploadRef = useRef<() => void>();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // 在組件掛載時創建一個可重用的 file input
   useEffect(() => {
@@ -387,12 +394,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         container: [
           ["bold", "italic", "underline", "strike"],
           [{ list: "ordered" }, { list: "bullet" }],
-          ["link", "image", "paperclip"],
+          ["link", "image", "paperclip", "fileinfo"],
           ["clean"],
         ],
         handlers: {
           image: () => handleImageUploadRef.current?.(),
           paperclip: () => handlePaperclipUploadRef.current?.(),
+          fileinfo: () => {
+            setIsModalOpen(true);
+          },
         },
       },
     }),
@@ -413,17 +423,23 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   ];
 
   return (
-    <ReactQuill
-      ref={quillRef}
-      theme="snow"
-      value={value}
-      onChange={onChange}
-      modules={modules}
-      formats={formats}
-      placeholder={placeholder}
-      readOnly={disabled}
-      className={`bg-white ${className}`}
-    />
+    <>
+      <ReactQuill
+        ref={quillRef}
+        theme="snow"
+        value={value}
+        onChange={onChange}
+        modules={modules}
+        formats={formats}
+        placeholder={placeholder}
+        readOnly={disabled}
+        className={`bg-white ${className}`}
+      />
+      <FileTypeModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </>
   );
 };
 

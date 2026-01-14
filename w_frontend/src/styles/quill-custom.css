@@ -55,6 +55,7 @@ div[dangerouslySetInnerHTML] img,
 
 /* 移動設備上圖片佔據更多空間 */
 @media (max-width: 768px) {
+
   .ql-editor img,
   .prose img,
   div[dangerouslySetInnerHTML] img,
@@ -131,4 +132,60 @@ div[dangerouslySetInnerHTML] li,
 [class*="prose"] li {
   display: list-item;
   margin: 0.25rem 0;
+}
+
+/* fileinfo 按鈕樣式 */
+.ql-toolbar button.ql-fileinfo {
+  width: 28px !important;
+  position: relative;
+  cursor: pointer;
+}
+
+/* fileinfo 按鈕的 tooltip */
+.ql-toolbar button.ql-fileinfo::after {
+  content: "支援 34 種檔案格式（點擊查看完整列表）";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background-color: #1f2937;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* tooltip 箭頭 */
+.ql-toolbar button.ql-fileinfo::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1f2937;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* hover 時顯示 tooltip */
+.ql-toolbar button.ql-fileinfo:hover::after,
+.ql-toolbar button.ql-fileinfo:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* fileinfo 按鈕的 hover 效果 */
+.ql-toolbar button.ql-fileinfo:hover {
+  color: #2563eb;
 }

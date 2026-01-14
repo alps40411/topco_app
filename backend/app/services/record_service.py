@@ -193,15 +193,6 @@ class RecordService:
         try:
             logger.info(f"上傳檔案: {file.filename}, empno={empno}, cocode={cocode}")
 
-            # 檢查檔案類型
-            not_allowed_extensions = {'.exe', '.bat', 'cmd', '.ps1', '.vbs', '.js', '.msi', '.dll', '.com'}
-            file_ext = Path(file.filename or "").suffix.lower()
-            if file_ext in not_allowed_extensions:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"不支援的檔案類型: {file_ext}"
-                )
-
             # 使用 CommonAPI 上傳
             result = await CommonApiFileService.upload_file(
                 file=file,
