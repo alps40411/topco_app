@@ -14,11 +14,11 @@ import { AuthProvider } from "./contexts/AuthContext.tsx";
 import { useAuth } from "./hooks/useAuth";
 import "./index.css";
 
-// This component checks for 'daily_no' and decides whether to redirect or render the app.
+// This component checks for 'weekly_no' and decides whether to redirect or render the app.
 const RootHandler = () => {
   const [searchParams] = useSearchParams();
-  // If daily_no exists in the URL, it's a link from an email that needs redirection.
-  if (searchParams.has("daily_no")) {
+  // If weekly_no exists in the URL, it's a link from an email that needs redirection.
+  if (searchParams.has("weekly_no")) {
     return <RedirectHandler />;
   }
   // Otherwise, render the main application.

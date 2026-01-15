@@ -30,8 +30,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   onReviewCompleted,
 }) => {
   // 週報詳情資料
-  const [weeklyReportData, setWeeklyReportData] =
-    useState<ShowWeeklyReportResponse | null>(null);
+  const [weeklyReportData, setWeeklyReportData] = useState<
+    ShowWeeklyReportResponse | null | false
+  >(null);
   const [approvals, setApprovals] = useState<SupervisorApprovalInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>(
@@ -65,7 +66,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       const response: ShowWeeklyReportResponse =
         await WeeklyReportApi.getWeeklyReportDetail(weeklyNo, authFetch);
 
-      if (response.ResponseNo === "0000" && response.ResponseData) {
+      if (response.ResponseNo === "0000" && response.ResponseData?.weeklyReportDetails?.length === 0) {
+        setWeeklyReportData(false);
+      } else if (response.ResponseNo === "0000" && response.ResponseData) {
         setWeeklyReportData(response);
 
         // 提取作者資訊
@@ -91,9 +94,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             approved_at:
               reply.xdate && reply.xtime
                 ? `${reply.xdate.replace(
-                    /(\d{4})(\d{2})(\d{2})/,
-                    "$1-$2-$3"
-                  )} ${reply.xtime}`
+                  /(\d{4})(\d{2})(\d{2})/,
+                  "$1-$2-$3"
+                )} ${reply.xtime}`
                 : undefined,
             rating: reply.score ? parseInt(reply.score) : undefined,
             feedback: reply.memo || undefined,
@@ -189,9 +192,8 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       {[...Array(5)].map((_, i) => (
         <Star
           key={i}
-          className={`w-5 h-5 ${
-            i < (rating || 0) ? "fill-current" : "text-gray-300"
-          }`}
+          className={`w-5 h-5 ${i < (rating || 0) ? "fill-current" : "text-gray-300"
+            }`}
         />
       ))}
     </div>
@@ -199,6 +201,20 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
   if (isLoading) {
     return <div className="p-6 text-center">載入週報詳情中...</div>;
+  }
+  if (weeklyReportData === false) {
+    // 權限不足：API 回傳成功但 weeklyReportDetails 為空
+    return (
+      <div className="p-6 text-center">
+        <div className="text-gray-500 mb-4">您沒有權限查看此週報。</div>
+        <button
+          onClick={onBack}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          返回
+        </button>
+      </div>
+    );
   }
   if (!weeklyReportData || !weeklyReportData.ResponseData) {
     return <div className="p-6 text-center">找不到指定的週報。</div>;
@@ -373,21 +389,21 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             // ✅ 轉換 weeklyReportReplies 為 Comment[] 格式
             weeklyReportReplies
               ? weeklyReportReplies.map((reply, index) => ({
-                  id: reply.reply_nos || index,
-                  content: reply.memo || "",
-                  created_at:
-                    reply.xdate && reply.xtime
-                      ? `${reply.xdate} ${reply.xtime}`
-                      : "",
-                  user_id: reply.empno ? String(reply.empno) : "",
-                  author: {
-                    id: reply.empno ? String(reply.empno) : "",
-                    name: reply.xuser || "未知用戶",
-                  },
-                  rating: reply.score ? parseInt(reply.score) : undefined,
-                  forwarded_to: undefined,
-                  replies: [],
-                }))
+                id: reply.reply_nos || index,
+                content: reply.memo || "",
+                created_at:
+                  reply.xdate && reply.xtime
+                    ? `${reply.xdate} ${reply.xtime}`
+                    : "",
+                user_id: reply.empno ? String(reply.empno) : "",
+                author: {
+                  id: reply.empno ? String(reply.empno) : "",
+                  name: reply.xuser || "未知用戶",
+                },
+                rating: reply.score ? parseInt(reply.score) : undefined,
+                forwarded_to: undefined,
+                replies: [],
+              }))
               : []
           }
           reportId={reportId}

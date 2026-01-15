@@ -428,19 +428,6 @@ class ReviewService:
         """確認已讀日報並更新信箱狀態"""
 
         try:
-            # 驗證日報是否存在
-            report_check_sql = text("""
-                SELECT empno, empnamec, cocode
-                FROM jps.tdr_master
-                WHERE daily_no = :daily_no
-            """)
-            report_result = await run_in_threadpool(
-                lambda: db.execute(report_check_sql, {"daily_no": daily_no}).fetchone()
-            )
-
-            if not report_result:
-                raise ValueError(f"日報 {daily_no} 不存在")
-
             # 更新 wfinbox 狀態（透過 CommonAPI）
             try:
                 await WfinboxService.update_status_to_read(

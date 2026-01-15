@@ -266,14 +266,18 @@ function App() {
       }
     }
 
-    // 同步 report 和 employee - 必須同時存在或同時不存在
-    if (reportParam && employeeParam) {
+    // 同步 report - 週報系統可以只有 report 參數（從信件連結進入）
+    if (reportParam) {
       const reportId = parseInt(reportParam);
       if (reportId !== selectedReportId) {
         setSelectedReportId(reportId);
       }
+      // 確保 tab 是 weeklyList（從信件連結進入時可能沒有 tab 參數）
+      if (activeTab !== "weeklyList") {
+        setActiveTab("weeklyList");
+      }
     } else {
-      // 如果 URL 沒有 report 或 employee，清空狀態
+      // 如果 URL 沒有 report，清空狀態
       if (selectedReportId !== null) {
         setSelectedReportId(null);
       }
