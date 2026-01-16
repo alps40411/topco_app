@@ -33,15 +33,15 @@ const OverdueARTable: React.FC<OverdueARTableProps> = ({
 }) => {
   // 從 localStorage 讀取摺疊狀態，預設為 false（展開）
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('overdueARTableCollapsed');
-    return saved === 'true';
+    const saved = localStorage.getItem("overdueARTableCollapsed");
+    return saved === "true";
   });
 
   // 當摺疊狀態改變時，保存到 localStorage
   const handleToggleCollapse = () => {
     const newState = !isCollapsed;
     setIsCollapsed(newState);
-    localStorage.setItem('overdueARTableCollapsed', String(newState));
+    localStorage.setItem("overdueARTableCollapsed", String(newState));
   };
 
   // 依照銷貨日 (doc_date) 從小到大排序
@@ -62,7 +62,7 @@ const OverdueARTable: React.FC<OverdueARTableProps> = ({
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
       <div
         className="flex items-center justify-between px-6 py-2 border-b border-gray-200"
-        style={{ backgroundColor: "#d8d8c3" }}
+        style={{ backgroundColor: "#cad6c4" }}
       >
         <h3 className=" text-gray-900" style={{ fontSize: "16px" }}>
           逾期應收帳款

@@ -30,15 +30,15 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
 }) => {
   // 從 localStorage 讀取摺疊狀態，預設為 false（展開）
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('revenueTableCollapsed');
-    return saved === 'true';
+    const saved = localStorage.getItem("revenueTableCollapsed");
+    return saved === "true";
   });
 
   // 當摺疊狀態改變時，保存到 localStorage
   const handleToggleCollapse = () => {
     const newState = !isCollapsed;
     setIsCollapsed(newState);
-    localStorage.setItem('revenueTableCollapsed', String(newState));
+    localStorage.setItem("revenueTableCollapsed", String(newState));
   };
 
   // ✅ 載入中或沒有資料時都不顯示，避免畫面閃爍
@@ -50,7 +50,7 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
       <div
         className="flex items-center justify-between px-6 py-2 border-b border-gray-200"
-        style={{ backgroundColor: "#cad6c4" }}
+        style={{ backgroundColor: "#d8d8c3" }}
       >
         <h3 className="text-gray-900" style={{ fontSize: "16px" }}>
           營收達成率
@@ -160,9 +160,7 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
                     className="whitespace-nowrap text-sm text-gray-900 text-right font-medium border border-gray-300"
                     style={{ padding: "5px 3px" }}
                   >
-                    {formatRate(
-                      row.m_rev_amt
-                    )}
+                    {formatRate(row.m_rev_amt)}
                   </td>
                 </tr>
               ))}
