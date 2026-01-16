@@ -52,8 +52,9 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
         className="flex items-center justify-between px-6 py-2 border-b border-gray-200"
         style={{ backgroundColor: "#d8d8c3" }}
       >
-        <h3 className="text-gray-900" style={{ fontSize: "16px" }}>
-          營收達成率
+        <h3 className=" text-gray-900" style={{ fontSize: "16px" }}>
+          營收達成率&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;資料至
+          {data[0]?.DATA_DATE}止
         </h3>
         <button
           onClick={handleToggleCollapse}
@@ -165,6 +166,17 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr style={{ backgroundColor: "#e8efe5" }}>
+                <td
+                  colSpan={7}
+                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 text-right"
+                  style={{ fontSize: "16px" }}
+                >
+                  最後更新：{data[0]?.last_updatetime || "-"}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

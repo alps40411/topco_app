@@ -65,8 +65,10 @@ const OverdueARTable: React.FC<OverdueARTableProps> = ({
         style={{ backgroundColor: "#cad6c4" }}
       >
         <h3 className=" text-gray-900" style={{ fontSize: "16px" }}>
-          逾期應收帳款
+          逾期應收帳款&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;資料至
+          {data[0]?.data_date}止
         </h3>
+
         <button
           onClick={handleToggleCollapse}
           className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -177,6 +179,17 @@ const OverdueARTable: React.FC<OverdueARTableProps> = ({
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr style={{ backgroundColor: "#e8efe5" }}>
+                <td
+                  colSpan={7}
+                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 text-right"
+                  style={{ fontSize: "16px" }}
+                >
+                  最後更新：{data[0]?.last_updatetime || "-"}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
