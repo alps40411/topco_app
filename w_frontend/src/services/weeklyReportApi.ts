@@ -449,18 +449,23 @@ export class WeeklyReportApi {
 
   /**
    * 獲取逾期應收帳款
+   * @param empno 可選，指定員工工號。若不傳則使用當前登入用戶的工號
    */
   static async getOverdueAR(
     year: number,
     weekNo: number,
-    authFetch: Function
+    authFetch: Function,
+    empno?: string
   ) {
     try {
       const url = buildApiUrl("/api/weekly/overdue-ar");
-      const payload = {
+      const payload: { year: number; week_no: number; empno?: string } = {
         year,
         week_no: weekNo,
       };
+      if (empno) {
+        payload.empno = empno;
+      }
 
       const response = await authFetch(url, {
         method: "POST",
@@ -478,18 +483,23 @@ export class WeeklyReportApi {
 
   /**
    * 獲取營收達成率
+   * @param empno 可選，指定員工工號。若不傳則使用當前登入用戶的工號
    */
   static async getRevenue(
     year: number,
     weekNo: number,
-    authFetch: Function
+    authFetch: Function,
+    empno?: string
   ) {
     try {
       const url = buildApiUrl("/api/weekly/revenue");
-      const payload = {
+      const payload: { year: number; week_no: number; empno?: string } = {
         year,
         week_no: weekNo,
       };
+      if (empno) {
+        payload.empno = empno;
+      }
 
       const response = await authFetch(url, {
         method: "POST",

@@ -133,33 +133,40 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
         );
         setForwardedReports(markedForwardedReports);
 
-        // 檢查所有唯一週報編號的可編輯狀態
-        const allReports = [
-          ...(data.subordinate_reports || []),
-          ...(data.forwarded_reports || []),
-        ];
-        const uniqueWeeklyNos = [
-          ...new Set(allReports.map((r) => r.id.toString()).filter((id) => id)),
-        ];
+        // 只檢查自己的週報的可編輯狀態（編輯/刪除按鈕只會顯示在自己的週報上）
+        const userEmpno = user?.employee?.empno;
+        if (userEmpno) {
+          const allReports = [
+            ...(data.subordinate_reports || []),
+            ...(data.forwarded_reports || []),
+          ];
+          // 只過濾出自己的週報
+          const myReports = allReports.filter(
+            (r) => r.employee.empno === userEmpno
+          );
+          const uniqueWeeklyNos = [
+            ...new Set(myReports.map((r) => r.id.toString()).filter((id) => id)),
+          ];
 
-        const statusPromises = uniqueWeeklyNos.map(async (weeklyNo) => {
-          const status = await checkReportEditable(weeklyNo);
-          return [weeklyNo, status];
-        });
+          const statusPromises = uniqueWeeklyNos.map(async (weeklyNo) => {
+            const status = await checkReportEditable(weeklyNo);
+            return [weeklyNo, status];
+          });
 
-        const statusResults = await Promise.all(statusPromises);
-        const statusMap: Record<
-          string,
-          { can_edit: boolean; can_delete: boolean }
-        > = {};
-        statusResults.forEach(([weeklyNo, status]) => {
-          statusMap[weeklyNo as string] = status as {
-            can_edit: boolean;
-            can_delete: boolean;
-          };
-        });
+          const statusResults = await Promise.all(statusPromises);
+          const statusMap: Record<
+            string,
+            { can_edit: boolean; can_delete: boolean }
+          > = {};
+          statusResults.forEach(([weeklyNo, status]) => {
+            statusMap[weeklyNo as string] = status as {
+              can_edit: boolean;
+              can_delete: boolean;
+            };
+          });
 
-        setEditableStatus(statusMap);
+          setEditableStatus(statusMap);
+        }
       } catch (error) {
         console.error("載入週報列表失敗:", error);
         toast.error("載入週報列表失敗");
@@ -171,7 +178,7 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
     };
 
     loadReports();
-  }, [selectedYear, selectedWeek, authFetch]);
+  }, [selectedYear, selectedWeek, authFetch, user]);
 
   // 處理刪除週報
   const handleDeleteReport = async (
@@ -228,19 +235,20 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
 
   // 按公司分組週報
   const groupReportsByCompany = (reports: WeeklyReport[]) => {
-    const grouped = new Map<string, WeeklyReport[]>();
+    const grouped = new Map<string, { companyCode: string; reports: WeeklyReport[] }>();
 
     reports.forEach((report) => {
       const companyName = report.employee.company_name || "未分類公司";
+      const companyCode = report.employee.company_code || "ZZZ"; // 無代碼的排最後
       if (!grouped.has(companyName)) {
-        grouped.set(companyName, []);
+        grouped.set(companyName, { companyCode, reports: [] });
       }
-      grouped.get(companyName)!.push(report);
+      grouped.get(companyName)!.reports.push(report);
     });
 
     return Array.from(grouped.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], "zh-TW"))
-      .map(([companyName, reports]) => ({
+      .sort((a, b) => a[1].companyCode.localeCompare(b[1].companyCode)) // 依據 company_code 排序
+      .map(([companyName, { reports }]) => ({
         companyName: companyName,
         reports,
       }));

@@ -906,15 +906,16 @@ async def get_overdue_ar(
 
     payload: {
         "year": 2025,
-        "week_no": 1
+        "week_no": 1,
+        "empno": "12345"  // 可選，若不傳則使用當前用戶的工號
     }
     """
     import httpx
     from app.core.config import settings
 
     try:
-        # 使用當前用戶的資訊
-        empno = current_user.employee.empno
+        # 若有傳入 empno 則使用傳入的，否則使用當前用戶的工號
+        empno = payload.get("empno") or current_user.employee.empno
         deptno = current_user.employee.deptno or ""
 
         # 構建請求參數（測試用固定值）
@@ -971,15 +972,16 @@ async def get_revenue(
 
     payload: {
         "year": 2025,
-        "week_no": 1
+        "week_no": 1,
+        "empno": "12345"  // 可選，若不傳則使用當前用戶的工號
     }
     """
     import httpx
     from app.core.config import settings
 
     try:
-        # 使用當前用戶的資訊
-        empno = current_user.employee.empno
+        # 若有傳入 empno 則使用傳入的，否則使用當前用戶的工號
+        empno = payload.get("empno") or current_user.employee.empno
 
         # 構建請求參數（測試用固定值）
         request_data = {

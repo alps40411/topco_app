@@ -15,7 +15,6 @@ import {
   ShowWeeklyReportResponse,
 } from "../services/types";
 import { WeeklyReportApi } from "../services/weeklyReportApi";
-import { getCurrentWeek } from "../utils/weekUtils";
 import { processHtmlImageUrls } from "../utils/urlUtils";
 
 interface EmployeeDetailTabProps {
@@ -55,9 +54,6 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   const status = urlParams.get("status") || undefined;
   const replyid = urlParams.get("replyid") || undefined;
 
-  // 獲取當前週次（用於載入表格資料）
-  const { year: currentYear, week: currentWeek } = getCurrentWeek();
-
   const fetchReportDetails = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -66,7 +62,10 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       const response: ShowWeeklyReportResponse =
         await WeeklyReportApi.getWeeklyReportDetail(weeklyNo, authFetch);
 
-      if (response.ResponseNo === "0000" && response.ResponseData?.weeklyReportDetails?.length === 0) {
+      if (
+        response.ResponseNo === "0000" &&
+        response.ResponseData?.weeklyReportDetails?.length === 0
+      ) {
         setWeeklyReportData(false);
       } else if (response.ResponseNo === "0000" && response.ResponseData) {
         setWeeklyReportData(response);
@@ -94,9 +93,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             approved_at:
               reply.xdate && reply.xtime
                 ? `${reply.xdate.replace(
-                  /(\d{4})(\d{2})(\d{2})/,
-                  "$1-$2-$3"
-                )} ${reply.xtime}`
+                    /(\d{4})(\d{2})(\d{2})/,
+                    "$1-$2-$3"
+                  )} ${reply.xtime}`
                 : undefined,
             rating: reply.score ? parseInt(reply.score) : undefined,
             feedback: reply.memo || undefined,
@@ -119,16 +118,37 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
     fetchReportDetails();
   }, [reportId, fetchReportDetails]);
 
-  // 載入逾期應收帳款和營收達成率資料
+  // 載入逾期應收帳款和營收達成率資料（使用週報作者的工號、年份和週次）
   const loadTableData = useCallback(async () => {
-    if (!authFetch) return;
+    if (!authFetch || !weeklyReportData || weeklyReportData === false) return;
+
+    const reportYear = weeklyReportData.ResponseData?.weeklyReportMaster?.YY;
+    const reportWeek =
+      weeklyReportData.ResponseData?.weeklyReportMaster?.Week_No;
+    const reportEmpno =
+      weeklyReportData.ResponseData?.weeklyReportMaster?.empno;
+
+    if (!reportYear || !reportWeek || !reportEmpno) return;
+
+    // 將工號補齊為 5 位數
+    const empnoStr = String(reportEmpno).padStart(5, "0");
 
     setIsLoadingTables(true);
     try {
-      // 同時載入兩個 API 的資料
+      // 同時載入兩個 API 的資料（使用該週報作者的工號、年份和週次）
       const [overdueARResult, revenueResult] = await Promise.allSettled([
-        WeeklyReportApi.getOverdueAR(currentYear, currentWeek, authFetch),
-        WeeklyReportApi.getRevenue(currentYear, currentWeek, authFetch),
+        WeeklyReportApi.getOverdueAR(
+          Number(reportYear),
+          Number(reportWeek),
+          authFetch,
+          empnoStr
+        ),
+        WeeklyReportApi.getRevenue(
+          Number(reportYear),
+          Number(reportWeek),
+          authFetch,
+          empnoStr
+        ),
       ]);
 
       // 處理逾期應收帳款資料
@@ -154,7 +174,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
     } finally {
       setIsLoadingTables(false);
     }
-  }, [authFetch, currentYear, currentWeek]);
+  }, [authFetch, weeklyReportData]);
 
   useEffect(() => {
     loadTableData();
@@ -192,8 +212,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       {[...Array(5)].map((_, i) => (
         <Star
           key={i}
-          className={`w-5 h-5 ${i < (rating || 0) ? "fill-current" : "text-gray-300"
-            }`}
+          className={`w-5 h-5 ${
+            i < (rating || 0) ? "fill-current" : "text-gray-300"
+          }`}
         />
       ))}
     </div>
@@ -322,8 +343,8 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       </div>
 
       {/* 逾期應收帳款和營收達成率表格 */}
-      <OverdueARTable data={overdueARData} isLoading={isLoadingTables} />
       <RevenueTable data={revenueData} isLoading={isLoadingTables} />
+      <OverdueARTable data={overdueARData} isLoading={isLoadingTables} />
 
       {/* 上方 - 週報內容 */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
@@ -389,21 +410,21 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             // ✅ 轉換 weeklyReportReplies 為 Comment[] 格式
             weeklyReportReplies
               ? weeklyReportReplies.map((reply, index) => ({
-                id: reply.reply_nos || index,
-                content: reply.memo || "",
-                created_at:
-                  reply.xdate && reply.xtime
-                    ? `${reply.xdate} ${reply.xtime}`
-                    : "",
-                user_id: reply.empno ? String(reply.empno) : "",
-                author: {
-                  id: reply.empno ? String(reply.empno) : "",
-                  name: reply.xuser || "未知用戶",
-                },
-                rating: reply.score ? parseInt(reply.score) : undefined,
-                forwarded_to: undefined,
-                replies: [],
-              }))
+                  id: reply.reply_nos || index,
+                  content: reply.memo || "",
+                  created_at:
+                    reply.xdate && reply.xtime
+                      ? `${reply.xdate} ${reply.xtime}`
+                      : "",
+                  user_id: reply.empno ? String(reply.empno) : "",
+                  author: {
+                    id: reply.empno ? String(reply.empno) : "",
+                    name: reply.xuser || "未知用戶",
+                  },
+                  rating: reply.score ? parseInt(reply.score) : undefined,
+                  forwarded_to: undefined,
+                  replies: [],
+                }))
               : []
           }
           reportId={reportId}

@@ -193,6 +193,9 @@ function App() {
     setSelectedReportId(reportId);
     setActiveTab("weeklyList"); // 保持在週報首頁模式
 
+    // 重置滾動位置到頂部
+    window.scrollTo(0, 0);
+
     // 保留當前的週次參數
     const yearParam = searchParams.get("year");
     const weekParam = searchParams.get("week");
