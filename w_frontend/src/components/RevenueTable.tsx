@@ -45,7 +45,35 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
   if (isLoading || !data || data.length === 0) {
     return null;
   }
+  const totals = data.reduce(
+    (acc, row) => {
+      acc.annual_target += row.ym_bg_rev_amt || 0;
+      acc.annual_shipment += row.ym_rev_amt || 0;
+      acc.rev_amt += row.y_rev_amt || 0;
+      acc.monthly_target += row.bg_rev_amt || 0; // Based on table usage
+      acc.monthly_revenue += row.rev_amt || 0; // Based on table usage
+      acc.m_rev_amt += row.m_rev_amt || 0;
+      return acc;
+    },
+    {
+      annual_target: 0,
+      annual_shipment: 0,
+      monthly_target: 0,
+      monthly_revenue: 0,
+      rev_amt: 0,
+      m_rev_amt: 0,
+    }
+  );
 
+  const total_annual_rate =
+    totals.annual_target > 0
+      ? (totals.annual_shipment / totals.annual_target) * 100
+      : 0;
+
+  const total_monthly_rate =
+    totals.monthly_target > 0
+      ? (totals.monthly_revenue / totals.monthly_target) * 100
+      : 0;
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
       <div
@@ -149,7 +177,7 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
                     className="whitespace-nowrap text-sm text-gray-900 text-right border border-gray-300"
                     style={{ padding: "5px 3px" }}
                   >
-                    {formatAmount(row.ym_bg_rev_amt)}
+                    {formatAmount(row.bg_rev_amt)}
                   </td>
                   <td
                     className="whitespace-nowrap text-sm text-gray-900 text-right border border-gray-300"
@@ -167,6 +195,50 @@ const RevenueTable: React.FC<RevenueTableProps> = ({
               ))}
             </tbody>
             <tfoot>
+              <tr>
+                <td
+                  className="whitespace-nowrap text-sm text-gray-900 text-left border border-gray-300"
+                  style={{ padding: "5px 3px" }}
+                >
+                  總營收
+                </td>
+                <td
+                  className="whitespace-nowrap text-sm text-gray-900 text-right border border-gray-300"
+                  style={{ padding: "5px 3px" }}
+                >
+                  {formatAmount(totals.annual_target)}
+                </td>
+                <td
+                  className="whitespace-nowrap text-sm text-gray-900 text-right border border-gray-300"
+                  style={{ padding: "5px 3px" }}
+                >
+                  {formatAmount(totals.annual_shipment)}
+                </td>
+                <td
+                  className="whitespace-nowrap text-sm text-gray-900 text-right font-medium border border-gray-300"
+                  style={{ padding: "5px 3px" }}
+                >
+                  {formatRate(total_annual_rate)}
+                </td>
+                <td
+                  className="whitespace-nowrap text-sm text-gray-900 text-right border border-gray-300"
+                  style={{ padding: "5px 3px" }}
+                >
+                  {formatAmount(totals.monthly_target)}
+                </td>
+                <td
+                  className="whitespace-nowrap text-sm text-gray-900 text-right border border-gray-300"
+                  style={{ padding: "5px 3px" }}
+                >
+                  {formatAmount(totals.monthly_revenue)}
+                </td>
+                <td
+                  className="whitespace-nowrap text-sm text-gray-900 text-right font-medium border border-gray-300"
+                  style={{ padding: "5px 3px" }}
+                >
+                  {formatRate(total_monthly_rate)}
+                </td>
+              </tr>
               <tr style={{ backgroundColor: "#e8efe5" }}>
                 <td
                   colSpan={7}
