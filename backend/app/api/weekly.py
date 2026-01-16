@@ -225,7 +225,7 @@ async def _generate_enhanced_weekly_content(
 
 
 # 固定的工作項目
-JOB_ITEMS = ["營收報告", "工作重點", "應收帳款追蹤", "原廠說明"]
+JOB_ITEMS = ["營收報告", "工作重點", "應收帳款追蹤", "原廠說明", "市場動態", "競爭者資訊", "專案", "部門人事", "其他"]
 
 # 檔案儲存路徑
 STORAGE_PATH = Path("storage/weekly")
@@ -921,8 +921,8 @@ async def get_overdue_ar(
         request_data = {
             "empno": empno,
             "deptno": deptno,
-            "year": 2025,
-            "week_no": 48
+            "year": payload.get("year", 0),
+            "week_no": payload.get("week_no", 0)
         }
 
         # 調用 CommonAPI
@@ -984,8 +984,8 @@ async def get_revenue(
         # 構建請求參數（測試用固定值）
         request_data = {
             "empno": empno,
-            "year": 2025,
-            "week_no": 48
+            "year": payload.get("year", 0),
+            "week_no": payload.get("week_no", 0)
         }
 
         # 調用 CommonAPI
