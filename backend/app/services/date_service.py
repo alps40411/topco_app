@@ -64,7 +64,7 @@ class DateService:
                          WHERE m.empno = :empno AND m.doc_date = :doc_date) as score_count,
                         (SELECT COUNT(*) FROM jps.tdr_reply r
                          JOIN jps.tdr_master m ON r.daily_no = m.daily_no
-                         WHERE m.empno = :empno AND m.doc_date = :doc_date) as reply_count
+                         WHERE m.empno = :empno AND m.doc_date = :doc_date AND r.from_where is not NULL) as reply_count
                 """)
 
                 review_result = db.execute(review_status_sql, {
