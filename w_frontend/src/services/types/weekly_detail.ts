@@ -6,10 +6,12 @@
 export interface WeeklyReportMaster {
   cocode?: string;
   empno?: string;
+  empname?: string; // 員工姓名
   doc_date?: string; // YYYYMMDD
   classify?: string;
   deptno?: string;
-  DEPTABBV?: string; // 部門名稱（單位名稱）
+  deptabbv?: string; // 部門名稱（小寫）
+  DEPTABBV?: string; // 部門名稱（大寫，相容舊格式）
   emergency?: string;
   week_no?: string;
   XUSER?: string; // 使用者名稱
@@ -19,6 +21,7 @@ export interface WeeklyReportMaster {
   Week_No?: string; // 週次
   xdate?: string; // 最後修改日期 YYYYMMDD
   xtime?: string; // 最後修改時間 HH:MM:SS
+  reviewers?: string[]; // 可評分主管工號陣列
 }
 
 /**
@@ -61,6 +64,7 @@ export interface WeeklyReportDetail {
 export interface WeeklyReportReply {
   weekly_no?: string;
   reply_nos?: string; // 回覆編號
+  score?: string; // 評分（1-5）
   empno?: string;
   memo?: string; // 回覆內容
   xuser?: string; // 回覆者名稱

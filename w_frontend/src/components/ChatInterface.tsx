@@ -70,6 +70,7 @@ interface ChatInterfaceProps {
   urlStatus?: string; // URL 中的 status 參數，'P' 表示顯示確認按鈕
   urlReplyId?: string; // ✅ URL 中的 replyid 參數，用於預設回覆目標
   initialComments?: Comment[]; // ✅ 週報系統：從 EmployeeDetailTab 傳入的歷史回覆
+  reviewers?: string[];
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -89,6 +90,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   urlStatus,
   urlReplyId, // ✅ 接收 replyid 參數
   initialComments = [], // ✅ 接收歷史回覆
+  reviewers = [],
 }) => {
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [newMessage, setNewMessage] = useState("");
@@ -113,7 +115,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // 回應目標相關狀態
   const [replyTargets, setReplyTargets] = useState<ReplyTarget[]>([]);
   const [selectedReplyTargets, setSelectedReplyTargets] = useState<string[]>(
-    []
+    [],
   );
 
   const { authFetch, user } = useAuth();
@@ -121,8 +123,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // This effect now correctly determines if the current user has reviewed
   useEffect(() => {
     if (user?.employee?.empno && approvals && Array.isArray(approvals)) {
+      const userEmpnoPadded = String(user.employee.empno).padStart(5, "0");
       const myApproval = approvals.find(
-        (approval) => approval.supervisor_empno === user.employee.empno
+        (approval) => approval.supervisor_empno === userEmpnoPadded,
       );
       // A review is considered submitted if the status is no longer pending.
       setHasSubmittedReview(!!myApproval && myApproval.status !== "pending");
@@ -134,17 +137,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     user?.employee?.empno && reportOwnerEmpno
       ? user.employee.empno === reportOwnerEmpno
       : false;
-  // 檢查當前用戶是否為此報告的主管
-  // ✅ 修改邏輯：如果是審核名單中的人，或者是有主管權限且非作者本人，都視為主管
-  const isReportSupervisor =
-    (user?.employee?.empno && approvals && Array.isArray(approvals)
-      ? approvals.some(
-        (approval) => approval.supervisor_empno === user.employee.empno
-      )
-      : false) ||
-    (user?.is_supervisor && !isReportAuthor);
 
-
+  // 檢查當前用戶是否為此報告的主管（可評分者）
+  const currentUserEmpno = user?.employee?.empno
+    ? String(user.employee.empno).padStart(5, "0")
+    : null;
+  const canReview =
+    currentUserEmpno && reviewers && reviewers.length > 0
+      ? reviewers.includes(currentUserEmpno)
+      : false;
+  const isReportSupervisor = canReview && !isReportAuthor;
 
   // 建構回應目標列表
   const buildReplyTargets = useCallback(
@@ -215,19 +217,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         // 1. 如果有 urlReplyId，找到對應的 comment，並選擇該 comment 的作者
         if (urlReplyId && commentsData.length > 0) {
           const targetComment = commentsData.find(
-            (c) => c.id === parseInt(urlReplyId)
+            (c) => c.id === parseInt(urlReplyId),
           );
           if (targetComment && targetComment.author?.id) {
             const targetEmpno = String(targetComment.author.id).padStart(
               5,
-              "0"
+              "0",
             );
             // 確保這個 empno 在 targets 中存在
             const targetInList = targets.find((t) => t.empno === targetEmpno);
             if (targetInList) {
               defaultSelected = [targetEmpno];
               console.log(
-                `✅ 根據 replyid=${urlReplyId} 預設回覆給 ${targetInList.empname} (${targetEmpno})`
+                `✅ 根據 replyid=${urlReplyId} 預設回覆給 ${targetInList.empname} (${targetEmpno})`,
               );
             }
           }
@@ -248,7 +250,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         setSelectedReplyTargets([]);
       }
     },
-    [reportAuthor, user?.employee?.empno, urlReplyId] // ✅ 新增 urlReplyId 依賴
+    [reportAuthor, user?.employee?.empno, urlReplyId], // ✅ 新增 urlReplyId 依賴
   );
 
   // ✅ 週報系統：當 initialComments 變化時更新 comments 和 replyTargets
@@ -286,7 +288,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         null, // score (一般回覆不傳評分)
         selectedReplyTargets.filter((target) => target), // to_users (過濾掉空值)
         forwardEmpnos, // forward_users
-        authFetch
+        authFetch,
       );
 
       if (result.ResponseNo === "0000") {
@@ -353,7 +355,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         selectedRating, // score (主管評分)
         selectedReplyTargets.filter((target) => target), // to_users (過濾掉空值)
         forwardEmpnos, // forward_users
-        authFetch
+        authFetch,
       );
 
       if (result.ResponseNo === "0000") {
@@ -456,7 +458,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           body: JSON.stringify({
             rating: selectedRating,
           }),
-        }
+        },
       );
       if (response.ok) {
         const data = await response.json();
@@ -507,7 +509,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const second = timePart.substring(4, 6);
 
       const date = new Date(
-        `${year}-${month}-${day}T${hour}:${minute}:${second}`
+        `${year}-${month}-${day}T${hour}:${minute}:${second}`,
       );
       return isNaN(date.getTime()) ? new Date(0) : date;
     }
@@ -522,7 +524,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const second = timeString.substring(12, 14);
 
       const date = new Date(
-        `${year}-${month}-${day}T${hour}:${minute}:${second}`
+        `${year}-${month}-${day}T${hour}:${minute}:${second}`,
       );
       return isNaN(date.getTime()) ? new Date(0) : date;
     }
@@ -677,7 +679,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <div className="p-4 bg-gray-50">
             <div>
               {flattenComments(comments).map((comment) =>
-                renderComment(comment)
+                renderComment(comment),
               )}
             </div>
           </div>
@@ -740,7 +742,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             setSelectedReplyTargets(
                               replyTargets
                                 .map((t) => t.empno)
-                                .filter((empno) => empno)
+                                .filter((empno) => empno),
                             );
                           } else if (value) {
                             setSelectedReplyTargets([value]);
@@ -785,7 +787,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             setSelectedReplyTargets(
                               replyTargets
                                 .map((t) => t.empno)
-                                .filter((empno) => empno)
+                                .filter((empno) => empno),
                             );
                           } else if (value) {
                             setSelectedReplyTargets([value]);
@@ -834,10 +836,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         type="button"
                         onClick={() => setSelectedRating(option.value)}
                         className={`px-4 py-2 text-sm font-medium border transition-colors
-                            ${selectedRating === option.value
-                            ? "bg-blue-500 text-white border-blue-500 z-10"
-                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                          }
+                            ${
+                              selectedRating === option.value
+                                ? "bg-blue-500 text-white border-blue-500 z-10"
+                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                            }
                             ${option.value === 1 ? "rounded-l-lg" : ""}
                             ${option.value === 5 ? "rounded-r-lg" : ""}
                           `}
@@ -953,7 +956,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       // 重置回應目標選擇到預設值
                       if (replyTargets.length > 0) {
                         const defaultTarget = replyTargets.find(
-                          (t) => t.is_author
+                          (t) => t.is_author,
                         );
                         if (defaultTarget) {
                           setSelectedReplyTargets([defaultTarget.empno]);
@@ -1007,7 +1010,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             setSelectedReplyTargets(
                               replyTargets
                                 .map((t) => t.empno)
-                                .filter((empno) => empno)
+                                .filter((empno) => empno),
                             );
                           } else if (value) {
                             setSelectedReplyTargets([value]);
@@ -1051,7 +1054,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             setSelectedReplyTargets(
                               replyTargets
                                 .map((t) => t.empno)
-                                .filter((empno) => empno)
+                                .filter((empno) => empno),
                             );
                           } else if (value) {
                             setSelectedReplyTargets([value]);

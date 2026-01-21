@@ -82,7 +82,7 @@ async def check_can_submit(
             # 檢查是否有主管回覆記錄
             reply_check_sql = text("""
                 SELECT COUNT(*) FROM jps.tdr_weekly_reply
-                WHERE weekly_no = :weekly_no
+                WHERE weekly_no = :weekly_no and from_where is not NULL
             """)
 
             reply_result = db.execute(reply_check_sql, {"weekly_no": weekly_no}).fetchone()

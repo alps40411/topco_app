@@ -59,7 +59,8 @@
       "Bash(for file in app/api/*.py)",
       "Bash(do echo \"=== $file ===\")",
       "Bash(done)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

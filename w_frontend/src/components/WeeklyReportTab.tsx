@@ -10,8 +10,10 @@ import {
   Edit,
   Wand2,
   ArrowLeft,
+  Eye,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useAutoSave } from "../hooks/useAutoSave";
 import { toast } from "react-hot-toast";
 import RichTextEditor from "./RichTextEditor";
 import AttachedFilesManager from "./AttachedFilesManager";
@@ -25,6 +27,7 @@ import { TypographyClasses } from "../styles/typography";
 import { getFullFileUrl } from "../utils/urlUtils";
 import OverdueARTable from "./OverdueARTable";
 import RevenueTable from "./RevenueTable";
+import WeeklyReportPreviewModal from "./WeeklyReportPreviewModal";
 import { OverdueARData, RevenueData } from "../services/types";
 
 interface FileForUpload {
@@ -89,6 +92,9 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   const [newFiles, setNewFiles] = useState<FileForUpload[]>([]);
   const [isSavingNew, setIsSavingNew] = useState(false);
 
+  // 追蹤新增筆記的 seq（用於自動儲存後的更新）
+  const newNoteSeqRef = useRef<number | null>(null);
+
   // 編輯狀態
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editWorkItemId, setEditWorkItemId] = useState<number | undefined>();
@@ -115,6 +121,9 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     reason: string;
     next_submit_time: string;
   } | null>(null);
+
+  // 預覽 Modal 狀態
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // 載入工作項目列表
   useEffect(() => {
@@ -238,8 +247,133 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     }
   }, [weeklyNo, checkSubmitStatus]);
 
+  // ========== 自動暫存邏輯 ==========
+
+  // 檢查新增模式是否有內容可儲存
+  const hasNewContent = useCallback(() => {
+    return (
+      isAddingNew &&
+      newWorkItemId !== undefined &&
+      (newSubject.trim() !== "" || newContent.trim() !== "" || newFiles.length > 0)
+    );
+  }, [isAddingNew, newWorkItemId, newSubject, newContent, newFiles]);
+
+  // 檢查編輯模式是否有內容可儲存
+  const hasEditContent = useCallback(() => {
+    return editingNoteId !== null && editWorkItemId !== undefined;
+  }, [editingNoteId, editWorkItemId]);
+
+  // 新增模式的自動儲存函數
+  const autoSaveNew = useCallback(async () => {
+    if (!authFetch || !weeklyNo || !newWorkItemId) return;
+
+    const formData: WeeklyReportForm = {
+      year: currentYear,
+      week: currentWeek,
+      work_item_id: newWorkItemId,
+      subject: newSubject,
+      content: newContent,
+      files: newFiles,
+    };
+
+    // 如果已經有 seq，使用 updateNote；否則使用 saveDraft
+    if (newNoteSeqRef.current) {
+      await WeeklyReportApi.updateNote(
+        weeklyNo,
+        newNoteSeqRef.current,
+        formData,
+        authFetch
+      );
+    } else {
+      // 第一次儲存，取得 seq
+      const result = await WeeklyReportApi.saveDraft(formData, authFetch, weeklyNo);
+      if (result?.seq) {
+        newNoteSeqRef.current = result.seq;
+      }
+    }
+  }, [
+    authFetch,
+    weeklyNo,
+    currentYear,
+    currentWeek,
+    newWorkItemId,
+    newSubject,
+    newContent,
+    newFiles,
+  ]);
+
+  // 編輯模式的自動儲存函數（不重新載入列表，避免閃爍）
+  const autoSaveEdit = useCallback(async () => {
+    if (!authFetch || !editingNoteId || !weeklyNo) return;
+
+    const formData: WeeklyReportForm = {
+      year: currentYear,
+      week: currentWeek,
+      work_item_id: editWorkItemId,
+      subject: editSubject,
+      content: editContent,
+      files: editFiles,
+    };
+
+    // 使用 updateNote（會傳入 seq），確保是更新而非新增
+    await WeeklyReportApi.updateNote(
+      weeklyNo,
+      editingNoteId,
+      formData,
+      authFetch
+    );
+
+    // 同步更新本地狀態，避免重新載入整個列表導致閃爍
+    setWeeklyNotes((prev) =>
+      prev.map((note) =>
+        note.id === editingNoteId
+          ? {
+              ...note,
+              work_item_id: editWorkItemId || note.work_item_id,
+              work_item_name:
+                workItems.find((w) => w.id === editWorkItemId)?.name ||
+                note.work_item_name,
+              subject: editSubject,
+              content: editContent,
+              files: editFiles,
+            }
+          : note
+      )
+    );
+  }, [
+    authFetch,
+    editingNoteId,
+    currentYear,
+    currentWeek,
+    editWorkItemId,
+    editSubject,
+    editContent,
+    editFiles,
+    weeklyNo,
+    workItems,
+  ]);
+
+  // 啟用自動儲存 - 新增模式
+  useAutoSave({
+    interval: 60000, // 1 分鐘
+    onSave: autoSaveNew,
+    enabled: isAddingNew && !hasReplies,
+    hasContent: hasNewContent,
+  });
+
+  // 啟用自動儲存 - 編輯模式
+  useAutoSave({
+    interval: 60000, // 1 分鐘
+    onSave: autoSaveEdit,
+    enabled: editingNoteId !== null && !hasReplies,
+    hasContent: hasEditContent,
+  });
+
   // 開始新增筆記
   const startAddNew = () => {
+    // 清除之前的 seq ref
+    newNoteSeqRef.current = null;
+
     setIsAddingNew(true);
     setNewWorkItemId(workItems.length > 0 ? workItems[0].id : undefined);
     setNewSubject("");
@@ -255,13 +389,40 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     }, 100);
   };
 
-  // 取消新增
-  const cancelAddNew = () => {
+  // 重置新增表單狀態
+  const resetNewNoteForm = () => {
+    newNoteSeqRef.current = null;
     setIsAddingNew(false);
     setNewWorkItemId(workItems.length > 0 ? workItems[0].id : undefined);
     setNewSubject("");
     setNewContent("");
     setNewFiles([]);
+  };
+
+  // 取消新增
+  const cancelAddNew = async () => {
+    // 如果已經自動儲存過（有 seq），詢問用戶
+    if (newNoteSeqRef.current && weeklyNo) {
+      const userChoice = window.confirm(
+        "此筆記已自動儲存。\n\n按「確定」保留草稿，按「取消」刪除草稿。"
+      );
+
+      if (!userChoice) {
+        // 用戶選擇刪除
+        try {
+          await WeeklyReportApi.deleteNote(weeklyNo, newNoteSeqRef.current, authFetch);
+          toast.success("草稿已刪除");
+        } catch (error) {
+          console.error("刪除草稿失敗:", error);
+          toast.error("刪除草稿失敗");
+        }
+      } else {
+        // 用戶選擇保留，重新載入列表以顯示該筆記
+        await loadWeeklyNotes();
+      }
+    }
+
+    resetNewNoteForm();
   };
 
   // 保存新筆記
@@ -297,13 +458,25 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         files: newFiles,
       };
 
-      await WeeklyReportApi.saveDraft(formData, authFetch, weeklyNo);
+      // 如果已經自動儲存過（有 seq），使用 updateNote
+      if (newNoteSeqRef.current) {
+        await WeeklyReportApi.updateNote(
+          weeklyNo,
+          newNoteSeqRef.current,
+          formData,
+          authFetch
+        );
+      } else {
+        await WeeklyReportApi.saveDraft(formData, authFetch, weeklyNo);
+      }
+
       toast.success("筆記已保存");
 
       await loadWeeklyNotes();
       // 重新檢查提交狀態
       await checkSubmitStatus();
-      cancelAddNew();
+      // 重置表單（不詢問，因為已經手動保存）
+      resetNewNoteForm();
     } catch (error: any) {
       console.error(error);
       toast.error(`保存失敗: ${error.message}`);
@@ -737,8 +910,19 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
           </div>
         </div>
 
-        {/* 右側：三個按鈕 */}
+        {/* 右側：按鈕組 */}
         <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
+          {/* 預覽週報 */}
+          <button
+            onClick={() => setIsPreviewOpen(true)}
+            disabled={!weeklyNo || weeklyNotes.length === 0}
+            className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">預覽週報</span>
+            <span className="sm:hidden">預覽</span>
+          </button>
+
           {/* 新增筆記 */}
           <button
             onClick={startAddNew}
@@ -1144,6 +1328,19 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
           </div>
         ))}
       </div>
+
+      {/* 預覽 Modal */}
+      <WeeklyReportPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        year={currentYear}
+        week={currentWeek}
+        empno={user?.employee?.empno || ""}
+        empName={user?.employee?.empname || ""}
+        deptName={user?.employee?.deptabbv || ""}
+        notes={weeklyNotes}
+        authFetch={authFetch}
+      />
     </div>
   );
 };

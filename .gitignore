@@ -76,3 +76,6 @@ backend/storage/
 # Logs
 *.log
 logs/
+
+.claude/settings.local.json
+.claude/

@@ -33,6 +33,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
     ShowWeeklyReportResponse | null | false
   >(null);
   const [approvals, setApprovals] = useState<SupervisorApprovalInfo[]>([]);
+  const [reviewers, setReviewers] = useState<string[]>([]); // 可評分主管工號陣列
   const [isLoading, setIsLoading] = useState(true);
   const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>(
     []
@@ -102,6 +103,9 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           }));
 
         setApprovals(approvalsData);
+
+        // 提取可評分主管名單（從 weeklyReportMaster 中）
+        setReviewers(response.ResponseData.weeklyReportMaster.reviewers || []);
       } else {
         console.error("獲取週報詳情失敗:", response.ResponseNa);
         setWeeklyReportData(null);
@@ -443,6 +447,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           onForwardUsersChange={setSelectedForwardUsers}
           urlStatus={status}
           urlReplyId={replyid}
+          reviewers={reviewers}
         />
       </div>
 
