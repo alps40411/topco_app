@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../hooks/useAuth";
 import WeekSelector from "./WeekSelector";
-import { getCurrentWeek } from "../utils/weekUtils";
+import { getCurrentWeek, getWeekStartDate } from "../utils/weekUtils";
+import { getISOWeek, getISOWeekYear, subWeeks } from "date-fns";
 import { WeeklyReportApi } from "../services/weeklyReportApi";
 import { toast } from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -45,6 +46,16 @@ interface WeeklyEmployeeListTabProps {
   onSelectEmployee?: (employee: any, reportId: number) => void;
 }
 
+// 獲取前一週的年份和週次
+const getPreviousWeek = (year: number, week: number): { year: number; week: number } => {
+  const weekStart = getWeekStartDate(year, week);
+  const prevWeekDate = subWeeks(weekStart, 1);
+  return {
+    year: getISOWeekYear(prevWeekDate),
+    week: getISOWeek(prevWeekDate),
+  };
+};
+
 const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   onSelectEmployee,
 }) => {
@@ -61,6 +72,9 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   const { authFetch, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // 檢查 URL 是否有指定週次參數
+  const hasUrlParams = searchParams.get("year") && searchParams.get("week");
 
   // 獲取初始週次（從 URL 參數或當前週次）
   const getInitialWeek = (): { year: number; week: number } => {
@@ -83,12 +97,43 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   const [selectedWeek, setSelectedWeek] = useState<number>(
     getInitialWeek().week
   );
+  const [hasCheckedSubmitWindow, setHasCheckedSubmitWindow] = useState(false);
 
   useEffect(() => {
     if (user?.employee?.empno) {
       setCurrentUserEmpno(user.employee.empno);
     }
   }, [user]);
+
+  // 檢查是否在提交時間窗口內，決定預設顯示哪一週
+  useEffect(() => {
+    const checkSubmitWindow = async () => {
+      // 如果 URL 有指定週次，或已經檢查過，就不再調整
+      if (hasUrlParams || hasCheckedSubmitWindow || !authFetch) return;
+
+      try {
+        const response = await authFetch("/api/weekly/can-submit");
+        if (response.ok) {
+          const data = await response.json();
+          // 如果不在提交時間窗口內（週五 17:00 之前），預設顯示前一週
+          if (!data.in_submit_window) {
+            const current = getCurrentWeek();
+            const prev = getPreviousWeek(current.year, current.week);
+            setSelectedYear(prev.year);
+            setSelectedWeek(prev.week);
+            // 更新 URL 參數
+            navigate(`?tab=weeklyList&year=${prev.year}&week=${prev.week}`, { replace: true });
+          }
+        }
+      } catch (error) {
+        console.error("檢查提交時間窗口失敗:", error);
+      } finally {
+        setHasCheckedSubmitWindow(true);
+      }
+    };
+
+    checkSubmitWindow();
+  }, [authFetch, hasUrlParams, hasCheckedSubmitWindow, navigate]);
 
   // 檢查週報是否可編輯/刪除
   const checkReportEditable = async (weeklyNo: string) => {

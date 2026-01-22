@@ -106,12 +106,13 @@ async def check_can_submit(
             reason = "可以編輯、刪除和提交週報"
 
         return {
-            "can_submit": True,
+            "can_submit": can_submit,
             "can_edit": can_edit,
             "can_delete": can_delete,
             "reason": reason,
             "next_submit_time": next_submit_time,
-            "has_replies": has_replies
+            "has_replies": has_replies,
+            "in_submit_window": in_time_window  # 是否在提交時間窗口內（週五 17:00 ~ 週一 08:30）
         }
 
     except Exception as e:
@@ -122,9 +123,11 @@ async def check_can_submit(
         return {
             "can_submit": True,
             "can_edit": True,
+            "can_delete": True,
             "reason": "檢查失敗，預設允許提交",
             "next_submit_time": "",
-            "has_replies": False
+            "has_replies": False,
+            "in_submit_window": True  # 預設為在提交窗口內，避免影響列表頁顯示
         }
 
 

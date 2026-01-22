@@ -108,7 +108,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [generatingAiFor, setGeneratingAiFor] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
 
   // 提交狀態
@@ -155,7 +155,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         currentYear,
         currentWeek,
         user.employee.empno,
-        authFetch
+        authFetch,
       );
       setWeeklyNo(result.weekly_no);
       setWeeklyNotes(result.notes);
@@ -224,7 +224,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
 
     try {
       const response = await authFetch(
-        `/api/weekly/can-submit?weekly_no=${weeklyNo}`
+        `/api/weekly/can-submit?weekly_no=${weeklyNo}`,
       );
       const data = await response.json();
       setCanSubmit(data.can_submit);
@@ -254,7 +254,9 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     return (
       isAddingNew &&
       newWorkItemId !== undefined &&
-      (newSubject.trim() !== "" || newContent.trim() !== "" || newFiles.length > 0)
+      (newSubject.trim() !== "" ||
+        newContent.trim() !== "" ||
+        newFiles.length > 0)
     );
   }, [isAddingNew, newWorkItemId, newSubject, newContent, newFiles]);
 
@@ -282,11 +284,15 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         weeklyNo,
         newNoteSeqRef.current,
         formData,
-        authFetch
+        authFetch,
       );
     } else {
       // 第一次儲存，取得 seq
-      const result = await WeeklyReportApi.saveDraft(formData, authFetch, weeklyNo);
+      const result = await WeeklyReportApi.saveDraft(
+        formData,
+        authFetch,
+        weeklyNo,
+      );
       if (result?.seq) {
         newNoteSeqRef.current = result.seq;
       }
@@ -320,7 +326,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       weeklyNo,
       editingNoteId,
       formData,
-      authFetch
+      authFetch,
     );
 
     // 同步更新本地狀態，避免重新載入整個列表導致閃爍
@@ -337,8 +343,8 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
               content: editContent,
               files: editFiles,
             }
-          : note
-      )
+          : note,
+      ),
     );
   }, [
     authFetch,
@@ -404,13 +410,17 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     // 如果已經自動儲存過（有 seq），詢問用戶
     if (newNoteSeqRef.current && weeklyNo) {
       const userChoice = window.confirm(
-        "此筆記已自動儲存。\n\n按「確定」保留草稿，按「取消」刪除草稿。"
+        "此筆記已自動儲存。\n\n按「確定」保留草稿，按「取消」刪除草稿。",
       );
 
       if (!userChoice) {
         // 用戶選擇刪除
         try {
-          await WeeklyReportApi.deleteNote(weeklyNo, newNoteSeqRef.current, authFetch);
+          await WeeklyReportApi.deleteNote(
+            weeklyNo,
+            newNoteSeqRef.current,
+            authFetch,
+          );
           toast.success("草稿已刪除");
         } catch (error) {
           console.error("刪除草稿失敗:", error);
@@ -464,7 +474,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
           weeklyNo,
           newNoteSeqRef.current,
           formData,
-          authFetch
+          authFetch,
         );
       } else {
         await WeeklyReportApi.saveDraft(formData, authFetch, weeklyNo);
@@ -541,7 +551,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
           weeklyNo,
           editingNoteId,
           formData,
-          authFetch
+          authFetch,
         );
       }
 
@@ -616,11 +626,11 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         // 嘗試 HTML 編碼的 URL
         const escapedHtmlUrl = htmlEncodedUrl.replace(
           /[.*+?^${}()|[\]\\]/g,
-          "\\$&"
+          "\\$&",
         );
         const regex2 = new RegExp(
           `<img[^>]*src="${escapedHtmlUrl}"[^>]*>`,
-          "g"
+          "g",
         );
         newContent = newContent.replace(regex2, "");
 
@@ -637,8 +647,8 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   const handleNewAiSelectionChange = (fileUrl: string, isSelected: boolean) => {
     setNewFiles((prev) =>
       prev.map((f) =>
-        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f
-      )
+        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f,
+      ),
     );
   };
 
@@ -679,11 +689,11 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         // 嘗試 HTML 編碼的 URL
         const escapedHtmlUrl = htmlEncodedUrl.replace(
           /[.*+?^${}()|[\]\\]/g,
-          "\\$&"
+          "\\$&",
         );
         const regex2 = new RegExp(
           `<img[^>]*src="${escapedHtmlUrl}"[^>]*>`,
-          "g"
+          "g",
         );
         newContent = newContent.replace(regex2, "");
 
@@ -699,12 +709,12 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
 
   const handleEditAiSelectionChange = (
     fileUrl: string,
-    isSelected: boolean
+    isSelected: boolean,
   ) => {
     setEditFiles((prev) =>
       prev.map((f) =>
-        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f
-      )
+        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f,
+      ),
     );
   };
 
@@ -753,14 +763,14 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         note.weekly_no,
         note.seq!,
         selectedAiService,
-        authFetch
+        authFetch,
       );
 
       // 更新筆記的 AI 內容
       setWeeklyNotes((prev) =>
         prev.map((n) =>
-          n.id === noteId ? { ...n, ai_content: result.ai_content } : n
-        )
+          n.id === noteId ? { ...n, ai_content: result.ai_content } : n,
+        ),
       );
 
       if (!isAiViewActive) setIsAiViewActive(true);
@@ -806,14 +816,14 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
             note.weekly_no,
             note.seq,
             selectedAiService,
-            authFetch
+            authFetch,
           );
 
           // 更新該筆記的 AI 內容
           setWeeklyNotes((prev) =>
             prev.map((n) =>
-              n.id === noteId ? { ...n, ai_content: result.ai_content } : n
-            )
+              n.id === noteId ? { ...n, ai_content: result.ai_content } : n,
+            ),
           );
         } catch (error) {
           console.error(`筆記 ${note.subject} AI 潤飾出錯:`, error);
@@ -864,7 +874,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         weeklyNo,
         currentYear,
         currentWeek,
-        authFetch
+        authFetch,
       );
 
       if (result.ResponseNa === "週報儲存成功") {
@@ -905,7 +915,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
             </h2>
             <div className="flex items-center mt-1 text-xs sm:text-sm text-gray-600 gap-2">
               <span>{weekRangeText}</span>
-              <span className="text-blue-600">第 {currentWeek} 周</span>
+              <span className="text-blue-600">第 {currentWeek} 週</span>
             </div>
           </div>
         </div>
@@ -1006,7 +1016,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
                   value={newWorkItemId || ""}
                   onChange={(e) =>
                     setNewWorkItemId(
-                      e.target.value ? Number(e.target.value) : undefined
+                      e.target.value ? Number(e.target.value) : undefined,
                     )
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1052,7 +1062,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
                   placeholder="記錄您的想法... (可直接貼上圖片或者附上檔案)"
                   docDate={`${currentYear}${String(currentWeek).padStart(
                     2,
-                    "0"
+                    "0",
                   )}01`}
                 />
               </div>
@@ -1109,7 +1119,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
                       value={editWorkItemId || ""}
                       onChange={(e) =>
                         setEditWorkItemId(
-                          e.target.value ? Number(e.target.value) : undefined
+                          e.target.value ? Number(e.target.value) : undefined,
                         )
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1155,7 +1165,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
                       placeholder="編輯記錄內容... (可直接貼上圖片)"
                       docDate={`${currentYear}${String(currentWeek).padStart(
                         2,
-                        "0"
+                        "0",
                       )}01`}
                     />
                   </div>
