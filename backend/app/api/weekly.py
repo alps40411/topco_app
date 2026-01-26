@@ -1420,9 +1420,8 @@ async def get_ai_suggestions(
         # 1. 查詢週報內容
         sql = text("""
             SELECT subject, job_item, content
-            FROM jps.tdr_weekly_draft
+            FROM jps.tdr_weekly_detail1
             WHERE weekly_no = :weekly_no
-              AND (status IS NULL OR status != 'D')
             ORDER BY seq
         """)
 
