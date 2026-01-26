@@ -1314,10 +1314,9 @@ async def get_forward_candidates(
         title_sql = text("""
             SELECT a.empno, a.empname, 'title' AS type
             FROM jps.tdr_forward_visor a
-            LEFT JOIN jps.dcd003$master b ON a.empno = b.empno
-                AND b.estatus <> '3'
-                AND (b.RIGHT_STOP_DATE IS NULL OR b.RIGHT_STOP_DATE <= TO_CHAR(sysdate, 'yyyyMMdd'))
-                AND cocode IN (SELECT cocode FROM jps.dcd001$master WHERE eip_active = 'Y')
+            LEFT JOIN jps.dcd003$master b ON a.empno = b.empno AND b.estatus <> '3'
+            AND (b.RIGHT_STOP_DATE IS not NULL and b.RIGHT_STOP_DATE <= TO_CHAR(sysdate, 'yyyyMMdd'))
+            AND cocode IN (SELECT cocode FROM jps.dcd001$master WHERE eip_active = 'Y')
             ORDER BY a.sorting
         """)
         title_rows = db.execute(title_sql).fetchall()
