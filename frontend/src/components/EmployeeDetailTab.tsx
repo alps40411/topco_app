@@ -28,11 +28,11 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   onReviewCompleted,
 }) => {
   const [reportDetail, setReportDetail] = useState<ReportWithApprovals | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(true);
   const [selectedForwardUsers, setSelectedForwardUsers] = useState<string[]>(
-    []
+    [],
   );
   // ✅ 新增: 提取作者資訊並傳遞給 ChatInterface
   const [reportAuthor, setReportAuthor] = useState<{
@@ -75,7 +75,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
 
         // Fetch the detailed approval status for this specific report
         const approvalResponse = await authFetch(
-          `/api/supervisor/${reportId}/approvals`
+          `/api/supervisor/${reportId}/approvals`,
         );
         if (approvalResponse.ok) {
           const approvals = await approvalResponse.json();
@@ -112,7 +112,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
       // 更新 URL（組件會因 key 變化而重新掛載）
       window.location.href = `?${params.toString()}`;
     },
-    [reportDetail]
+    [reportDetail],
   );
 
   useEffect(() => {
@@ -226,12 +226,12 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             reportDetail.approvals.length > 0 &&
             (() => {
               const ratedApprovals = reportDetail.approvals.filter(
-                (a) => a.rating && a.rating > 0
+                (a) => a.rating && a.rating > 0,
               );
               if (ratedApprovals.length === 0) return null;
               const totalRating = ratedApprovals.reduce(
                 (sum, a) => sum + (a.rating || 0),
-                0
+                0,
               );
               const averageRating = totalRating / ratedApprovals.length;
               const clampedAvg = Math.min(5, Math.max(1, averageRating));
@@ -302,12 +302,12 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
           reportDetail.approvals.length > 0 &&
           (() => {
             const ratedApprovals = reportDetail.approvals.filter(
-              (a) => a.rating && a.rating > 0
+              (a) => a.rating && a.rating > 0,
             );
             if (ratedApprovals.length === 0) return null;
             const totalRating = ratedApprovals.reduce(
               (sum, a) => sum + (a.rating || 0),
-              0
+              0,
             );
             const averageRating = totalRating / ratedApprovals.length;
             const clampedAvg = Math.min(5, Math.max(1, averageRating));
@@ -334,7 +334,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             ).reduce(
               (total, project) =>
                 total + (project.total_execution_time_minutes || 0),
-              0
+              0,
             );
             return totalExecutionTime > 0 ? (
               <span className="text-xs sm:text-sm text-green-600 bg-green-50 px-2 sm:px-3 py-1 rounded-full font-medium border border-green-200 w-fit">
@@ -396,9 +396,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                       {projectReport.total_execution_time_minutes} 小時
                     </span>
                   ) : (
-                    <span className="text-xs sm:text-sm text-gray-400 bg-gray-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded font-medium whitespace-nowrap">
-                      未設定
-                    </span>
+                    <span className="text-xs sm:text-sm text-gray-400 bg-gray-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded font-medium whitespace-nowrap"></span>
                   )}
                 </div>
                 <div
@@ -410,7 +408,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                   content={projectReport.content}
                 />
               </div>
-            )
+            ),
           )}
         </div>
         {/* 最後修改日期時間 - 整個日報內容區塊的底部 */}
@@ -421,7 +419,7 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
             <div className="pt-3 text-right text-xs text-gray-400">
               {reportDetail.consolidated_content[0].xdate.replace(
                 /(\d{4})(\d{2})(\d{2})/,
-                "$1/$2/$3"
+                "$1/$2/$3",
               )}{" "}
               {reportDetail.consolidated_content[0].xtime}
             </div>

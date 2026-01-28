@@ -613,7 +613,7 @@ async def get_report_detail_deprecated(
                     "planno": detail_row[35] or ""  # planno
                 },
                 "content": detail_row[36] or "",  # memo - 工作內容
-                "execution_work_name": execution_work_name_c or detail_row[62] or f"執行工作 {detail_row[2] or ''}",  # 中文執行工作名稱
+                "execution_work_name": execution_work_name_c or "",  # 中文執行工作名稱（沒有則留空）
                 "work_item_name": work_item_display,  # 處理後的工作項目名稱
                 "service_company_name": service_company_name,  # 服務公司
                 "service_target_name": service_target_name,  # 服務對象
@@ -622,7 +622,7 @@ async def get_report_detail_deprecated(
                 "prod_cate": detail_row[4] or "",  # prod_cate
                 "estimate": detail_row[7] or "",  # estimate
                 "attitude": detail_row[8] or "",  # attitude
-                "finish_rate": detail_row[39] or 0,  # finish_rate
+                "finish_rate": detail_row[43] or 0,  # finish_rate
                 "cuno_subj": detail_row[10] or "",  # cuno_subj
                 "cuno_msg": detail_row[11] or "",  # cuno_msg
                 "comp_desc": detail_row[14] or "",  # comp_desc
