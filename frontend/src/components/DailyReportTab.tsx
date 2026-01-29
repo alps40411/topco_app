@@ -41,17 +41,17 @@ import DateSelector from "./DateSelector";
 import RichTextEditor from "./RichTextEditor";
 import AiServiceSelector, { AiService } from "./AiServiceSelector";
 import AiEnhanceButton from "./AiEnhanceButton";
+import DailyReportPreviewModal from "./DailyReportPreviewModal";
 import { toast } from "react-hot-toast";
 import { TypographyClasses } from "../styles/typography";
 import { formatMinutesToHours } from "../utils/timeUtils";
 import { RecordsApi } from "../services/recordsApi";
 import { getDateCache } from "../utils/dateCache";
 
-interface DailyRecordCreate
-  extends Omit<
-    WorkRecordCreate,
-    "service_company_id" | "service_target_id" | "work_item_id"
-  > {
+interface DailyRecordCreate extends Omit<
+  WorkRecordCreate,
+  "service_company_id" | "service_target_id" | "work_item_id"
+> {
   work_item_ids?: number[]; // 支援多選工作項目
   service_cocode?: string;
   service_empno?: string;
@@ -90,7 +90,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [editContent, setEditContent] = useState<string>("");
   const [editFiles, setEditFiles] = useState<FileForUpload[]>([]);
   const [editProjectId, setEditProjectId] = useState<number | undefined>(
-    undefined
+    undefined,
   );
   const [editExecutionWorkId, setEditExecutionWorkId] = useState<
     number | undefined
@@ -100,7 +100,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     string | undefined
   >(undefined);
   const [editServiceEmpno, setEditServiceEmpno] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [editServiceEmpnamec, setEditServiceEmpnamec] = useState<
     string | undefined
@@ -115,7 +115,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     useState<number>(0);
   const [editOriginalContent, setEditOriginalContent] = useState<string>("");
   const [editOriginalFiles, setEditOriginalFiles] = useState<FileForUpload[]>(
-    []
+    [],
   );
   // ✅ REMOVED: editPendingDeleteFiles, editPendingUploadFiles - CommonAPI 檔案不需要刪除
   const { authFetch, user, writingStatus, refreshWritingStatus } = useAuth(); // ✅ 使用全域狀態
@@ -123,13 +123,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [isGeneratingAllAi, setIsGeneratingAllAi] = useState(false);
   const [generatingAiFor, setGeneratingAiFor] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [isFocusMode, setIsFocusMode] = useState(true); // 預設隱藏其他欄位（專注模式）
   const [selectedAiService, setSelectedAiService] = useState<AiService>("aoai"); // AI 服務選擇
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [newRecord, setNewRecord] = useState<Partial<DailyRecordCreate>>({
     content: "",
     project_id: undefined,
@@ -167,7 +168,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     // 將 selectedDate (YYYY-MM-DD) 轉換為 YYYYMMDD 格式
     const formattedDate = selectedDate.replace(/-/g, "");
     const currentDateOption = dateCache.data.find(
-      (date) => date.value === formattedDate
+      (date) => date.value === formattedDate,
     );
 
     return currentDateOption?.can_submit ?? false;
@@ -179,7 +180,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       setServiceCompanies(companies);
       setServiceTargets(targets);
     },
-    []
+    [],
   );
 
   // 新增記錄的回調函數
@@ -314,7 +315,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -336,7 +337,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
             rServiceEmpno === serviceEmpno
             ? { ...r, ai_content: enhancedReport.ai_content }
             : r;
-        })
+        }),
       );
 
       if (!isAiViewActive) setIsAiViewActive(true);
@@ -365,7 +366,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
       const enhancePromises = reports.map(async (report) => {
         if (!report.sopno || !report.daily_no) {
           console.warn(
-            `跳過專案 ${report.project.plan_subj_c}: 缺少sopno或daily_no`
+            `跳過專案 ${report.project.plan_subj_c}: 缺少sopno或daily_no`,
           );
           return;
         }
@@ -398,7 +399,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               headers: {
                 "Content-Type": "application/json",
               },
-            }
+            },
           );
 
           if (response.ok) {
@@ -417,7 +418,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   rServiceEmpno === serviceEmpno
                   ? { ...r, ai_content: enhancedReport.ai_content }
                   : r;
-              })
+              }),
             );
           } else {
             console.error(`專案 ${report.project.plan_subj_c} AI增強失敗`);
@@ -425,7 +426,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         } catch (error) {
           console.error(
             `專案 ${report.project.plan_subj_c} AI增強出錯:`,
-            error
+            error,
           );
         } finally {
           // 清除該專案的生成中狀態
@@ -489,7 +490,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
     const nameMatch = report.service_target_name?.match(/^(.+)\(/);
     setEditServiceEmpnamec(
-      nameMatch ? nameMatch[1] : report.service_target_name
+      nameMatch ? nameMatch[1] : report.service_target_name,
     );
     setEditServiceTargetCocode(report.service_target_cocode);
     setEditServiceDeptno(report.service_deptno);
@@ -544,7 +545,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         (r.project?.planno || "NULL") === planno &&
         r.sopno === sopno &&
         (r.service_cocode || "") === service_cocode &&
-        (r.service_empno || "") === service_empno
+        (r.service_empno || "") === service_empno,
     );
     if (!reportToDelete) {
       toast.error("無法找到記錄資訊");
@@ -634,7 +635,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           (r.project?.planno || "NULL") === planno &&
           r.sopno === sopno &&
           (r.service_cocode || "") === service_cocode &&
-          (r.service_empno || "") === service_empno
+          (r.service_empno || "") === service_empno,
       );
       if (!reportToUpdate) throw new Error("找不到原始報告");
 
@@ -712,7 +713,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     // 格式化日期為中文顯示 (YYYYMMDD -> YYYY年MM月DD日)
     const formattedDate = docDate.replace(
       /(\d{4})(\d{2})(\d{2})/,
-      "$1年$2月$3日"
+      "$1年$2月$3日",
     );
     if (!window.confirm(`確定要提交此版本作為 ${formattedDate} 的最終日報嗎？`))
       return;
@@ -732,7 +733,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         // 將 YYYYMMDD 轉換為 YYYY-MM-DD 格式
         const formattedDate = docDate.replace(
           /(\d{4})(\d{2})(\d{2})/,
-          "$1-$2-$3"
+          "$1-$2-$3",
         );
         onUploadComplete(formattedDate);
       }
@@ -755,7 +756,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         const uploadedFile: FileAttachment = await RecordsApi.uploadFile(
           file,
           uploadDocDate,
-          authFetch
+          authFetch,
         );
         const newFile: FileForUpload = {
           name: uploadedFile.name,
@@ -779,12 +780,12 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   const handleEditAiSelectionChange = (
     fileUrl: string,
-    isSelected: boolean
+    isSelected: boolean,
   ) => {
     setEditFiles((prev) =>
       prev.map((f) =>
-        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f
-      )
+        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f,
+      ),
     );
   };
 
@@ -809,7 +810,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
           const isMatch = file.url === targetUrl || fileFullUrl === targetUrl;
           return !isMatch;
-        })
+        }),
       );
 
       // 從編輯內容中移除圖片標籤 - 需要處理 HTML 編碼的 &amp;
@@ -821,17 +822,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         newContent = newContent.replace(
           new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g"),
-          ""
+          "",
         );
 
         // 嘗試 HTML 編碼的 URL
         const escapedHtmlUrl = htmlEncodedUrl.replace(
           /[.*+?^${}()|[\]\\]/g,
-          "\\$&"
+          "\\$&",
         );
         newContent = newContent.replace(
           new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g"),
-          ""
+          "",
         );
 
         return newContent;
@@ -862,7 +863,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         const uploadedFile: FileAttachment = await RecordsApi.uploadFile(
           file,
           uploadDocDate,
-          authFetch
+          authFetch,
         );
         const newFile: FileForUpload = {
           name: uploadedFile.name,
@@ -887,12 +888,12 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
 
   const handleNewRecordAiSelectionChange = (
     fileUrl: string,
-    isSelected: boolean
+    isSelected: boolean,
   ) => {
     setNewRecord((prev) => ({
       ...prev,
       files: (prev.files || []).map((f) =>
-        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f
+        f.url === fileUrl ? { ...f, is_selected_for_ai: isSelected } : f,
       ),
     }));
   };
@@ -939,17 +940,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
         const escapedUrl = targetUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         newContent = newContent.replace(
           new RegExp(`<img[^>]*src="${escapedUrl}"[^>]*>`, "g"),
-          ""
+          "",
         );
 
         // 嘗試 HTML 編碼的 URL
         const escapedHtmlUrl = htmlEncodedUrl.replace(
           /[.*+?^${}()|[\]\\]/g,
-          "\\$&"
+          "\\$&",
         );
         newContent = newContent.replace(
           new RegExp(`<img[^>]*src="${escapedHtmlUrl}"[^>]*>`, "g"),
-          ""
+          "",
         );
 
         return {
@@ -1065,7 +1066,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           ? selectedDate.replace(/-/g, "")
           : new Date().toISOString().slice(0, 10).replace(/-/g, "");
         const existingDraftsResponse = await authFetch(
-          `/api/drafts/${user.employee.empno}?doc_date=${docDate}&draft_type=TEMP`
+          `/api/drafts/${user.employee.empno}?doc_date=${docDate}&draft_type=TEMP`,
         );
         if (existingDraftsResponse.ok) {
           const existingDrafts = await existingDraftsResponse.json();
@@ -1236,7 +1237,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
   // 計算總執行時間
   const totalExecutionMinutes = reports.reduce(
     (sum, report) => sum + (report.total_execution_time_minutes || 0),
-    0
+    0,
   );
 
   return (
@@ -1288,6 +1289,17 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               }
               isLoading={isGeneratingAllAi}
             />
+            {/* 預覽日報 */}
+            <button
+              onClick={() => setIsPreviewOpen(true)}
+              disabled={reports.length === 0}
+              className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed flex-shrink-0"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">預覽日報</span>
+              <span className="sm:hidden">預覽</span>
+            </button>
+            {/* 上傳最終版 */}
             <button
               onClick={handleSubmitReport}
               disabled={
@@ -1467,11 +1479,11 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                           selectedProjectId={editProjectId?.toString()}
                           selectedExecutionWorkId={editExecutionWorkId?.toString()}
                           selectedWorkItemId={editWorkItemIds.map((id) =>
-                            id.toString()
+                            id.toString(),
                           )}
                           onProjectChange={(projectId) => {
                             setEditProjectId(
-                              projectId ? parseInt(projectId) : undefined
+                              projectId ? parseInt(projectId) : undefined,
                             );
                             // 當工作計畫改變時，清空執行工作和工作項目選擇
                             // 因為不同工作計畫對應的執行工作不同
@@ -1482,14 +1494,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                             setEditExecutionWorkId(
                               executionWorkId
                                 ? parseInt(executionWorkId)
-                                : undefined
+                                : undefined,
                             );
                             // 當執行工作改變時，清空工作項目選擇
                             setEditWorkItemIds([]);
                           }}
                           onWorkItemChange={(workItemIds) =>
                             setEditWorkItemIds(
-                              workItemIds?.map((id) => parseInt(id)) || []
+                              workItemIds?.map((id) => parseInt(id)) || [],
                             )
                           }
                           onWorkItemsAvailabilityChange={(hasItems) =>
@@ -1644,7 +1656,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                 })() && (
                   <div className="absolute bottom-4 right-4 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
                     {formatMinutesToHours(
-                      report.total_execution_time_minutes || 0
+                      report.total_execution_time_minutes || 0,
                     )}
                   </div>
                 )}
@@ -1741,12 +1753,14 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
                   selectedProjectId={newRecord.project_id?.toString()}
                   selectedExecutionWorkId={newRecord.execution_work_id?.toString()}
                   selectedWorkItemId={newRecord.work_item_ids?.map((id) =>
-                    id.toString()
+                    id.toString(),
                   )}
                   onProjectChange={handleProjectChange}
                   onExecutionWorkChange={handleExecutionWorkChange}
                   onWorkItemChange={handleWorkItemChange}
-                  onWorkItemsAvailabilityChange={(hasItems) => setHasWorkItems(hasItems)}
+                  onWorkItemsAvailabilityChange={(hasItems) =>
+                    setHasWorkItems(hasItems)
+                  }
                   onServiceDataLoaded={handleServiceDataLoaded}
                   required={false}
                 />
@@ -1847,6 +1861,23 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
           animation: fade-in-scale 0.2s ease-in-out forwards;
         }
       `}</style>
+
+      {/* 預覽 Modal */}
+      <DailyReportPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        onSubmit={() => {
+          setIsPreviewOpen(false);
+          handleSubmitReport();
+        }}
+        isSubmitting={isSubmitting}
+        canSubmit={canSubmitCurrentDate && editingRecordKey === null}
+        selectedDate={selectedDate || ""}
+        empno={user?.employee?.empno || ""}
+        empName={user?.employee?.empnamec || ""}
+        deptName={user?.employee?.deptabbv || ""}
+        reports={reports}
+      />
     </>
   );
 };

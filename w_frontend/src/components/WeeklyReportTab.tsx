@@ -1343,6 +1343,12 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       <WeeklyReportPreviewModal
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
+        onSubmit={() => {
+          setIsPreviewOpen(false);
+          handleSubmitWeekly();
+        }}
+        isSubmitting={isSubmitting}
+        canSubmit={canSubmit && !editingNoteId && !isAddingNew && !hasReplies}
         year={currentYear}
         week={currentWeek}
         empno={user?.employee?.empno || ""}

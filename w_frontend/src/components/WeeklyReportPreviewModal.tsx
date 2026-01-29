@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { X } from "lucide-react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { Upload } from "lucide-react";
 import { WeeklyReportApi } from "../services/weeklyReportApi";
 import { TypographyClasses } from "../styles/typography";
 import { processHtmlImageUrls } from "../utils/urlUtils";
@@ -29,6 +29,9 @@ interface WeeklyNote {
 interface WeeklyReportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  canSubmit: boolean;
   year: number;
   week: number;
   empno: string;
@@ -42,6 +45,9 @@ interface WeeklyReportPreviewModalProps {
 const WeeklyReportPreviewModal: React.FC<WeeklyReportPreviewModalProps> = ({
   isOpen,
   onClose,
+  onSubmit,
+  isSubmitting,
+  canSubmit,
   year,
   week,
   empno,
@@ -53,6 +59,7 @@ const WeeklyReportPreviewModal: React.FC<WeeklyReportPreviewModalProps> = ({
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
   const [overdueARData, setOverdueARData] = useState<OverdueARData[]>([]);
   const [isLoadingTables, setIsLoadingTables] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const loadTableData = useCallback(async () => {
     if (!authFetch) return;
@@ -81,6 +88,10 @@ const WeeklyReportPreviewModal: React.FC<WeeklyReportPreviewModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadTableData();
+      // 重置滾動位置到頂部
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
     }
   }, [isOpen, loadTableData]);
 
@@ -120,16 +131,8 @@ const WeeklyReportPreviewModal: React.FC<WeeklyReportPreviewModalProps> = ({
         onClick={onClose}
       />
 
-      {/* 右上角關閉按鈕 */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-10 p-2 bg-white rounded-full shadow-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
       {/* 主體 - 全螢幕可滾動，內容置中 */}
-      <div className="relative w-full h-full bg-gray-50 overflow-y-auto">
+      <div ref={scrollContainerRef} className="relative w-full h-full bg-gray-50 overflow-y-auto">
         <div className="max-w-5xl mx-auto p-2 sm:p-4 md:p-6">
           {/* 標題列 */}
           <div className="flex items-center justify-between mb-6">
@@ -217,6 +220,24 @@ const WeeklyReportPreviewModal: React.FC<WeeklyReportPreviewModalProps> = ({
                 ))}
               </div>
             )}
+          </div>
+
+          {/* 底部按鈕區域 */}
+          <div className="flex justify-center gap-4 py-6">
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            >
+              關閉預覽
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={!canSubmit || isSubmitting}
+              className="inline-flex items-center px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {isSubmitting ? "提交中..." : "確定送出"}
+            </button>
           </div>
         </div>
       </div>

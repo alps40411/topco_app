@@ -116,6 +116,8 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
   );
 
   useEffect(() => {
+    // 組件掛載時滾動到頂部
+    window.scrollTo(0, 0);
     fetchReportDetails();
   }, [reportId, fetchReportDetails]);
 
