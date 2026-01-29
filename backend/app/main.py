@@ -7,6 +7,7 @@ from app.core.config import settings
 from typing import Dict
 import time
 import logging
+import socket
 
 # --- 引入所有需要的 API 路由 ---
 from app.api import supervisor, auth, reviews, users, drafts, ai, work_data, dates, records, weekly
@@ -15,6 +16,24 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(message)s'
 )
+
+# Graylog GELF UDP 配置 - 僅發送 WARNING 以上級別
+if settings.GRAYLOG_HOST:
+    try:
+        from pygelf import GelfUdpHandler
+
+        gelf_handler = GelfUdpHandler(
+            host=settings.GRAYLOG_HOST,
+            port=settings.GRAYLOG_PORT,
+            _machine_name=socket.gethostname(),
+            _app_version=settings.APP_VERSION,
+            _source=settings.GRAYLOG_SOURCE
+        )
+        gelf_handler.setLevel(logging.WARNING)
+        logging.getLogger().addHandler(gelf_handler)
+        print(f"✅ Graylog GELF UDP connected: {settings.GRAYLOG_HOST}:{settings.GRAYLOG_PORT}")
+    except Exception as e:
+        print(f"⚠️ Graylog connection failed: {e}")
 
 app = FastAPI(
     title="TSC 業務日誌 API",

@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     # 刪除週報 API
     DELETE_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/DeleteWeeklyReport"
 
+    # Graylog 設定
+    GRAYLOG_HOST: str = ""
+    GRAYLOG_PORT: int = 12201
+    GRAYLOG_SOURCE: str = "TopcoWebCore"
+    APP_VERSION: str = "1.0.0"
+
 
 
     class Config:

@@ -376,3 +376,5 @@ zipp==3.23.0
 
 zstandard==0.24.0
 
+pygelf==0.4.2
+

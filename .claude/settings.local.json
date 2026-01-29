@@ -60,7 +60,10 @@
       "Bash(do echo \"=== $file ===\")",
       "Bash(done)",
       "Bash(git ls-tree:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(ping:*)",
+      "Bash(tracert:*)",
+      "Bash(ipconfig:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
