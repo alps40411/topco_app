@@ -1267,6 +1267,16 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
             />
           </div>
           <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
+            {/* 預覽日報 */}
+            <button
+              onClick={() => setIsPreviewOpen(true)}
+              disabled={reports.length === 0}
+              className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed flex-shrink-0"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">預覽日報</span>
+              <span className="sm:hidden">預覽</span>
+            </button>
             <button
               onClick={() => setIsAddNoteModalOpen(true)}
               disabled={editingRecordKey !== null || generatingAiFor.size > 0}
@@ -1289,16 +1299,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
               }
               isLoading={isGeneratingAllAi}
             />
-            {/* 預覽日報 */}
-            <button
-              onClick={() => setIsPreviewOpen(true)}
-              disabled={reports.length === 0}
-              className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed flex-shrink-0"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">預覽日報</span>
-              <span className="sm:hidden">預覽</span>
-            </button>
+
             {/* 上傳最終版 */}
             <button
               onClick={handleSubmitReport}

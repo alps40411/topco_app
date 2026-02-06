@@ -319,7 +319,7 @@ async def extract_text_from_file(file_path: str) -> str:
         file_ext = file_path_obj.suffix.lower()
         logger.info(f"檔案類型: {file_ext}")
         
-        supported_types = {'.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'}
+        supported_types = {'.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp', '.gif', '.docx', 'xlsx', '.pptx', '.txt', '.md', '.csv'}
         
         if file_ext not in supported_types:
             logger.info(f"檔案類型 {file_ext} 不支援 Document Intelligence，嘗試讀取為純文字")

@@ -29,6 +29,7 @@ interface SearchableDropdownProps {
   searchFields?: string[];
   displayTemplate?: "default" | "table";
   maxVisibleItems?: number; // 最多顯示幾筆（控制下拉選單高度）
+  searchPlaceholder?: string; // 自訂搜尋框 placeholder
 }
 
 const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
@@ -45,6 +46,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   searchFields = ["name"],
   displayTemplate = "default",
   maxVisibleItems = 8, // 預設顯示 8 筆
+  searchPlaceholder,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -232,9 +234,11 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 ref={searchInputRef}
                 type="text"
                 placeholder={
-                  enableMultiFieldSearch
-                    ? "輸入工號、姓名、公司或部門搜尋..."
-                    : "輸入姓名搜尋 (如：張、元、林...)"
+                  searchPlaceholder
+                    ? searchPlaceholder
+                    : enableMultiFieldSearch
+                      ? "輸入工號、姓名、公司或部門搜尋..."
+                      : "輸入姓名搜尋 (如：張、元、林...)"
                 }
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

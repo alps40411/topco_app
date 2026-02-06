@@ -57,6 +57,8 @@ async def upload_file(
         result = await RecordService.upload_file(db, file, doc_date, empno, cocode)
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"檔案上傳失敗: {str(e)}")

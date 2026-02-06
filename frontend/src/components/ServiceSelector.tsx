@@ -2,7 +2,6 @@
 
 import React from "react";
 import SearchableDropdown from "./SearchableDropdown";
-import SimpleDropdown from "./SimpleDropdown";
 
 export interface ServiceCompany {
   id?: string;
@@ -113,8 +112,8 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* 服務公司選擇 - 顯示 12 筆 */}
-      <SimpleDropdown
+      {/* 服務公司選擇 - 可搜尋，顯示 12 筆 */}
+      <SearchableDropdown
         label="服務公司"
         placeholder="請選擇服務公司"
         options={companyOptions}
@@ -122,6 +121,10 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         onSelectionChange={handleCompanyChange}
         isLoading={false}
         required={required}
+        enableMultiFieldSearch={false}
+        searchFields={["name"]}
+        searchPlaceholder="輸入公司名稱搜尋..."
+        displayTemplate="default"
         maxVisibleItems={12}
       />
 

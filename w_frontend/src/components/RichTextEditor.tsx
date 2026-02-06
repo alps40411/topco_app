@@ -115,7 +115,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             body: formData,
           });
 
-          if (!response.ok) throw new Error(`圖片 ${file.name} 上傳失敗`);
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            const reason = errorData?.detail || `HTTP ${response.status}`;
+            throw new Error(reason);
+          }
 
           const uploadedFile = await response.json();
 
@@ -191,7 +195,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 body: formData,
               });
 
-              if (!response.ok) throw new Error(`檔案 ${file.name} 上傳失敗`);
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                const reason = errorData?.detail || `HTTP ${response.status}`;
+                throw new Error(reason);
+              }
 
               const uploadedFile = await response.json();
 
@@ -338,7 +346,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               body: formData,
             });
 
-            if (!response.ok) throw new Error("圖片上傳失敗");
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => null);
+              const reason = errorData?.detail || `HTTP ${response.status}`;
+              throw new Error(reason);
+            }
 
             const uploadedFile = await response.json();
 

@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = ""
 
     # File upload settings (使用 CommonAPI)
-    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    MAX_FILE_SIZE: int = 6 * 1024 * 1024  # 6MB
 
     # CommonAPI 配置
     COMMONAPI_BASE_URL: str = "http://10.129.1.98/CommonApi"
