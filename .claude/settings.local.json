@@ -63,7 +63,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(ping:*)",
       "Bash(tracert:*)",
-      "Bash(ipconfig:*)"
+      "Bash(ipconfig:*)",
+      "WebFetch(domain:ckeditor.com)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
