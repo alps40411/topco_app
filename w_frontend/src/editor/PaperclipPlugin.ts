@@ -3,6 +3,7 @@
 import { Plugin, ButtonView } from "ckeditor5";
 import { toast } from "react-hot-toast";
 import type { FileForUpload } from "../App";
+import { isSupportedFileType } from "../constants/fileTypes";
 
 export interface PaperclipContext {
   authFetch: ((url: string, options?: RequestInit) => Promise<Response>) | null;
@@ -59,9 +60,17 @@ export function createPaperclipPlugin(
             (async () => {
               try {
                 for (const file of files) {
+                  const toastId = `file-upload-${file.name}`;
+
+                  // 檢查副檔名是否支援
+                  if (!isSupportedFileType(file.name)) {
+                    const ext = file.name.substring(file.name.lastIndexOf('.'));
+                    toast.error(`不支援的檔案格式: ${ext}，請點擊工具列的檔案資訊按鈕查看支援的格式`, { id: toastId, duration: 5000 });
+                    continue;
+                  }
+
                   const formData = new FormData();
                   formData.append("file", file);
-                  const toastId = `file-upload-${file.name}`;
 
                   try {
                     toast.loading(`上傳 ${file.name}...`, { id: toastId });

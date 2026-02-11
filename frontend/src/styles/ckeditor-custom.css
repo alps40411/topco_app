@@ -253,6 +253,100 @@ div[dangerouslySetInnerHTML] s,
   z-index: 9999;
 }
 
+/* ===== 表格樣式 ===== */
+/* CKEditor 5 輸出: <figure class="table"><table>...</table></figure> */
+
+.ckeditor-wrapper .ck-content .table,
+.prose .table,
+div[dangerouslySetInnerHTML] .table,
+[class*="prose"] .table,
+.ckeditor-wrapper .ck-content figure.table,
+.prose figure.table,
+div[dangerouslySetInnerHTML] figure.table,
+[class*="prose"] figure.table {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+}
+
+.ckeditor-wrapper .ck-content table,
+.prose table,
+div[dangerouslySetInnerHTML] table,
+[class*="prose"] table {
+  border-collapse: collapse;
+  width: 100%;
+  border: 1px solid #d1d5db;
+}
+
+.ckeditor-wrapper .ck-content table th,
+.prose table th,
+div[dangerouslySetInnerHTML] table th,
+[class*="prose"] table th {
+  background-color: #f3f4f6;
+  font-weight: bold;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.ckeditor-wrapper .ck-content table td,
+.prose table td,
+div[dangerouslySetInnerHTML] table td,
+[class*="prose"] table td {
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 0.75rem;
+}
+
+.ckeditor-wrapper .ck-content table tr:nth-child(even),
+.prose table tr:nth-child(even),
+div[dangerouslySetInnerHTML] table tr:nth-child(even),
+[class*="prose"] table tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+/* ===== 文字對齊樣式 ===== */
+/* CKEditor 5 使用 inline style: style="text-align:center" */
+/* 需要 !important 覆蓋 Tailwind prose 的預設對齊 */
+
+.ckeditor-wrapper .ck-content [style*="text-align"],
+.prose [style*="text-align"],
+div[dangerouslySetInnerHTML] [style*="text-align"],
+[class*="prose"] [style*="text-align"] {
+  text-align: inherit !important;
+}
+
+.ckeditor-wrapper .ck-content [style*="text-align:center"],
+.ckeditor-wrapper .ck-content [style*="text-align: center"],
+.prose [style*="text-align:center"],
+.prose [style*="text-align: center"],
+div[dangerouslySetInnerHTML] [style*="text-align:center"],
+div[dangerouslySetInnerHTML] [style*="text-align: center"],
+[class*="prose"] [style*="text-align:center"],
+[class*="prose"] [style*="text-align: center"] {
+  text-align: center !important;
+}
+
+.ckeditor-wrapper .ck-content [style*="text-align:right"],
+.ckeditor-wrapper .ck-content [style*="text-align: right"],
+.prose [style*="text-align:right"],
+.prose [style*="text-align: right"],
+div[dangerouslySetInnerHTML] [style*="text-align:right"],
+div[dangerouslySetInnerHTML] [style*="text-align: right"],
+[class*="prose"] [style*="text-align:right"],
+[class*="prose"] [style*="text-align: right"] {
+  text-align: right !important;
+}
+
+.ckeditor-wrapper .ck-content [style*="text-align:justify"],
+.ckeditor-wrapper .ck-content [style*="text-align: justify"],
+.prose [style*="text-align:justify"],
+.prose [style*="text-align: justify"],
+div[dangerouslySetInnerHTML] [style*="text-align:justify"],
+div[dangerouslySetInnerHTML] [style*="text-align: justify"],
+[class*="prose"] [style*="text-align:justify"],
+[class*="prose"] [style*="text-align: justify"] {
+  text-align: justify !important;
+}
+
 /* 確保編輯器在小螢幕上也能正常顯示 */
 @media (max-width: 640px) {
   .ckeditor-wrapper .ck.ck-toolbar {

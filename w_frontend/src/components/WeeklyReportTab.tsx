@@ -922,17 +922,6 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
 
         {/* 右側：按鈕組 */}
         <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
-          {/* 預覽週報 */}
-          <button
-            onClick={() => setIsPreviewOpen(true)}
-            disabled={!weeklyNo || weeklyNotes.length === 0}
-            className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed flex-shrink-0"
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">預覽週報</span>
-            <span className="sm:hidden">預覽</span>
-          </button>
-
           {/* 新增筆記 */}
           <button
             onClick={startAddNew}
@@ -958,6 +947,16 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
             }
             isLoading={isGeneratingAi}
           />
+          {/* 預覽週報 */}
+          <button
+            onClick={() => setIsPreviewOpen(true)}
+            disabled={!weeklyNo || weeklyNotes.length === 0}
+            className="inline-flex items-center justify-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 disabled:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">預覽週報</span>
+            <span className="sm:hidden">預覽</span>
+          </button>
 
           {/* 提交週報 */}
           <button

@@ -32,6 +32,24 @@ class CommonApiFileService:
         try:
             logger.info(f"開始上傳檔案至 CommonAPI: {file.filename}, cocode={cocode}")
 
+            # 檢查副檔名
+            ALLOWED_EXTENSIONS = {
+                '.pdf', '.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt',
+                '.rtf', '.odt', '.ods', '.wps', '.pages', '.txt', '.csv',
+                '.jpg', '.png', '.jpeg', '.webp', '.gif',
+                '.zip', '.rar', '.7z',
+                '.ai', '.psd', '.dwg', '.eps', '.vsdx',
+                '.mp4', '.avi',
+                '.log', '.eml', '.ics', '.kml', '.xml',
+            }
+            filename = file.filename or ""
+            ext = filename.lower()[filename.rfind('.'):] if '.' in filename else ""
+            if ext not in ALLOWED_EXTENSIONS:
+                raise HTTPException(
+                    status_code=415,
+                    detail=f"不支援的檔案格式: {ext}"
+                )
+
             # 讀取檔案內容
             content = await file.read()
 

@@ -17,6 +17,9 @@ import {
   ImageResize,
   FileRepository,
   PasteFromOffice,
+  Table,
+  TableToolbar,
+  Alignment,
 } from "ckeditor5";
 import "ckeditor5/ckeditor5.css";
 import coreTranslations from "ckeditor5/translations/zh.js";
@@ -145,6 +148,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         ImageResize,
         FileRepository,
         PasteFromOffice,
+        Table,
+        TableToolbar,
+        Alignment,
         PaperclipPluginClass,
         FileInfoPluginClass,
       ],
@@ -159,7 +165,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           "numberedList",
           "bulletedList",
           "|",
+          "alignment",
+          "|",
           "link",
+          "insertTable",
           "uploadImage",
           "paperclip",
           "fileinfo",
@@ -177,6 +186,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         insert: {
           type: "auto" as const,
         },
+      },
+      table: {
+        contentToolbar: ["tableColumn", "tableRow", "mergeTableCells"],
       },
     };
   }, []); // 空依賴 — Plugin 透過 ref 讀取最新狀態
