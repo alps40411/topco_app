@@ -458,10 +458,16 @@ async def save_weekly_draft(
 
         # 準備檔案資料
         files_json = json.dumps(files, ensure_ascii=False) if files else None
-        # att_file1: 第一個檔案的原始檔名
-        # att_file2: 第一個檔案的路徑（CommonAPI FileId）
-        att_file1 = files[0].get("filename") or files[0].get("name") if len(files) > 0 else None
-        att_file2 = files[0].get("file_path") or files[0].get("id") if len(files) > 0 else None
+        # att_file1: 所有檔案的原始檔名，逗號分隔
+        # att_file2: 所有檔案的路徑（CommonAPI FileId），逗號分隔
+        if files:
+            names = [f.get("filename") or f.get("name") or "" for f in files]
+            paths = [f.get("file_path") or f.get("id") or "" for f in files]
+            att_file1 = ",".join(n for n in names if n) or None
+            att_file2 = ",".join(p for p in paths if p) or None
+        else:
+            att_file1 = None
+            att_file2 = None
 
         now = datetime.now()
         current_date = now.strftime("%Y%m%d")
@@ -1259,6 +1265,41 @@ async def get_weekly_report_detail(
                     status_code=400,
                     detail=result.get("ResponseNa", "獲取週報詳情失敗")
                 )
+
+            # 將 m_attfile1/m_attfile2 轉換為 files 陣列（含 CommonAPI 下載 URL）
+            try:
+                from app.services.commonapi_file_service import CommonApiFileService
+                response_data = result.get("ResponseData") or {}
+                master = response_data.get("weeklyReportMaster") or {}
+                cocode = master.get("cocode") or current_user.employee.cocode or "A"
+                details = response_data.get("weeklyReportDetails") or []
+                for detail in details:
+                    files = []
+                    m_attfile1 = detail.get("m_attfile1") or ""
+                    m_attfile2 = detail.get("m_attfile2") or ""
+                    filenames = [n.strip() for n in m_attfile1.split(",") if n.strip()]
+                    filepaths = [p.strip() for p in m_attfile2.split(",") if p.strip()]
+                    for i, filename in enumerate(filenames):
+                        filepath = filepaths[i] if i < len(filepaths) else ""
+                        if not filepath:
+                            continue
+                        file_url = CommonApiFileService.generate_download_url(
+                            file_id=filepath,
+                            filename=filename,
+                            cocode=cocode
+                        )
+                        file_ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+                        file_type = f"image/{file_ext}" if file_ext in ("jpg", "jpeg", "png", "gif", "bmp") else "application/octet-stream"
+                        files.append({
+                            "name": filename,
+                            "url": file_url,
+                            "type": file_type,
+                            "size": 0,
+                            "is_selected_for_ai": False
+                        })
+                    detail["files"] = files
+            except Exception as e:
+                logger.warning(f"轉換週報附件失敗（不影響主流程）: {e}")
 
             return result
 

@@ -176,6 +176,72 @@ class SupervisorService:
             raise
 
     @staticmethod
+    def get_boss_daily_homepage_reports(
+        db: Session,
+        doc_date: str
+    ) -> List[Dict[str, Any]]:
+        """取得集團董事長（99988）日報首頁 - 從 tdr_boss_daily 撈取"""
+        try:
+            sql = text("""
+                SELECT
+                    daily_no, doc_date, cocode, empno, empnamec, emergency, classify,
+                    att_file1, att_file2, att_file3,
+                    cust_ename1, cust_ename2, cust_ename3,
+                    cust_comp_abbv1, cust_comp_abbv2, cust_comp_abbv3,
+                    sop_desc_c, reply_status, memo_status, proj_status,
+                    openpath, openwebpage, sort_cocode, g_deptno, deptnamec,
+                    reply_count, replier_count, isforwarded,
+                    case_reply, case_classify, case_emergency,
+                    category_no, deptno, case_forward, lastdatetime,
+                    special_sort, general_sort, my_ask, other_ask
+                FROM jps.tdr_boss_daily
+                WHERE doc_date = :doc_date
+                ORDER BY special_sort, general_sort, sort_cocode, g_deptno, deptnamec, empno, daily_no
+            """)
+
+            result = db.execute(sql, {"doc_date": doc_date})
+
+            reports = []
+            for row in result.fetchall():
+                report = {
+                    "id": int(row[0]),
+                    "employee": {
+                        "id": str(row[3] or "").zfill(5),
+                        "empno": str(row[3] or "").zfill(5),
+                        "name": row[4] or "",
+                        "department_no": row[23] or "",
+                        "department_name": row[24] or "",
+                        "company_code": row[2] or "",
+                    },
+                    "date": row[1],
+                    "status": "pending" if row[17] != 'Y' else "reviewed",
+                    "emergency": row[5] or "",
+                    "classify": row[6] or "",
+                    "sop_desc_c": row[16] or "",
+                    "reply_count": int(row[25] or 0),
+                    "replier_count": int(row[26] or 0),
+                    "my_ask": (row[37] or "") == "true",
+                    "other_ask": (row[38] or "") == "true",
+                    "is_forwarded": (row[27] or "") == "true",
+                    "attachments": [f for f in [row[7], row[8], row[9]] if f],
+                    "has_attachments": any(f for f in [row[7], row[8], row[9]] if f),
+                    "customers": [
+                        {"name": row[10], "company": row[13]} if row[10] else None,
+                        {"name": row[11], "company": row[14]} if row[11] else None,
+                        {"name": row[12], "company": row[15]} if row[12] else None,
+                    ],
+                    "last_update": row[34] if row[34] else None,
+                    "can_view_detail": True,
+                }
+                reports.append(report)
+
+            return reports
+
+        except Exception as e:
+            logger.error(f"Error getting boss daily homepage reports: {str(e)}")
+            raise
+
+    @staticmethod
     def get_report_navigation(
         db: Session,
         current_daily_no: str,

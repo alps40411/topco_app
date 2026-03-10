@@ -781,6 +781,17 @@ async def get_daily_homepage_reports(
 
         logger.info(f"Fetching reports for empno={empno}, date={doc_date}, cocode={cocode}, deptno={deptno}")
 
+        # 集團董事長（99988）使用專屬的 tdr_boss_daily 表
+        if empno == '99988':
+            boss_reports = SupervisorService.get_boss_daily_homepage_reports(
+                db=legacy_db,
+                doc_date=doc_date
+            )
+            return {
+                "subordinate_reports": boss_reports,
+                "forwarded_reports": []
+            }
+
         # ✅ 優化: 權限檢查已整合到 SQL 中，無需 Python 迴圈
         # 1. 取得下屬日報列表 (can_view_detail 已在 SQL 層計算)
         subordinate_reports = SupervisorService.get_daily_homepage_reports(

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, Star } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import ChatInterface from "./ChatInterface";
+import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import type { SupervisorApprovalInfo } from "../types/supervisor";
 import ForwardSelector from "./ForwardSelector";
 import { TypographyClasses } from "../styles/typography";
@@ -389,6 +390,11 @@ const EmployeeDetailTab: React.FC<EmployeeDetailTabProps> = ({
                 dangerouslySetInnerHTML={{
                   __html: processHtmlImageUrls(detail.content || ""),
                 }}
+              />
+              {/* 附件 */}
+              <AttachedFilesDisplay
+                files={detail.files}
+                content={detail.content || ""}
               />
               {/* 建立時間 */}
               {detail.xdate && detail.xtime && (

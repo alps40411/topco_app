@@ -64,7 +64,8 @@
       "Bash(ping:*)",
       "Bash(tracert:*)",
       "Bash(ipconfig:*)",
-      "WebFetch(domain:ckeditor.com)"
+      "WebFetch(domain:ckeditor.com)",
+      "Bash(set PYTHONIOENCODING=utf-8)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

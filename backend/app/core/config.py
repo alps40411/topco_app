@@ -51,26 +51,26 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 6 * 1024 * 1024  # 6MB
 
     # CommonAPI 配置
-    COMMONAPI_BASE_URL: str = "http://10.129.1.98/CommonApi"
-    COMMONAPI_UPLOAD_URL: str = "http://10.129.1.98/CommonApi/api/SharedFile/upimages"
-    COMMONAPI_DOWNLOAD_URL: str = "http://10.129.1.98/CommonApi/api/SharedFile"
-    WFINBOX_API_URL: str = "http://10.129.1.98/CommonApi/EIP/ChangeWFINBOX"
-    MYREPORT_GET_WRITABLE_DATE_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetWritableDate"
-    MYREPORT_GET_FORWARD_LIST_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetForwardList"
+    COMMONAPI_BASE_URL: str = "http://10.129.8.248/CommonApi"
+    COMMONAPI_UPLOAD_URL: str = "http://10.129.8.248/CommonApi/api/SharedFile/upimages"
+    COMMONAPI_DOWNLOAD_URL: str = "http://10.129.8.248/CommonApi/api/SharedFile"
+    WFINBOX_API_URL: str = "http://10.129.8.248/CommonApi/EIP/ChangeWFINBOX"
+    MYREPORT_GET_WRITABLE_DATE_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetWritableDate"
+    MYREPORT_GET_FORWARD_LIST_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetForwardList"
     # 週報列表 API（可在 .env 中配置，預設使用測試環境）
-    WEEKLY_REPORT_LIST_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetWeeklyReportList"
+    WEEKLY_REPORT_LIST_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetWeeklyReportList"
     # 逾期應收帳款 API
-    OVERDUE_AR_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetOverdueAR"
+    OVERDUE_AR_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetOverdueAR"
     # 營收達成率 API
-    REVENUE_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/GetRevenue"
+    REVENUE_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetRevenue"
     # 提交週報 API
-    SUBMIT_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/SubmitWeeklyReport"
+    SUBMIT_WEEKLY_REPORT_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/SubmitWeeklyReport"
     # 週報詳情 API
-    SHOW_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/ShowWeeklyReport"
+    SHOW_WEEKLY_REPORT_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/ShowWeeklyReport"
     # 回覆週報 API
-    REPLY_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/ReplyWeeklyReport"
+    REPLY_WEEKLY_REPORT_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/ReplyWeeklyReport"
     # 刪除週報 API
-    DELETE_WEEKLY_REPORT_API_URL: str = "http://10.129.1.98/CommonApi/MyReport/DeleteWeeklyReport"
+    DELETE_WEEKLY_REPORT_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/DeleteWeeklyReport"
 
     # Graylog 設定
     GRAYLOG_HOST: str = ""

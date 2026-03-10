@@ -56,6 +56,15 @@ export interface WeeklyReportDetail {
   content1?: string;
   content2?: string;
   content?: string; // 內容
+  m_attfile1?: string; // 附件檔名（逗號分隔多筆）
+  m_attfile2?: string; // 附件路徑（CommonAPI FileId，逗號分隔多筆）
+  files?: Array<{
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+    is_selected_for_ai: boolean;
+  }>; // 後端轉換後的附件列表
 }
 
 /**
