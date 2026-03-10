@@ -10,17 +10,27 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
+_AZURE_KEY = "your_key_here"
+_AZURE_ENDPOINT = "your_endpoint_here"
+_AZURE_DEPLOYMENT = "your_deployment_name_here"
+
 def _build_client() -> Optional[AsyncAzureOpenAI]:
-    if not settings.AZURE_OPENAI_KEY or not settings.AZURE_OPENAI_ENDPOINT or not settings.AZURE_OPENAI_DEPLOYMENT_NAME:
+    key = _AZURE_KEY or settings.AZURE_OPENAI_KEY
+    endpoint = _AZURE_ENDPOINT or settings.AZURE_OPENAI_ENDPOINT
+    if not key or not endpoint:
         return None
 
     return AsyncAzureOpenAI(
-        api_key=settings.AZURE_OPENAI_KEY,
+        api_key=key,
         api_version="2025-04-01-preview",
-        azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+        azure_endpoint=endpoint,
         timeout=60.0,  # 設置 60 秒超時
         max_retries=2,  # 最多重試 2 次
     )
+
+def _get_deployment() -> str:
+    return _AZURE_DEPLOYMENT or settings.AZURE_OPENAI_DEPLOYMENT_NAME
 
 async def get_ai_enhanced_weekly_report(
     original_content: str,
@@ -85,7 +95,7 @@ async def get_ai_enhanced_weekly_report(
     
     try:
         response = await client.chat.completions.create(
-            model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+            model=_get_deployment(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -152,9 +162,9 @@ async def get_ai_enhanced_report(original_content: str, project_name: str, refer
         return "AI service not available."
 
     try:
-        logger.info(f"Calling Azure OpenAI API with model: {settings.AZURE_OPENAI_DEPLOYMENT_NAME}")
+        logger.info(f"Calling Azure OpenAI API with model: {_get_deployment()}")
         response = await client.chat.completions.create(
-            model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+            model=_get_deployment(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -182,7 +192,7 @@ async def get_completion(prompt: str, temperature: float = 1, max_completion_tok
     
     try:
         response = await client.chat.completions.create(
-            model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
+            model=_get_deployment(),
             messages=[
                 {"role": "user", "content": prompt}
             ],
