@@ -22,6 +22,20 @@ export default defineConfig({
     },
   ],
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // CKEditor 最大，獨立拆出（~500KB+）
+          ckeditor: ['ckeditor5', '@ckeditor/ckeditor5-react'],
+          // React 核心
+          react: ['react', 'react-dom', 'react-router-dom'],
+          // 其他工具庫
+          utils: ['date-fns', 'lucide-react'],
+        },
+      },
+    },
+  },
   optimizeDeps: {
     include: ["lucide-react"],
   },

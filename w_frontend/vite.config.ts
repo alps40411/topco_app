@@ -26,9 +26,17 @@ export default defineConfig({
     include: ["lucide-react"],
   },
 
-  // 增加構建時的內存限制和區塊大小警告閾值
   build: {
     chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          ckeditor: ['ckeditor5', '@ckeditor/ckeditor5-react'],
+          react: ['react', 'react-dom', 'react-router-dom'],
+          utils: ['date-fns', 'lucide-react'],
+        },
+      },
+    },
   },
   server: {
     host: "0.0.0.0",
