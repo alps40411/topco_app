@@ -11,9 +11,9 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-_AZURE_KEY = "your_key_here"
-_AZURE_ENDPOINT = "your_endpoint_here"
-_AZURE_DEPLOYMENT = "your_deployment_name_here"
+_AZURE_KEY = ""
+_AZURE_ENDPOINT = ""
+_AZURE_DEPLOYMENT = ""
 
 def _build_client() -> Optional[AsyncAzureOpenAI]:
     key = _AZURE_KEY or settings.AZURE_OPENAI_KEY

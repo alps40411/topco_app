@@ -37,5 +37,21 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // 部署新版後，舊快取的 index.html 會引用已不存在的 JS bundle
+      // 偵測載入失敗時自動重新整理一次（避免無限迴圈）
+      window.addEventListener('error', function (e) {
+        if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+          var reloaded = sessionStorage.getItem('cache_reload');
+          if (!reloaded) {
+            sessionStorage.setItem('cache_reload', '1');
+            window.location.reload(true);
+          }
+        }
+      }, true);
+      window.addEventListener('load', function () {
+        sessionStorage.removeItem('cache_reload');
+      });
+    </script>
   </body>
 </html>
