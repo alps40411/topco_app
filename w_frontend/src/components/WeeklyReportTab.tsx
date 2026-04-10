@@ -20,7 +20,6 @@ import AttachedFilesManager from "./AttachedFilesManager";
 import AttachedFilesDisplay from "./AttachedFilesDisplay";
 import AiEnhanceButton from "./AiEnhanceButton";
 import { AiService } from "./AiServiceSelector";
-import { getCurrentWeek, formatWeekRange } from "../utils/weekUtils";
 import { WeeklyReportApi, WeeklyReportForm } from "../services/weeklyReportApi";
 import { blueButtonStyle } from "../utils/colorUtils";
 import { TypographyClasses } from "../styles/typography";
@@ -60,9 +59,11 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
 }) => {
   const { authFetch, user } = useAuth();
 
-  // 當前週次（固定）
-  const { year: currentYear, week: currentWeek } = getCurrentWeek();
-  const weekRangeText = formatWeekRange(currentYear, currentWeek);
+  // 當前週次（由 API 驅動，含補交邏輯）
+  const [currentYear, setCurrentYear] = useState<number>(0);
+  const [currentWeek, setCurrentWeek] = useState<number>(0);
+  const [weekRangeText, setWeekRangeText] = useState<string>("");
+  const [isLoadingWeekInfo, setIsLoadingWeekInfo] = useState(true);
 
   // 新增筆記區域的 ref
   const addNoteRef = useRef<HTMLDivElement>(null);
@@ -117,10 +118,6 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   // 提交/編輯權限狀態
   const [canSubmit, setCanSubmit] = useState<boolean>(true);
   const [hasReplies, setHasReplies] = useState<boolean>(false); // 是否已被主管審閱
-  const [submitTimeInfo, setSubmitTimeInfo] = useState<{
-    reason: string;
-    next_submit_time: string;
-  } | null>(null);
 
   // 預覽 Modal 狀態
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -145,37 +142,53 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     loadWorkItems();
   }, [authFetch]);
 
-  // 載入本週筆記列表
-  const loadWeeklyNotes = useCallback(async () => {
-    if (!authFetch || !user?.employee?.empno) return;
+  // 一次載入：當前週次 + 草稿（取代過去的 loadWeekInfo + loadWeeklyNotes 兩個獨立呼叫）
+  // isInitial=true 會顯示全頁 loading；false 為靜默刷新（儲存後使用）
+  const loadInit = useCallback(async (isInitial = false) => {
+    if (!authFetch) return;
 
-    setIsLoading(true);
+    if (isInitial) {
+      setIsLoadingWeekInfo(true);
+      setIsLoading(true);
+    }
     try {
-      const result = await WeeklyReportApi.getWeeklyNotes(
-        currentYear,
-        currentWeek,
-        user.employee.empno,
-        authFetch,
-      );
-      setWeeklyNo(result.weekly_no);
-      setWeeklyNotes(result.notes);
+      const data = await WeeklyReportApi.getInit(authFetch);
+
+      setCurrentYear(data.year);
+      setCurrentWeek(data.weekly_no);
+      setCanSubmit(data.can_send);
+      setWeeklyNo(data.weekly_no_id);
+      setWeeklyNotes(data.notes);
+
+      // 顯示日期範圍：YYYYMMDD → MM/DD ~ MM/DD
+      if (data.startdate && data.enddate) {
+        const fmt = (s: string) => `${s.substring(4, 6)}/${s.substring(6, 8)}`;
+        setWeekRangeText(`${fmt(data.startdate)} ~ ${fmt(data.enddate)}`);
+      }
 
       // 如果有任何筆記包含 AI 內容，啟用 AI 視圖
-      if (result.notes.some((note: WeeklyNote) => note.ai_content)) {
+      if (data.notes.some((note: WeeklyNote) => note.ai_content)) {
         setIsAiViewActive(true);
       }
     } catch (error) {
-      console.error("載入本週筆記失敗:", error);
-      toast.error("載入本週筆記失敗");
-      setWeeklyNotes([]);
+      console.error("載入週報資料失敗:", error);
+      if (isInitial) toast.error("載入週報資料失敗");
     } finally {
-      setIsLoading(false);
+      if (isInitial) {
+        setIsLoadingWeekInfo(false);
+        setIsLoading(false);
+      }
     }
-  }, [authFetch, user, currentYear, currentWeek]);
+  }, [authFetch]);
 
   useEffect(() => {
-    loadWeeklyNotes();
-  }, [loadWeeklyNotes]);
+    loadInit(true);
+  }, [loadInit]);
+
+  // 靜默刷新草稿列表（儲存/刪除後使用）
+  const loadWeeklyNotes = useCallback(async () => {
+    await loadInit(false);
+  }, [loadInit]);
 
   // 載入逾期應收帳款和營收達成率資料
   const loadTableData = useCallback(async () => {
@@ -218,7 +231,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     loadTableData();
   }, [loadTableData]);
 
-  // 載入提交時間限制和審閱狀態
+  // 檢查審閱狀態（時間窗口由 /init 的 can_send 處理，這裡只查 has_replies）
   const checkSubmitStatus = useCallback(async () => {
     if (!authFetch || !weeklyNo) return;
 
@@ -227,16 +240,9 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         `/api/weekly/can-submit?weekly_no=${weeklyNo}`,
       );
       const data = await response.json();
-      setCanSubmit(data.can_submit);
       setHasReplies(data.has_replies);
-      setSubmitTimeInfo({
-        reason: data.reason,
-        next_submit_time: data.next_submit_time,
-      });
     } catch (error) {
-      console.error("檢查提交狀態失敗:", error);
-      // 預設允許提交（防止 API 錯誤影響使用）
-      setCanSubmit(true);
+      console.error("檢查審閱狀態失敗:", error);
       setHasReplies(false);
     }
   }, [authFetch, weeklyNo]);
@@ -297,6 +303,10 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         newNoteSeqRef.current = result.seq;
       }
     }
+
+    // 自動儲存後重新載入列表，同步 UI 顯示
+    // 不影響正在編輯的表單（newContent 等 state 獨立於 weeklyNotes）
+    await loadWeeklyNotes();
   }, [
     authFetch,
     weeklyNo,
@@ -306,6 +316,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     newSubject,
     newContent,
     newFiles,
+    loadWeeklyNotes,
   ]);
 
   // 編輯模式的自動儲存函數（不重新載入列表，避免閃爍）
@@ -360,7 +371,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   ]);
 
   // 啟用自動儲存 - 新增模式
-  useAutoSave({
+  const { pause: pauseAutoSaveNew, resume: resumeAutoSaveNew } = useAutoSave({
     interval: 60000, // 1 分鐘
     onSave: autoSaveNew,
     enabled: isAddingNew && !hasReplies,
@@ -368,7 +379,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   });
 
   // 啟用自動儲存 - 編輯模式
-  useAutoSave({
+  const { pause: pauseAutoSaveEdit, resume: resumeAutoSaveEdit } = useAutoSave({
     interval: 60000, // 1 分鐘
     onSave: autoSaveEdit,
     enabled: editingNoteId !== null && !hasReplies,
@@ -458,6 +469,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     }
 
     setIsSavingNew(true);
+    pauseAutoSaveNew(); // 暫停自動儲存，防止 race condition
     try {
       const formData: WeeklyReportForm = {
         year: currentYear,
@@ -492,6 +504,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       toast.error(`保存失敗: ${error.message}`);
     } finally {
       setIsSavingNew(false);
+      resumeAutoSaveNew(); // 恢復自動儲存
     }
   };
 
@@ -536,6 +549,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     }
 
     setIsSaving(true);
+    pauseAutoSaveEdit(); // 暫停自動儲存，防止 race condition
     try {
       const formData: WeeklyReportForm = {
         year: currentYear,
@@ -565,6 +579,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       toast.error(`更新失敗: ${error.message}`);
     } finally {
       setIsSaving(false);
+      resumeAutoSaveEdit(); // 恢復自動儲存
     }
   };
 
@@ -868,25 +883,26 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
 
     if (!confirm("確定要提交本週週報嗎？提交後將無法修改。")) return;
 
+    // 先記住提交的週次，避免 state 更新後丟失
+    const submittedYear = currentYear;
+    const submittedWeek = currentWeek;
+
     setIsSubmitting(true);
     try {
       const result = await WeeklyReportApi.submitWeeklyReport(
         weeklyNo,
-        currentYear,
-        currentWeek,
+        submittedYear,
+        submittedWeek,
         authFetch,
       );
 
       if (result.ResponseNa === "週報儲存成功") {
         toast.success("週報已提交成功！");
 
-        // 重新載入筆記列表以更新狀態
-        await loadWeeklyNotes();
-        // 重新檢查提交狀態
-        await checkSubmitStatus();
-
+        // 跳轉到提交的那一週的週報首頁
         if (onUploadComplete) {
-          onUploadComplete(currentYear, currentWeek);
+          onUploadComplete(submittedYear, submittedWeek);
+          return;
         }
       } else {
         toast.error(`提交失敗: ${result.ResponseNa || "未知錯誤"}`);
@@ -899,7 +915,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     }
   };
 
-  if (isLoading) {
+  if (isLoadingWeekInfo || isLoading) {
     return <div className="p-6 text-center">載入中...</div>;
   }
 

@@ -98,8 +98,6 @@ async def get_current_user(
     from app.schemas.user import User as UserSchema
     from sqlalchemy import text
 
-    legacy_db = next(get_legacy_db())
-
     # ✅ 優先從 URL query params 獲取 cocode，其次是 SSO headers，最後預設為 'A'
     query_param_cocode = request.query_params.get("cocode")
     query_cocode = query_param_cocode or sso_cocode or 'A'
@@ -120,36 +118,42 @@ async def get_current_user(
         WHERE cocode = :cocode AND deptno = :deptno
     """)
 
-    result = legacy_db.execute(user_sql, {"empno": empno, "cocode": query_cocode})
-    user_row = result.fetchone()
+    # 使用 generator 並用 close() 確保 connection 釋放回 pool
+    legacy_db_gen = get_legacy_db()
+    legacy_db = next(legacy_db_gen)
+    try:
+        result = legacy_db.execute(user_sql, {"empno": empno, "cocode": query_cocode})
+        user_row = result.fetchone()
 
-    if not user_row:
-        raise credentials_exception
-    
-    dept_result = legacy_db.execute(dept_sql, {"cocode": query_cocode, "deptno": user_row[3]})
-    dept_row = dept_result.fetchone()
+        if not user_row:
+            raise credentials_exception
 
-    # 創建用戶物件，確保格式與認證 API 一致
-    user = UserSchema(
-        id=1,  # 使用非零 ID，避免前端條件檢查失敗
-        name=user_row[1] or "",
-        email=user_row[5] or "",
-        is_active=True,
-        is_supervisor=False,
-        employee=EmployeeForUser(
-            id=1,  # 使用非零 ID，避免前端條件檢查失敗
-            empno=user_row[0],
-            empnamec=user_row[1] or "",
-            dutyscript=user_row[4] or "",    # dutyscript
-            deptabbv=user_row[7] or "",      # deptabbv from join
-            cocode=user_row[2] or "",      # cocode
-            deptno=user_row[3] or "",       # deptno
-            g_deptno=user_row[10] or "",    # g_deptno
-            department_name=dept_row[0] or "", # deptname
+        dept_result = legacy_db.execute(dept_sql, {"cocode": query_cocode, "deptno": user_row[3]})
+        dept_row = dept_result.fetchone()
+
+        # 創建用戶物件，確保格式與認證 API 一致
+        user = UserSchema(
+            id=1,
+            name=user_row[1] or "",
+            email=user_row[5] or "",
+            is_active=True,
+            is_supervisor=False,
+            employee=EmployeeForUser(
+                id=1,
+                empno=user_row[0],
+                empnamec=user_row[1] or "",
+                dutyscript=user_row[4] or "",
+                deptabbv=user_row[7] or "",
+                cocode=user_row[2] or "",
+                deptno=user_row[3] or "",
+                g_deptno=user_row[10] or "",
+                department_name=(dept_row[0] if dept_row else "") or "",
+            )
         )
-    )
 
-    return user
+        return user
+    finally:
+        legacy_db_gen.close()
 
 async def get_current_user_with_employee(
     request: Request,

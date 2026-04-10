@@ -27,107 +27,32 @@ async def check_can_submit(
     db: Session = Depends(get_legacy_db)
 ):
     """
-    檢查是否可以提交/編輯週報
+    檢查週報是否已被主管審閱
 
-    業務規則：
-    1. 時間窗口檢查：週五 17:00 ~ 週一 08:30
-    2. 審閱狀態檢查：是否已被主管回覆/評分
-
-    Returns:
-        - can_submit: 是否可提交
-        - can_edit: 是否可編輯
-        - reason: 原因說明
-        - next_submit_time: 下次可提交的時間
-        - has_replies: 是否已被主管審閱
+    時間窗口判斷已由 CommonAPI 的 can_send 取代，
+    此端點僅查詢 has_replies（是否被主管審閱）以決定能否編輯/刪除
     """
-    from datetime import datetime, timedelta
-    import pytz
-
     try:
-        # 使用台灣時區
-        taiwan_tz = pytz.timezone('Asia/Taipei')
-        now = datetime.now(taiwan_tz)
-
-        # 1. 時間窗口檢查
-        day_of_week = now.weekday()  # 0=週一, 1=週二, ..., 4=週五, 5=週六, 6=週日
-        hour = now.hour
-        minute = now.minute
-
-        in_time_window = False
-
-        if day_of_week == 4:  # 週五
-            if hour >= 17:
-                in_time_window = True
-        elif day_of_week == 5 or day_of_week == 6:  # 週六、週日
-            in_time_window = True
-        elif day_of_week == 0:  # 週一
-            if hour < 8 or (hour == 8 and minute < 30):
-                in_time_window = True
-
-        # 計算下次可提交的時間
-        next_submit_time = ""
-        if not in_time_window:
-            # 計算下個週五 17:00
-            days_until_friday = (4 - day_of_week) % 7
-            if days_until_friday == 0 and (hour >= 17 or (hour == 8 and minute >= 30)):
-                days_until_friday = 7
-
-            next_friday = now + timedelta(days=days_until_friday)
-            next_submit_datetime = next_friday.replace(hour=17, minute=0, second=0, microsecond=0)
-            next_submit_time = next_submit_datetime.strftime("%Y-%m-%d %H:%M:%S")
-
-        # 2. 審閱狀態檢查（如果有提供 weekly_no）
         has_replies = False
         if weekly_no:
-            # 檢查是否有主管回覆記錄
             reply_check_sql = text("""
                 SELECT COUNT(*) FROM jps.tdr_weekly_reply
                 WHERE weekly_no = :weekly_no and from_where is not NULL
             """)
-
             reply_result = db.execute(reply_check_sql, {"weekly_no": weekly_no}).fetchone()
             has_replies = reply_result[0] > 0 if reply_result else False
 
-        # 3. 決定最終結果
-        # 週報系統權限規則：
-        # - can_edit: 只要未被回覆就可編輯（無時間限制）
-        # - can_delete: 只要未被回覆就可刪除（無時間限制）
-        # - can_submit: 需在時間範圍內且未被回覆
-        can_edit = not has_replies
-        can_delete = not has_replies
-        can_submit = in_time_window and not has_replies
-
-        # 4. 生成原因說明
-        if has_replies:
-            reason = "此週報已被主管審閱，無法再修改或刪除"
-        elif not in_time_window:
-            reason = f"不在提交時間範圍內（週五 17:00 ~ 週一 08:30），但仍可編輯。下次可提交時間：{next_submit_time}"
-        else:
-            reason = "可以編輯、刪除和提交週報"
-
         return {
-            "can_submit": can_submit,
-            "can_edit": can_edit,
-            "can_delete": can_delete,
-            "reason": reason,
-            "next_submit_time": next_submit_time,
+            "can_edit": not has_replies,
+            "can_delete": not has_replies,
             "has_replies": has_replies,
-            "in_submit_window": in_time_window  # 是否在提交時間窗口內（週五 17:00 ~ 週一 08:30）
         }
-
     except Exception as e:
-        logger.error(f"檢查提交狀態失敗: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        # 預設允許提交（防止 API 錯誤影響使用）
+        logger.error(f"檢查審閱狀態失敗: {str(e)}")
         return {
-            "can_submit": True,
             "can_edit": True,
             "can_delete": True,
-            "reason": "檢查失敗，預設允許提交",
-            "next_submit_time": "",
             "has_replies": False,
-            "in_submit_window": True  # 預設為在提交窗口內，避免影響列表頁顯示
         }
 
 
@@ -235,15 +160,6 @@ STORAGE_PATH = Path("storage/weekly")
 STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 
-def get_current_week_info():
-    """獲取當前年份和週次（ISO 8601 標準）"""
-    now = datetime.now()
-    iso_calendar = now.isocalendar()
-    year = iso_calendar[0]  # ISO 年份（該周禮拜四所在的年份）
-    week = iso_calendar[1]  # ISO 週次
-    return year, week
-
-
 def generate_weekly_no(db: Session) -> str:
     """
     生成新的 weekly_no - 直接從 sequence 取得
@@ -259,6 +175,68 @@ def generate_weekly_no(db: Session) -> str:
     except Exception as e:
         logger.error(f"Error generating weekly_no: {str(e)}")
         raise HTTPException(status_code=500, detail=f"無法生成週報編號: {str(e)}")
+
+
+@router.get("/week-period")
+async def api_get_week_period(
+    year: int,
+    weeklyNo: int,
+):
+    """
+    根據年份和週次取得日期區間（透過 week_service，永久 cache）
+    回傳 YYYYMMDD 格式
+    """
+    try:
+        from app.services.week_service import get_week_period
+        info = await get_week_period(year, weeklyNo)
+        return info.to_dict()
+    except Exception as e:
+        logger.error(f"GetWeeklyPeriod 失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"取得週次期間失敗: {str(e)}")
+
+
+@router.get("/week-list")
+async def api_get_week_list(count: int = 20):
+    """
+    取得當前週往前 count 週的列表（給 WeekSelector 使用）
+    回傳 [{year, weekly_no, startdate, enddate}, ...]
+    當前週在最後（最右邊）
+
+    後端先用 GetWeeklyNoByDate 一次拿到當前週，再用 offset 計算各週日期
+    """
+    from app.services.week_service import get_week_by_date, _today_taiwan
+    from datetime import timedelta
+    import pytz
+
+    try:
+        taiwan_tz = pytz.timezone('Asia/Taipei')
+        now = datetime.now(taiwan_tz)
+
+        # 並行呼叫 count 個 GetWeeklyNoByDate（後端會 cache 同一週次的結果）
+        # 由近到遠
+        import asyncio
+        tasks = []
+        for i in range(count - 1, -1, -1):  # i = count-1, count-2, ..., 0
+            target_date = (now - timedelta(weeks=i)).strftime("%Y/%m/%d")
+            tasks.append(get_week_by_date(target_date))
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        weeks = []
+        seen = set()
+        for r in results:
+            if isinstance(r, Exception):
+                continue
+            key = (r.year, r.weekly_no)
+            if key in seen:
+                continue
+            seen.add(key)
+            weeks.append(r.to_dict())
+
+        return {"weeks": weeks}
+    except Exception as e:
+        logger.error(f"取得週次列表失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"取得週次列表失敗: {str(e)}")
 
 
 def get_next_seq(db: Session, weekly_no: str) -> int:
@@ -278,64 +256,17 @@ async def get_job_items():
     return {"job_items": JOB_ITEMS}
 
 
-@router.get("/weekly-no")
-async def get_weekly_no(
-    current_user: UserSchema = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
+def _query_drafts_by_date_range(
+    db: Session,
+    empno: str,
+    cocode: str,
+    start_date: str,
+    end_date: str,
 ):
-    """獲取或生成週報編號"""
-    empno = current_user.employee.empno
-    cocode = current_user.employee.cocode or "A"
-    year, week = get_current_week_info()
-
-    # 檢查該週是否已有 weekly_no（只接受純數字格式）
-    sql = text("""
-        SELECT weekly_no
-        FROM jps.tdr_weekly_draft
-        WHERE empno = :empno
-          AND cocode = :cocode
-          AND TO_CHAR(TO_DATE(doc_date, 'YYYYMMDD'), 'IYYY') = :year
-          AND TO_CHAR(TO_DATE(doc_date, 'YYYYMMDD'), 'IW') = :week
-          AND (status IS NULL OR status != 'D')
-          AND weekly_no NOT LIKE 'W%'
-        ORDER BY weekly_no DESC
-        LIMIT 1
-    """)
-
-    result = db.execute(sql, {
-        "empno": empno,
-        "cocode": cocode,
-        "year": str(year),
-        "week": str(week).zfill(2)
-    }).fetchone()
-
-    if result:
-        weekly_no = result[0]
-    else:
-        weekly_no = generate_weekly_no(db)
-
-    return {
-        "weekly_no": weekly_no,
-        "year": year,
-        "week": week
-    }
-
-
-@router.get("/drafts")
-async def get_weekly_drafts(
-    year: Optional[int] = None,
-    week: Optional[int] = None,
-    current_user: UserSchema = Depends(get_current_user),
-    db: Session = Depends(get_legacy_db)
-):
-    """獲取週報草稿列表"""
-    if not year or not week:
-        year, week = get_current_week_info()
-
-    empno = current_user.employee.empno
-    cocode = current_user.employee.cocode or "A"
-
-    # 查詢草稿（排除已刪除的）
+    """
+    從 DB 查詢指定日期範圍內的草稿
+    回傳 (drafts_list, weekly_no_found)
+    """
     sql = text("""
         SELECT
             weekly_no, empno, cocode, doc_date, seq,
@@ -346,8 +277,8 @@ async def get_weekly_drafts(
         FROM jps.tdr_weekly_draft
         WHERE empno = :empno
           AND cocode = :cocode
-          AND TO_CHAR(TO_DATE(doc_date, 'YYYYMMDD'), 'IYYY') = :year
-          AND TO_CHAR(TO_DATE(doc_date, 'YYYYMMDD'), 'IW') = :week
+          AND doc_date >= :start_date
+          AND doc_date <= :end_date
           AND (status IS NULL OR status != 'D')
         ORDER BY weekly_no, seq
     """)
@@ -355,15 +286,12 @@ async def get_weekly_drafts(
     results = db.execute(sql, {
         "empno": empno,
         "cocode": cocode,
-        "year": str(year),
-        "week": str(week).zfill(2)
+        "start_date": start_date,
+        "end_date": end_date,
     }).fetchall()
 
     drafts = []
-    weekly_no_from_drafts = None
-
-    empno = current_user.employee.empno
-    cocode = current_user.employee.cocode or "A"
+    weekly_no_found = None
 
     for row in results:
         # 解析 files JSON
@@ -385,11 +313,8 @@ async def get_weekly_drafts(
                 files_data = []
 
         # 記錄第一個有效的（純數字）weekly_no
-        if not weekly_no_from_drafts and row[0]:
-            logger.info(f"Found weekly_no in draft: {row[0]}, starts with 'W': {str(row[0]).startswith('W')}")
-            if not str(row[0]).startswith('W'):
-                weekly_no_from_drafts = row[0]
-                logger.info(f"Using valid weekly_no from drafts: {weekly_no_from_drafts}")
+        if not weekly_no_found and row[0] and not str(row[0]).startswith('W'):
+            weekly_no_found = row[0]
 
         draft = {
             "weekly_no": row[0],
@@ -415,17 +340,134 @@ async def get_weekly_drafts(
         }
         drafts.append(draft)
 
-    # 如果找到有效的 weekly_no 就用它，否則生成新的
-    if not weekly_no_from_drafts:
-        logger.info(f"No valid weekly_no found in drafts, generating new one")
-        weekly_no_from_drafts = generate_weekly_no(db)
+    return drafts, weekly_no_found
 
-    logger.info(f"Returning weekly_no: {weekly_no_from_drafts}")
+
+@router.get("/init")
+async def get_weekly_init(
+    year: Optional[int] = None,
+    week: Optional[int] = None,
+    offset: int = 0,
+    include_drafts: bool = True,
+    current_user: UserSchema = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """
+    一次回傳週報相關初始資料
+
+    參數優先順序：
+    1. year + week 同時提供 → 使用指定週次（offset 忽略）
+    2. offset != 0 → 從今天偏移 offset 週（-1 = 上週, 1 = 下週）
+    3. 都沒指定 → 由 CommonAPI 決定應交週次（含補交邏輯）
+
+    回傳：
+    - year, weekly_no, can_send, startdate, enddate
+    - drafts 列表（include_drafts=True 時才查 DB）
+    - weekly_no_id（DB 用的週報編號）
+    """
+    from datetime import timedelta
+    from app.services.week_service import (
+        get_latest_submit_week,
+        get_week_period,
+        get_week_by_date,
+        _today_taiwan,
+    )
+    import pytz
+
+    empno = current_user.employee.empno
+    cocode = (current_user.employee.cocode or "A").upper()
+
+    try:
+        if year and week:
+            # 1. 指定週次
+            period = await get_week_period(year, week)
+            target_year = year
+            target_week = week
+            start_date = period.start_date
+            end_date = period.end_date
+            try:
+                latest = await get_latest_submit_week(cocode, empno)
+                can_send = (latest.year == year and latest.weekly_no == week and latest.can_send)
+            except Exception:
+                can_send = False
+        elif offset != 0:
+            # 2. 從今天偏移指定週數
+            taiwan_tz = pytz.timezone('Asia/Taipei')
+            target_date = (datetime.now(taiwan_tz) + timedelta(weeks=offset)).strftime("%Y/%m/%d")
+            info = await get_week_by_date(target_date)
+            target_year = info.year
+            target_week = info.weekly_no
+            start_date = info.start_date
+            end_date = info.end_date
+            try:
+                latest = await get_latest_submit_week(cocode, empno)
+                can_send = (latest.year == target_year and latest.weekly_no == target_week and latest.can_send)
+            except Exception:
+                can_send = False
+        else:
+            # 3. 應交週次（含補交邏輯）
+            latest = await get_latest_submit_week(cocode, empno)
+            target_year = latest.year
+            target_week = latest.weekly_no
+            start_date = latest.start_date
+            end_date = latest.end_date
+            can_send = latest.can_send
+
+        # 查詢草稿（可選）
+        drafts = []
+        weekly_no_found = None
+        if include_drafts:
+            drafts, weekly_no_found = _query_drafts_by_date_range(
+                db, empno, cocode, start_date, end_date
+            )
+            if not weekly_no_found:
+                weekly_no_found = generate_weekly_no(db)
+
+        return {
+            "year": target_year,
+            "weekly_no": target_week,
+            "can_send": can_send,
+            "startdate": start_date,
+            "enddate": end_date,
+            "weekly_no_id": weekly_no_found,
+            "drafts": drafts,
+        }
+    except Exception as e:
+        logger.error(f"取得 weekly init 失敗: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"取得週報資訊失敗: {str(e)}")
+
+
+@router.get("/drafts")
+async def get_weekly_drafts(
+    year: int,
+    week: int,
+    current_user: UserSchema = Depends(get_current_user),
+    db: Session = Depends(get_legacy_db)
+):
+    """
+    獲取週報草稿列表（保留供獨立呼叫使用，例如 refresh 草稿列表）
+    year/week 為必填（前端應該已經知道當前週次）
+    """
+    from app.services.week_service import get_week_period
+
+    empno = current_user.employee.empno
+    cocode = (current_user.employee.cocode or "A").upper()
+
+    period = await get_week_period(year, week)
+    drafts, weekly_no_found = _query_drafts_by_date_range(
+        db, empno, cocode, period.start_date, period.end_date
+    )
+
+    if not weekly_no_found:
+        weekly_no_found = generate_weekly_no(db)
+
     return {
-        "weekly_no": weekly_no_from_drafts,
+        "weekly_no": weekly_no_found,
         "year": year,
         "week": week,
-        "drafts": drafts
+        "drafts": drafts,
     }
 
 
@@ -435,10 +477,21 @@ async def save_weekly_draft(
     current_user: UserSchema = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):
-    """新增或更新週報草稿"""
+    """
+    新增或更新週報草稿
+
+    必填參數（POST body）：
+    - year: int 該草稿所屬週次的年份
+    - week: int 該草稿所屬週次的週次編號
+    - weekly_no: str
+    - subject, job_item, content, files
+
+    為避免 DB session 被 httpx 卡住，所有 CommonAPI 呼叫先在外部完成，
+    DB 操作放在最後一刻
+    """
     try:
         empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
 
         weekly_no = draft_data.get("weekly_no")
         seq = draft_data.get("seq")
@@ -446,20 +499,27 @@ async def save_weekly_draft(
         job_item = draft_data.get("job_item")
         content = draft_data.get("content", "")
         files = draft_data.get("files", [])
+        year_info = draft_data.get("year")
+        week_info = draft_data.get("week")
 
         # 驗證必填欄位
         if not weekly_no:
             raise HTTPException(status_code=400, detail="缺少 weekly_no")
         if not job_item or job_item not in JOB_ITEMS:
             raise HTTPException(status_code=400, detail="無效的工作項目")
+        if not year_info or not week_info:
+            raise HTTPException(status_code=400, detail="缺少 year/week")
+
+        # 從 service 取得 doc_date（走 cache，幾乎不會打 CommonAPI）
+        from app.services.week_service import get_week_period
+        period = await get_week_period(int(year_info), int(week_info))
+        doc_date = period.start_date
 
         # 計算字數
         word_count = len(content)
 
         # 準備檔案資料
         files_json = json.dumps(files, ensure_ascii=False) if files else None
-        # att_file1: 所有檔案的原始檔名，逗號分隔
-        # att_file2: 所有檔案的路徑（CommonAPI FileId），逗號分隔
         if files:
             names = [f.get("filename") or f.get("name") or "" for f in files]
             paths = [f.get("file_path") or f.get("id") or "" for f in files]
@@ -469,7 +529,9 @@ async def save_weekly_draft(
             att_file1 = None
             att_file2 = None
 
-        now = datetime.now()
+        import pytz
+        taiwan_tz = pytz.timezone('Asia/Taipei')
+        now = datetime.now(taiwan_tz)
         current_date = now.strftime("%Y%m%d")
         current_time = now.strftime("%H:%M:%S")
 
@@ -535,7 +597,7 @@ async def save_weekly_draft(
                 "weekly_no": weekly_no,
                 "empno": empno,
                 "cocode": cocode,
-                "doc_date": current_date,
+                "doc_date": doc_date,
                 "seq": seq,
                 "subject": subject,
                 "job_item": job_item,
@@ -622,7 +684,7 @@ async def upload_weekly_file(
 
     try:
         empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
 
         logger.info(f"上傳檔案: {file.filename}, empno={empno}, cocode={cocode}, weekly_no={weekly_no}, seq={seq}")
 
@@ -735,7 +797,7 @@ async def get_weekly_report_list(
     try:
         # 使用當前用戶的 empno
         empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
 
         # 構建請求參數
         request_data = {
@@ -793,7 +855,7 @@ async def enhance_weekly_note(
     
     try:
         empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
         
         logger.info(f"🔥 AI潤飾週報: weekly_no={weekly_no}, seq={seq}, ai_service={ai_service}")
         
@@ -1058,7 +1120,7 @@ async def submit_weekly_report(
         # 使用當前用戶的資訊
         empno = current_user.employee.empno
         empname = current_user.employee.empnamec or current_user.employee.name or ""
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
         deptno = current_user.employee.deptno or ""
         g_deptno = current_user.employee.g_deptno or ""
         deptname = current_user.employee.department_name or ""
@@ -1114,10 +1176,13 @@ async def submit_weekly_report(
             }
             content_list.append(content_obj)
 
-        # 計算週的開始和結束日期
-        from app.utils.weekUtils import get_week_start_date, get_week_end_date
-        sdate = get_week_start_date(year, week_no)  # YYYYMMDD
-        edate = get_week_end_date(year, week_no)    # YYYYMMDD
+        # 從 service 取得 sdate/edate（走 cache）
+        from app.services.week_service import get_week_period
+        period = await get_week_period(int(year), int(week_no))
+        sdate = period.start_date
+        edate = period.end_date
+
+        import httpx
 
         # 構建請求參數
         request_data = {
@@ -1187,6 +1252,10 @@ async def submit_weekly_report(
                 db.commit()
 
                 logger.info(f"週報提交成功，已更新草稿狀態: {weekly_no}")
+
+                # 提交成功後清除該員工的 latest submit cache，下次取會拿到新狀態
+                from app.services.week_service import invalidate_latest_submit_cache
+                invalidate_latest_submit_cache(cocode=cocode, empno=empno)
 
             return result
 
@@ -1271,7 +1340,7 @@ async def get_weekly_report_detail(
                 from app.services.commonapi_file_service import CommonApiFileService
                 response_data = result.get("ResponseData") or {}
                 master = response_data.get("weeklyReportMaster") or {}
-                cocode = master.get("cocode") or current_user.employee.cocode or "A"
+                cocode = (master.get("cocode") or current_user.employee.cocode or "A").upper()
                 details = response_data.get("weeklyReportDetails") or []
                 for detail in details:
                     files = []
@@ -1330,7 +1399,7 @@ async def get_forward_candidates(
     """
     try:
         empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
 
         logger.info(f"獲取轉寄候選人: empno={empno}, cocode={cocode}")
 
@@ -1548,7 +1617,7 @@ async def reply_weekly_report(
         # 1. 獲取回覆者資訊
         empno = current_user.employee.empno
         empname = current_user.employee.empnamec or current_user.employee.name or ""
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
 
         weekly_no = request_data.weekly_no
 
@@ -1680,7 +1749,7 @@ async def delete_weekly_report(
 
     try:
         empno = current_user.employee.empno
-        cocode = current_user.employee.cocode or "A"
+        cocode = (current_user.employee.cocode or "A").upper()
 
         logger.info(f"刪除週報: weekly_no={weekly_no}, empno={empno}, cocode={cocode}")
 

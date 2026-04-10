@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     REPLY_WEEKLY_REPORT_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/ReplyWeeklyReport"
     # 刪除週報 API
     DELETE_WEEKLY_REPORT_API_URL: str = "http://10.129.8.248/CommonApi/MyReport/DeleteWeeklyReport"
+    # 週次查詢 API
+    GET_WEEKLY_NO_BY_DATE_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetWeeklyNoByDate"
+    GET_WEEKLY_PERIOD_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetWeeklyPeriod"
+    GET_LATEST_SUBMIT_WEEKLY_NO_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetLastestSubmitWeeklyNo"
 
     # Graylog 設定
     GRAYLOG_HOST: str = ""

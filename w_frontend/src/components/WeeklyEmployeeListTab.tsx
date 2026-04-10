@@ -1,10 +1,8 @@
 // frontend/src/components/WeeklyEmployeeListTab.tsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../hooks/useAuth";
 import WeekSelector from "./WeekSelector";
-import { getCurrentWeek, getWeekStartDate } from "../utils/weekUtils";
-import { getISOWeek, getISOWeekYear, subWeeks } from "date-fns";
 import { WeeklyReportApi } from "../services/weeklyReportApi";
 import { toast } from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -46,15 +44,6 @@ interface WeeklyEmployeeListTabProps {
   onSelectEmployee?: (employee: any, reportId: number) => void;
 }
 
-// 獲取前一週的年份和週次
-const getPreviousWeek = (year: number, week: number): { year: number; week: number } => {
-  const weekStart = getWeekStartDate(year, week);
-  const prevWeekDate = subWeeks(weekStart, 1);
-  return {
-    year: getISOWeekYear(prevWeekDate),
-    week: getISOWeek(prevWeekDate),
-  };
-};
 
 const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   onSelectEmployee,
@@ -73,31 +62,8 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // 檢查 URL 是否有指定週次參數
-  const hasUrlParams = searchParams.get("year") && searchParams.get("week");
-
-  // 獲取初始週次（從 URL 參數或當前週次）
-  const getInitialWeek = (): { year: number; week: number } => {
-    const yearParam = searchParams.get("year");
-    const weekParam = searchParams.get("week");
-
-    if (yearParam && weekParam) {
-      return {
-        year: parseInt(yearParam),
-        week: parseInt(weekParam),
-      };
-    }
-
-    return getCurrentWeek();
-  };
-
-  const [selectedYear, setSelectedYear] = useState<number>(
-    getInitialWeek().year
-  );
-  const [selectedWeek, setSelectedWeek] = useState<number>(
-    getInitialWeek().week
-  );
-  const [hasCheckedSubmitWindow, setHasCheckedSubmitWindow] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(0);
+  const [selectedWeek, setSelectedWeek] = useState<number>(0);
 
   useEffect(() => {
     if (user?.employee?.empno) {
@@ -105,35 +71,48 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
     }
   }, [user]);
 
-  // 檢查是否在提交時間窗口內，決定預設顯示哪一週
+  // 同步 URL 參數到 state（外部跳轉、提交後跳轉都靠這裡）
   useEffect(() => {
-    const checkSubmitWindow = async () => {
-      // 如果 URL 有指定週次，或已經檢查過，就不再調整
-      if (hasUrlParams || hasCheckedSubmitWindow || !authFetch) return;
+    const yearParam = searchParams.get("year");
+    const weekParam = searchParams.get("week");
+    if (yearParam && weekParam) {
+      const y = parseInt(yearParam);
+      const w = parseInt(weekParam);
+      if (y !== selectedYear || w !== selectedWeek) {
+        setSelectedYear(y);
+        setSelectedWeek(w);
+      }
+    }
+  }, [searchParams]);
+
+  // 沒有 URL 參數時，從 API 取得「上一週」資訊（僅執行一次）
+  // 首頁預設顯示上一週（當前週通常還在編輯中）
+  const initialWeekLoadedRef = useRef(false);
+  useEffect(() => {
+    const loadInitialWeek = async () => {
+      if (initialWeekLoadedRef.current || !authFetch) return;
+      // 如果 URL 已有參數（例如提交後跳轉），不覆蓋
+      if (searchParams.get("year") && searchParams.get("week")) {
+        initialWeekLoadedRef.current = true;
+        return;
+      }
+      initialWeekLoadedRef.current = true;
 
       try {
-        const response = await authFetch("/api/weekly/can-submit");
-        if (response.ok) {
-          const data = await response.json();
-          // 如果不在提交時間窗口內（週五 17:00 之前），預設顯示前一週
-          if (!data.in_submit_window) {
-            const current = getCurrentWeek();
-            const prev = getPreviousWeek(current.year, current.week);
-            setSelectedYear(prev.year);
-            setSelectedWeek(prev.week);
-            // 更新 URL 參數
-            navigate(`?tab=weeklyList&year=${prev.year}&week=${prev.week}`, { replace: true });
-          }
-        }
+        // 直接請後端用 GetWeeklyNoByDate 算「7 天前」屬於哪一週（避免跨年問題）
+        // include_drafts=false 因為列表頁不需要草稿，能節省 DB 查詢
+        const data = await WeeklyReportApi.getInit(authFetch, {
+          offset: -1,
+          includeDrafts: false,
+        });
+        navigate(`?tab=weeklyList&year=${data.year}&week=${data.weekly_no}`, { replace: true });
       } catch (error) {
-        console.error("檢查提交時間窗口失敗:", error);
-      } finally {
-        setHasCheckedSubmitWindow(true);
+        console.error("載入初始週次失敗:", error);
       }
     };
 
-    checkSubmitWindow();
-  }, [authFetch, hasUrlParams, hasCheckedSubmitWindow, navigate]);
+    loadInitialWeek();
+  }, [authFetch, navigate, searchParams]);
 
   // 檢查週報是否可編輯/刪除
   const checkReportEditable = async (weeklyNo: string) => {
@@ -158,7 +137,7 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
   // 載入週報列表
   useEffect(() => {
     const loadReports = async () => {
-      if (!authFetch) return;
+      if (!authFetch || !selectedYear || !selectedWeek) return;
 
       setIsLoading(true);
       try {

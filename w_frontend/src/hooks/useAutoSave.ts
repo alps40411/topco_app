@@ -15,6 +15,7 @@ interface AutoSaveOptions {
 /**
  * 自動儲存 Hook
  * 每隔指定時間自動呼叫儲存函數
+ * 支援 pause/resume 機制，防止手動儲存與自動儲存的 race condition
  */
 export function useAutoSave({
   interval = 60000,
@@ -23,11 +24,14 @@ export function useAutoSave({
   hasContent,
 }: AutoSaveOptions) {
   const isSavingRef = useRef<boolean>(false);
-  const lastContentRef = useRef<string>("");
+  const isPausedRef = useRef<boolean>(false);
 
   const save = useCallback(async () => {
     // 防止重複儲存
     if (isSavingRef.current) return;
+
+    // 如果被暫停（手動儲存中），跳過此次自動儲存
+    if (isPausedRef.current) return;
 
     // 檢查是否有內容
     if (!hasContent()) return;
@@ -44,6 +48,16 @@ export function useAutoSave({
     }
   }, [onSave, hasContent]);
 
+  // 暫停自動儲存（手動儲存前呼叫）
+  const pause = useCallback(() => {
+    isPausedRef.current = true;
+  }, []);
+
+  // 恢復自動儲存（手動儲存後呼叫）
+  const resume = useCallback(() => {
+    isPausedRef.current = false;
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -54,6 +68,5 @@ export function useAutoSave({
     return () => clearInterval(timer);
   }, [enabled, interval, save]);
 
-  // 回傳手動觸發儲存的函數
-  return { saveNow: save, isSaving: isSavingRef.current };
+  return { saveNow: save, isSaving: isSavingRef.current, pause, resume };
 }

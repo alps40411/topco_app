@@ -1,14 +1,15 @@
 // frontend/src/components/WeekSelector.tsx
 
-import React, { useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import {
-  formatWeekRange,
-  getCurrentWeek,
-  getISOWeek,
-  getISOWeekYear,
-  getWeekStartDate,
-} from "../utils/weekUtils";
-import { addWeeks } from "date-fns";
+import React, { useEffect, useLayoutEffect, useRef, useState, useMemo } from "react";
+import { WeeklyReportApi } from "../services/weeklyReportApi";
+import { useAuth } from "../hooks/useAuth";
+
+interface WeekItem {
+  year: number;
+  weekly_no: number;
+  startdate: string; // YYYYMMDD
+  enddate: string;   // YYYYMMDD
+}
 
 interface WeekSelectorProps {
   selectedWeek: number;
@@ -17,97 +18,91 @@ interface WeekSelectorProps {
   className?: string;
 }
 
+const DISPLAY_WEEKS_COUNT = 20;
+
+const formatRange = (startdate: string, enddate: string) => {
+  // YYYYMMDD → MM/DD ~ MM/DD
+  if (!startdate || !enddate) return "";
+  const fmt = (s: string) => `${s.substring(4, 6)}/${s.substring(6, 8)}`;
+  return `${fmt(startdate)} ~ ${fmt(enddate)}`;
+};
+
 const WeekSelector: React.FC<WeekSelectorProps> = React.memo(
   ({ selectedWeek, selectedYear, onChange, className = "" }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const selectedWeekBtnRef = useRef<HTMLButtonElement>(null);
+    const { authFetch } = useAuth();
 
-    // 獲取當前周次
-    const { year: currentYear, week: currentWeek } = getCurrentWeek();
+    const [weeks, setWeeks] = useState<WeekItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // 獲取該年度的總週數（ISO 8601 標準）
-    const getTotalWeeksInYear = (year: number): number => {
-      const lastDayOfYear = new Date(year, 11, 31);
-      const lastWeek = getISOWeek(lastDayOfYear);
-      const yearOfLastWeek = getISOWeekYear(lastDayOfYear);
+    // 載入週次列表（一次 API 取得 20 週）
+    useEffect(() => {
+      if (!authFetch) return;
+      let cancelled = false;
 
-      // 如果 12/31 屬於下一年的第 1 周，該年實際周數更少
-      if (yearOfLastWeek !== year) {
-        const dec30 = new Date(year, 11, 30);
-        return getISOWeek(dec30);
-      }
+      WeeklyReportApi.getWeekList(authFetch, DISPLAY_WEEKS_COUNT)
+        .then((data) => {
+          if (!cancelled) {
+            setWeeks(data.weeks);
+            setIsLoading(false);
+          }
+        })
+        .catch((err) => {
+          console.error("WeekSelector 載入週次列表失敗:", err);
+          if (!cancelled) setIsLoading(false);
+        });
 
-      return lastWeek;
-    };
+      return () => {
+        cancelled = true;
+      };
+    }, [authFetch]);
 
-    // 定義週次項目類型
-    interface WeekItem {
-      year: number;
-      week: number;
-    }
+    // 找出當前選中週次的日期範圍
+    const selectedRangeText = useMemo(() => {
+      const selected = weeks.find(
+        (w) => w.year === selectedYear && w.weekly_no === selectedWeek
+      );
+      if (selected) return formatRange(selected.startdate, selected.enddate);
+      return "";
+    }, [weeks, selectedYear, selectedWeek]);
 
-    // 固定顯示範圍：當前周往前推 N 周，當前周在最右邊
-    const DISPLAY_WEEKS_COUNT = 20; // 顯示的周次數量
-
-    const allWeeks = useMemo((): WeekItem[] => {
-      const weeks: WeekItem[] = [];
-
-      // 總是基於當前周顯示，從當前周往前推指定數量的周次
-      // 當前周在最右邊
-      for (let i = DISPLAY_WEEKS_COUNT - 1; i >= 0; i--) {
-        const targetDate = addWeeks(
-          getWeekStartDate(currentYear, currentWeek),
-          -i
-        );
-        const weekYear = getISOWeekYear(targetDate);
-        const weekNum = getISOWeek(targetDate);
-        weeks.push({ year: weekYear, week: weekNum });
-      }
-
-      return weeks;
-    }, [currentYear, currentWeek]);
-
-    // 當前選中週次的日期範圍
-    const selectedWeekRange = useMemo(() => {
-      return formatWeekRange(selectedYear, selectedWeek);
-    }, [selectedYear, selectedWeek]);
-
-    // 只在初始載入時設置滾動位置（當前周在最右邊），之後保持不動
+    // 初始化滾動位置 — 滾到最右邊（顯示當前週）
     const hasScrolledRef = useRef(false);
-
     useLayoutEffect(() => {
-      if (scrollContainerRef.current && !hasScrolledRef.current) {
+      if (scrollContainerRef.current && !hasScrolledRef.current && weeks.length > 0) {
         const container = scrollContainerRef.current;
-        // 初始載入時，滾動到最右邊（顯示當前周）
         container.scrollLeft = container.scrollWidth - container.clientWidth;
         hasScrolledRef.current = true;
       }
-    }, [allWeeks]); // 只在周次列表變化時執行一次
+    }, [weeks]);
 
-    // 監聽窗口大小變化，重新調整滾動位置
+    // 視窗大小變化時重新滾動到當前週（如果選中的是當前週）
     useEffect(() => {
       const handleResize = () => {
-        if (
-          scrollContainerRef.current &&
-          selectedYear === currentYear &&
-          selectedWeek === currentWeek
-        ) {
+        if (!scrollContainerRef.current || weeks.length === 0) return;
+        const lastWeek = weeks[weeks.length - 1];
+        if (lastWeek && selectedYear === lastWeek.year && selectedWeek === lastWeek.weekly_no) {
           const container = scrollContainerRef.current;
           container.scrollLeft = container.scrollWidth - container.clientWidth;
         }
       };
-
       window.addEventListener("resize", handleResize);
       return () => window.removeEventListener("resize", handleResize);
-    }, [selectedWeek, selectedYear, currentWeek, currentYear]);
+    }, [weeks, selectedWeek, selectedYear]);
 
-    const handleWeekClick = (year: number, week: number) => {
-      onChange(year, week);
-    };
+    if (isLoading || weeks.length === 0) {
+      return (
+        <div className={`w-full ${className}`}>
+          <div className="w-full h-[76px] bg-white border border-gray-200 rounded-lg shadow-sm p-4 flex items-center justify-center text-gray-400">
+            載入週次中...
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className={`w-full ${className}`}>
-        {/* 新設計：簡潔優雅的水平週次選擇器 */}
         <div className="w-full bg-white border border-gray-200 rounded-lg shadow-sm p-4">
           <div className="flex items-center gap-6">
             {/* 週次按鈕列表（可滾動） */}
@@ -117,18 +112,14 @@ const WeekSelector: React.FC<WeekSelectorProps> = React.memo(
               style={{ scrollBehavior: "smooth" }}
             >
               <div className="flex gap-3 min-w-max items-center pl-2 pr-1 min-h-[44px]">
-                {allWeeks.map((weekItem) => {
+                {weeks.map((w) => {
                   const isSelected =
-                    weekItem.year === selectedYear &&
-                    weekItem.week === selectedWeek;
-
+                    w.year === selectedYear && w.weekly_no === selectedWeek;
                   return (
                     <button
-                      key={`${weekItem.year}-${weekItem.week}`}
+                      key={`${w.year}-${w.weekly_no}`}
                       ref={isSelected ? selectedWeekBtnRef : null}
-                      onClick={() =>
-                        handleWeekClick(weekItem.year, weekItem.week)
-                      }
+                      onClick={() => onChange(w.year, w.weekly_no)}
                       className={`
                       min-w-[36px] h-[36px] flex items-center justify-center rounded-full text-sm font-medium transition-all duration-300 ease-in-out
                       ${
@@ -137,9 +128,9 @@ const WeekSelector: React.FC<WeekSelectorProps> = React.memo(
                           : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
                       }
                     `}
-                      title={formatWeekRange(weekItem.year, weekItem.week)}
+                      title={formatRange(w.startdate, w.enddate)}
                     >
-                      {weekItem.week}
+                      {w.weekly_no}
                     </button>
                   );
                 })}
@@ -152,13 +143,12 @@ const WeekSelector: React.FC<WeekSelectorProps> = React.memo(
                 {selectedYear}
               </div>
               <div className="text-xs text-gray-600 mt-1 whitespace-nowrap font-medium">
-                {selectedWeekRange}
+                {selectedRangeText || "..."}
               </div>
             </div>
           </div>
         </div>
 
-        {/* 添加自定義 CSS 來隱藏滾動條但保持滾動功能 */}
         <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;

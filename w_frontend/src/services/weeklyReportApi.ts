@@ -2,20 +2,28 @@
 
 import { apiConfig, buildApiUrl } from "../config/api";
 
-// 工作項目映射（將字符串映射為 ID）
-const JOB_ITEM_MAP: { [key: number]: string } = {
-  1: "營收報告",
-  2: "工作重點",
-  3: "應收帳款追蹤",
-  4: "原廠說明",
-};
+// 工作項目列表（與後端 JOB_ITEMS 對齊，1-based index）
+const JOB_ITEMS_LIST = [
+  "營收報告",     // 1
+  "工作重點",     // 2
+  "應收帳款追蹤", // 3
+  "原廠說明",     // 4
+  "市場動態",     // 5
+  "競爭者資訊",   // 6
+  "專案",         // 7
+  "部門人事",     // 8
+  "其他",         // 9
+];
 
-const JOB_ITEM_REVERSE_MAP: { [key: string]: number } = {
-  營收報告: 1,
-  工作重點: 2,
-  應收帳款追蹤: 3,
-  原廠說明: 4,
-};
+// ID → 名稱
+const JOB_ITEM_MAP: { [key: number]: string } = Object.fromEntries(
+  JOB_ITEMS_LIST.map((name, i) => [i + 1, name])
+);
+
+// 名稱 → ID
+const JOB_ITEM_REVERSE_MAP: { [key: string]: number } = Object.fromEntries(
+  JOB_ITEMS_LIST.map((name, i) => [name, i + 1])
+);
 
 // API 回傳的原始資料型別
 export interface WeeklyReportListData {
@@ -87,9 +95,9 @@ export class WeeklyReportApi {
       if (!response.ok) throw new Error("Failed to load job items");
 
       const data = await response.json();
-      // 將字符串陣列轉換為 { id, name } 格式
-      return data.job_items.map((item: string) => ({
-        id: JOB_ITEM_REVERSE_MAP[item] || 0,
+      // 將字符串陣列轉換為 { id, name } 格式，使用 1-based index
+      return data.job_items.map((item: string, index: number) => ({
+        id: JOB_ITEM_REVERSE_MAP[item] || (index + 1),
         name: item,
       }));
     } catch (error) {
@@ -256,6 +264,8 @@ export class WeeklyReportApi {
       const payload = {
         weekly_no: weeklyNo,
         seq: seq,
+        year: data.year,
+        week: data.week,
         subject: data.subject,
         job_item: JOB_ITEM_MAP[data.work_item_id || 1],
         content: data.content,
@@ -416,33 +426,116 @@ export class WeeklyReportApi {
   }
 
   /**
-   * 獲取週報草稿（保持相容性）
+   * 一次取得週報初始化資料：當前應交週次 + 該週草稿列表
+   *
+   * @param year/week 指定週次（首頁用）
+   * @param offset 從今天偏移週數（-1=上週）；只在沒給 year/week 時生效
+   * @param includeDrafts 是否查詢 DB 拿草稿（首頁不需要時設 false 加快速度）
    */
-  static async getDraft(
-    year: number,
-    week: number,
-    empno: string,
-    authFetch: Function
+  static async getInit(
+    authFetch: Function,
+    options: {
+      year?: number;
+      week?: number;
+      offset?: number;
+      includeDrafts?: boolean;
+    } = {}
   ) {
-    const result = await this.getWeeklyNotes(year, week, empno, authFetch);
-    return result.notes.length > 0 ? result : null;
+    try {
+      let url = buildApiUrl(apiConfig.endpoints.weekly.init);
+      const params: string[] = [];
+      if (options.year) params.push(`year=${options.year}`);
+      if (options.week) params.push(`week=${options.week}`);
+      if (options.offset) params.push(`offset=${options.offset}`);
+      if (options.includeDrafts === false) params.push(`include_drafts=false`);
+      if (params.length) url += `?${params.join("&")}`;
+
+      const response = await authFetch(url);
+      if (!response.ok) throw new Error("取得週報初始資料失敗");
+
+      const data = await response.json();
+
+      // 轉換 drafts 為前端格式
+      const notes = (data.drafts || []).map((draft: any) => ({
+        id: draft.seq,
+        work_item_id: JOB_ITEM_REVERSE_MAP[draft.job_item] || 1,
+        work_item_name: draft.job_item,
+        subject: draft.subject || "",
+        content: draft.content || "",
+        files: (draft.files || []).map((file: any) => ({
+          id: file.id || 0,
+          name: file.filename || file.name || "",
+          type: file.file_type || file.type || "",
+          size: file.file_size || file.size || 0,
+          url: file.url || "",
+          file_path: file.file_path || "",
+          is_selected_for_ai: file.is_selected_for_ai || false,
+        })),
+        ai_content: draft.ai_content || undefined,
+        ai_service: draft.ai_service || undefined,
+        weekly_no: draft.weekly_no,
+        seq: draft.seq,
+      }));
+
+      return {
+        year: data.year as number,
+        weekly_no: data.weekly_no as number,
+        can_send: data.can_send as boolean,
+        startdate: data.startdate as string,  // YYYYMMDD
+        enddate: data.enddate as string,      // YYYYMMDD
+        weekly_no_id: data.weekly_no_id as string,  // 週報編號（DB 用）
+        notes,
+      };
+    } catch (error) {
+      console.error("取得週報初始資料失敗:", error);
+      throw error;
+    }
   }
 
   /**
-   * 獲取週報編號
+   * 取得當前週往前 count 週的列表（給 WeekSelector）
+   * 結果按時間升冪排序（最舊在前，當前在最後）
    */
-  static async getWeeklyNo(year: number, week: number, authFetch: Function) {
+  static async getWeekList(authFetch: Function, count: number = 20) {
     try {
-      const url = `${buildApiUrl(
-        apiConfig.endpoints.weekly.weeklyNo
-      )}?year=${year}&week=${week}`;
+      const url = `${buildApiUrl(apiConfig.endpoints.weekly.weekList)}?count=${count}`;
       const response = await authFetch(url);
-
-      if (!response.ok) throw new Error("Failed to get weekly_no");
-
-      return response.json();
+      if (!response.ok) throw new Error("取得週次列表失敗");
+      return response.json() as Promise<{
+        weeks: Array<{
+          year: number;
+          weekly_no: number;
+          startdate: string; // YYYYMMDD
+          enddate: string;   // YYYYMMDD
+        }>;
+      }>;
     } catch (error) {
-      console.error("獲取週報編號失敗:", error);
+      console.error("取得週次列表失敗:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 根據年份和週次取得日期區間（後端 cache，幾乎不會打 CommonAPI）
+   * 回傳 YYYYMMDD 格式
+   */
+  static async getWeekPeriod(
+    year: number,
+    weeklyNo: number,
+    authFetch: Function
+  ) {
+    try {
+      const url = `${buildApiUrl(apiConfig.endpoints.weekly.weekPeriod)}?year=${year}&weeklyNo=${weeklyNo}`;
+      const response = await authFetch(url);
+      if (!response.ok) throw new Error("取得日期區間失敗");
+      return response.json() as Promise<{
+        year: number;
+        weekly_no: number;
+        startdate: string;  // YYYYMMDD
+        enddate: string;    // YYYYMMDD
+      }>;
+    } catch (error) {
+      console.error("取得日期區間失敗:", error);
       throw error;
     }
   }

@@ -96,6 +96,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 當父元件的 initialComments 變化時同步更新
+  useEffect(() => {
+    setComments(initialComments);
+  }, [initialComments]);
   const navigate = useNavigate();
 
   // 審閱相關狀態

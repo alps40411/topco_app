@@ -31,6 +31,9 @@ export const apiConfig = {
         `/api/weekly/drafts/${weeklyNo}/${seq}`,
       reportList: "/api/weekly/report-list", // 週報列表
       reply: "/api/weekly/reply", // 回覆週報
+      init: "/api/weekly/init", // 一次取得當前週次 + 草稿
+      weekPeriod: "/api/weekly/week-period", // 週次→日期區間（後端有 cache）
+      weekList: "/api/weekly/week-list", // 週次列表（給 WeekSelector）
     },
   },
 };
