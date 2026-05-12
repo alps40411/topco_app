@@ -1,6 +1,6 @@
 // frontend/src/components/WeeklyReportTab.tsx
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Save,
   Upload,
@@ -115,6 +115,13 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   // 提交狀態
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 自動提交週報狀態
+  const [autoSubmitEnabled, setAutoSubmitEnabled] = useState<boolean>(false);
+  const [autoSubmitDone, setAutoSubmitDone] = useState<boolean>(false); // status='P' 已執行
+  const [autoSubmitCutoff, setAutoSubmitCutoff] = useState<number>(0);   // 勾選截止（週日 24:00）
+  const [autoSubmitExecution, setAutoSubmitExecution] = useState<number>(0); // batch 執行（週一 08:00）
+  const [autoSubmitBusy, setAutoSubmitBusy] = useState<boolean>(false);  // 防止重複切換
+
   // 提交/編輯權限狀態
   const [canSubmit, setCanSubmit] = useState<boolean>(true);
   const [hasReplies, setHasReplies] = useState<boolean>(false); // 是否已被主管審閱
@@ -159,6 +166,30 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       setCanSubmit(data.can_send);
       setWeeklyNo(data.weekly_no_id);
       setWeeklyNotes(data.notes);
+
+      // 自動繳交時間點
+      if (data.auto_submit_cutoff) {
+        setAutoSubmitCutoff(new Date(data.auto_submit_cutoff).getTime());
+      }
+      if (data.auto_submit_execution) {
+        setAutoSubmitExecution(new Date(data.auto_submit_execution).getTime());
+      }
+
+      // 還原自動繳交勾選狀態（失敗不阻塞主流程）
+      if (data.weekly_no_id) {
+        try {
+          const r = await WeeklyReportApi.getAutoSubmitStatus(
+            data.weekly_no_id,
+            authFetch,
+          );
+          setAutoSubmitEnabled(r.status === "Y");
+          setAutoSubmitDone(r.status === "P");
+        } catch (e) {
+          console.error("取得自動繳交狀態失敗:", e);
+          setAutoSubmitEnabled(false);
+          setAutoSubmitDone(false);
+        }
+      }
 
       // 顯示日期範圍：YYYYMMDD → MM/DD ~ MM/DD
       if (data.startdate && data.enddate) {
@@ -386,8 +417,25 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
     hasContent: hasEditContent,
   });
 
+  // 取消自動繳交（fire-and-forget，用於規則 2/3 內部呼叫）
+  const cancelAutoSubmitSilent = useCallback(() => {
+    if (!autoSubmitEnabled || !weeklyNo || !authFetch) return;
+    setAutoSubmitEnabled(false);
+    WeeklyReportApi.setAutoSubmit(
+      weeklyNo,
+      currentYear,
+      currentWeek,
+      "N",
+      authFetch,
+    ).catch((err) => {
+      console.error("自動取消自動繳交失敗:", err);
+    });
+  }, [autoSubmitEnabled, weeklyNo, currentYear, currentWeek, authFetch]);
+
   // 開始新增筆記
   const startAddNew = () => {
+    // 規則 2：點擊新增筆記時自動取消自動提交
+    cancelAutoSubmitSilent();
     // 清除之前的 seq ref
     newNoteSeqRef.current = null;
 
@@ -510,6 +558,8 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
 
   // 開始編輯筆記
   const startEdit = (note: WeeklyNote) => {
+    // 規則 2：點擊編輯筆記時自動取消自動提交
+    cancelAutoSubmitSilent();
     setEditingNoteId(note.id);
     setEditWorkItemId(note.work_item_id);
     setEditSubject(note.subject);
@@ -899,6 +949,9 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       if (result.ResponseNa === "週報儲存成功") {
         toast.success("週報已提交成功！");
 
+        // 規則 3：手動提交成功後同步取消自動繳交設定
+        cancelAutoSubmitSilent();
+
         // 跳轉到提交的那一週的週報首頁
         if (onUploadComplete) {
           onUploadComplete(submittedYear, submittedWeek);
@@ -912,6 +965,59 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       toast.error(`提交失敗: ${error.message || "未知錯誤"}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // 自動提交週報：禁用判斷與切換 handler
+  // 注意：can_send=false 不代表不能勾自動繳交（自動繳交本來就是在工作週中先設定，
+  // 此時 can_send 必然為 false），所以 disabled 條件不可加 !canSubmit
+  const isAutoSubmitDisabled = useMemo(() => {
+    if (autoSubmitBusy) return true;
+    if (autoSubmitDone) return true; // status='P' 已執行
+    if (weeklyNotes.length === 0) return true; // 規則 1
+    if (autoSubmitCutoff > 0 && Date.now() >= autoSubmitCutoff) return true; // 規則 4
+    if (editingNoteId !== null || isAddingNew) return true; // 編輯中不可切換
+    if (hasReplies) return true; // 已被主管審閱
+    return false;
+  }, [
+    autoSubmitBusy,
+    autoSubmitDone,
+    weeklyNotes.length,
+    autoSubmitCutoff,
+    editingNoteId,
+    isAddingNew,
+    hasReplies,
+  ]);
+
+  const handleAutoSubmitToggle = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (autoSubmitCutoff > 0 && Date.now() >= autoSubmitCutoff) {
+      toast("已超過自動繳交設定時限，請自行上傳週報");
+      return;
+    }
+    if (!weeklyNo || !authFetch) return;
+
+    const next = e.target.checked ? "Y" : "N";
+    setAutoSubmitBusy(true);
+    // 先樂觀更新 UI，失敗再回滾
+    const prev = autoSubmitEnabled;
+    setAutoSubmitEnabled(next === "Y");
+    try {
+      await WeeklyReportApi.setAutoSubmit(
+        weeklyNo,
+        currentYear,
+        currentWeek,
+        next,
+        authFetch,
+      );
+      toast.success(next === "Y" ? "已啟用自動提交週報" : "已取消自動提交週報");
+    } catch (err: any) {
+      console.error(err);
+      setAutoSubmitEnabled(prev);
+      toast.error(err.message || "設定自動提交失敗");
+    } finally {
+      setAutoSubmitBusy(false);
     }
   };
 
@@ -974,6 +1080,38 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
             <span className="sm:hidden">預覽</span>
           </button>
 
+          {/* 自動提交週報 */}
+          <label
+            className={`inline-flex items-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg border flex-shrink-0 ${
+              isAutoSubmitDisabled
+                ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer"
+            }`}
+            title={
+              autoSubmitDone
+                ? "已自動上傳完成"
+                : weeklyNotes.length === 0
+                ? "需先填寫筆記後才可啟用"
+                : autoSubmitCutoff > 0 && Date.now() >= autoSubmitCutoff
+                ? "已超過自動繳交設定時限，請自行上傳週報"
+                : ""
+            }
+          >
+            <input
+              type="checkbox"
+              className="mr-2 h-4 w-4 accent-blue-600 disabled:cursor-not-allowed"
+              checked={autoSubmitEnabled}
+              disabled={isAutoSubmitDisabled}
+              onChange={handleAutoSubmitToggle}
+            />
+            <span className="hidden sm:inline">
+              {autoSubmitDone ? "已自動上傳完成" : "自動提交週報"}
+            </span>
+            <span className="sm:hidden">
+              {autoSubmitDone ? "已上傳" : "自動提交"}
+            </span>
+          </label>
+
           {/* 提交週報 */}
           <button
             onClick={handleSubmitWeekly}
@@ -996,6 +1134,22 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 自動提交週報提示 */}
+      {autoSubmitEnabled && !autoSubmitDone && autoSubmitExecution > 0 && (
+        <div className="mb-3 sm:mb-4 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-700">
+          已啟用自動提交週報，系統將於{" "}
+          <span className="font-semibold">
+            {new Date(autoSubmitExecution).toLocaleString("zh-TW", {
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>{" "}
+          自動上傳本週週報。
+        </div>
+      )}
 
       {/* 逾期應收帳款和營收達成率表格 */}
       <OverdueARTable data={overdueARData} isLoading={isLoadingTables} />

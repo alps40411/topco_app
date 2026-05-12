@@ -74,7 +74,9 @@ class Settings(BaseSettings):
     # 週次查詢 API
     GET_WEEKLY_NO_BY_DATE_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetWeeklyNoByDate"
     GET_WEEKLY_PERIOD_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetWeeklyPeriod"
-    GET_LATEST_SUBMIT_WEEKLY_NO_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetLastestSubmitWeeklyNo"
+    # 自動繳交週報 API
+    SET_AUTO_SUBMIT_URL: str = "http://10.129.8.248/CommonApi/MyReport/SetAutoSubmit"
+    GET_AUTO_SUBMIT_RECORDS_URL: str = "http://10.129.8.248/CommonApi/MyReport/GetAutoSubmitRecords"
 
     # Graylog 設定
     GRAYLOG_HOST: str = ""

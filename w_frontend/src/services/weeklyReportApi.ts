@@ -483,13 +483,59 @@ export class WeeklyReportApi {
         can_send: data.can_send as boolean,
         startdate: data.startdate as string,  // YYYYMMDD
         enddate: data.enddate as string,      // YYYYMMDD
-        weekly_no_id: data.weekly_no_id as string,  // 週報編號（DB 用）
+        weekly_no_id: (data.weekly_no_id || "") as string,  // 週報編號（DB 用）；尚無 draft 時為 ""
         notes,
+        auto_submit_cutoff: data.auto_submit_cutoff as string,   // ISO timestamp
+        auto_submit_execution: data.auto_submit_execution as string, // ISO timestamp
       };
     } catch (error) {
       console.error("取得週報初始資料失敗:", error);
       throw error;
     }
+  }
+
+  /**
+   * 設定或取消自動繳交週報
+   * @param status 'Y' = 啟用; 'N' = 停用
+   */
+  static async setAutoSubmit(
+    weeklyNo: string,
+    year: number,
+    weekNo: number,
+    status: "Y" | "N",
+    authFetch: Function,
+  ) {
+    const url = buildApiUrl(apiConfig.endpoints.weekly.autoSubmit);
+    const response = await authFetch(url, {
+      method: "POST",
+      body: JSON.stringify({
+        weekly_no: weeklyNo,
+        year,
+        week_no: weekNo,
+        status,
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`設定自動繳交失敗: ${text || response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * 取得當前使用者於指定 weekly_no 的自動繳交狀態
+   * 回傳 status: 'Y' | 'N' | 'P'
+   */
+  static async getAutoSubmitStatus(
+    weeklyNo: string,
+    authFetch: Function,
+  ): Promise<{ status: "Y" | "N" | "P" }> {
+    const url = `${buildApiUrl(apiConfig.endpoints.weekly.autoSubmit)}/${weeklyNo}`;
+    const response = await authFetch(url);
+    if (!response.ok) {
+      throw new Error(`取得自動繳交狀態失敗: ${response.statusText}`);
+    }
+    return response.json();
   }
 
   /**

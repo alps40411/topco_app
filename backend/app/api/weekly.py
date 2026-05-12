@@ -196,20 +196,26 @@ async def api_get_week_period(
 
 
 @router.get("/week-list")
-async def api_get_week_list(count: int = 20):
+async def api_get_week_list(
+    count: int = 20,
+    current_user: UserSchema = Depends(get_current_user),
+):
     """
     取得當前週往前 count 週的列表（給 WeekSelector 使用）
     回傳 [{year, weekly_no, startdate, enddate}, ...]
     當前週在最後（最右邊）
 
-    後端先用 GetWeeklyNoByDate 一次拿到當前週，再用 offset 計算各週日期
+    後端用 GetWeeklyNoByDate 取各 offset 週的資訊（新 API 需 cocode/empno）
     """
-    from app.services.week_service import get_week_by_date, _today_taiwan
+    from app.services.week_service import get_week_by_date
     from datetime import timedelta
     import pytz
 
+    empno = current_user.employee.empno
+    cocode = (current_user.employee.cocode or "A").upper()
+
     try:
-        taiwan_tz = pytz.timezone('Asia/Taipei')
+        taiwan_tz = pytz.timezone("Asia/Taipei")
         now = datetime.now(taiwan_tz)
 
         # 並行呼叫 count 個 GetWeeklyNoByDate（後端會 cache 同一週次的結果）
@@ -217,8 +223,8 @@ async def api_get_week_list(count: int = 20):
         import asyncio
         tasks = []
         for i in range(count - 1, -1, -1):  # i = count-1, count-2, ..., 0
-            target_date = (now - timedelta(weeks=i)).strftime("%Y/%m/%d")
-            tasks.append(get_week_by_date(target_date))
+            target_date = (now - timedelta(weeks=i)).strftime("%Y-%m-%d %H:%M")
+            tasks.append(get_week_by_date(target_date, cocode, empno))
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -367,10 +373,10 @@ async def get_weekly_init(
     """
     from datetime import timedelta
     from app.services.week_service import (
-        get_latest_submit_week,
         get_week_period,
         get_week_by_date,
-        _today_taiwan,
+        _now_taiwan_with_minute,
+        compute_auto_submit_times,
     )
     import pytz
 
@@ -378,50 +384,60 @@ async def get_weekly_init(
     cocode = (current_user.employee.cocode or "A").upper()
 
     try:
+        now_with_minute = _now_taiwan_with_minute()
+        # 現在應交週次（包含 can_send / workweek_monday / workweek_friday）
+        current_info = await get_week_by_date(now_with_minute, cocode, empno)
+        workweek_monday: Optional[str] = current_info.workweek_monday
+        workweek_friday: Optional[str] = current_info.workweek_friday
+
         if year and week:
-            # 1. 指定週次
+            # 1. 指定週次：用 get_week_period 取得日期；can_send 以是否為當前應交週判斷
             period = await get_week_period(year, week)
             target_year = year
             target_week = week
             start_date = period.start_date
             end_date = period.end_date
-            try:
-                latest = await get_latest_submit_week(cocode, empno)
-                can_send = (latest.year == year and latest.weekly_no == week and latest.can_send)
-            except Exception:
-                can_send = False
+            can_send = (
+                current_info.year == year
+                and current_info.weekly_no == week
+                and bool(current_info.can_send)
+            )
+            # 指定週次時，workweek 仍以「當前應交週」為準（提交僅發生在當前週）
         elif offset != 0:
-            # 2. 從今天偏移指定週數
-            taiwan_tz = pytz.timezone('Asia/Taipei')
-            target_date = (datetime.now(taiwan_tz) + timedelta(weeks=offset)).strftime("%Y/%m/%d")
-            info = await get_week_by_date(target_date)
+            # 2. 從今天偏移指定週數（顯示某週的草稿與日期）
+            taiwan_tz = pytz.timezone("Asia/Taipei")
+            target_dt = datetime.now(taiwan_tz) + timedelta(weeks=offset)
+            target_date_with_minute = target_dt.strftime("%Y-%m-%d %H:%M")
+            info = await get_week_by_date(target_date_with_minute, cocode, empno)
             target_year = info.year
             target_week = info.weekly_no
             start_date = info.start_date
             end_date = info.end_date
-            try:
-                latest = await get_latest_submit_week(cocode, empno)
-                can_send = (latest.year == target_year and latest.weekly_no == target_week and latest.can_send)
-            except Exception:
-                can_send = False
+            can_send = (
+                current_info.year == target_year
+                and current_info.weekly_no == target_week
+                and bool(current_info.can_send)
+            )
         else:
             # 3. 應交週次（含補交邏輯）
-            latest = await get_latest_submit_week(cocode, empno)
-            target_year = latest.year
-            target_week = latest.weekly_no
-            start_date = latest.start_date
-            end_date = latest.end_date
-            can_send = latest.can_send
+            target_year = current_info.year
+            target_week = current_info.weekly_no
+            start_date = current_info.start_date
+            end_date = current_info.end_date
+            can_send = bool(current_info.can_send)
 
         # 查詢草稿（可選）
+        # 注意：若該員工本週尚未有任何 draft，weekly_no_found 會是 None；
+        # 此處 **不再** 從 sequence 預先分配 weekly_no（避免每次進首頁/換頁都消耗 nextval）。
+        # 真正的 weekly_no 會在使用者儲存第一筆 draft 時於 POST /drafts 內產生。
         drafts = []
         weekly_no_found = None
         if include_drafts:
             drafts, weekly_no_found = _query_drafts_by_date_range(
                 db, empno, cocode, start_date, end_date
             )
-            if not weekly_no_found:
-                weekly_no_found = generate_weekly_no(db)
+
+        auto_submit_cutoff, auto_submit_execution = compute_auto_submit_times(end_date)
 
         return {
             "year": target_year,
@@ -431,6 +447,10 @@ async def get_weekly_init(
             "enddate": end_date,
             "weekly_no_id": weekly_no_found,
             "drafts": drafts,
+            "auto_submit_cutoff": auto_submit_cutoff,
+            "auto_submit_execution": auto_submit_execution,
+            "workweek_monday": workweek_monday,
+            "workweek_friday": workweek_friday,
         }
     except Exception as e:
         logger.error(f"取得 weekly init 失敗: {str(e)}")
@@ -460,9 +480,8 @@ async def get_weekly_drafts(
         db, empno, cocode, period.start_date, period.end_date
     )
 
-    if not weekly_no_found:
-        weekly_no_found = generate_weekly_no(db)
-
+    # 不在此處消耗 sequence；若本週尚無 draft，weekly_no 回傳 None，
+    # 由 POST /drafts 儲存第一筆時再產生。
     return {
         "weekly_no": weekly_no_found,
         "year": year,
@@ -503,8 +522,10 @@ async def save_weekly_draft(
         week_info = draft_data.get("week")
 
         # 驗證必填欄位
-        if not weekly_no:
-            raise HTTPException(status_code=400, detail="缺少 weekly_no")
+        # 編輯既有 draft（有 seq）一定要帶 weekly_no；新增 draft（無 seq）允許空 weekly_no，
+        # 後續會在新增分支內呼叫 generate_weekly_no 預配
+        if seq and not weekly_no:
+            raise HTTPException(status_code=400, detail="編輯草稿需提供 weekly_no")
         if not job_item or job_item not in JOB_ITEMS:
             raise HTTPException(status_code=400, detail="無效的工作項目")
         if not year_info or not week_info:
@@ -1176,11 +1197,12 @@ async def submit_weekly_report(
             }
             content_list.append(content_obj)
 
-        # 從 service 取得 sdate/edate（走 cache）
-        from app.services.week_service import get_week_period
-        period = await get_week_period(int(year), int(week_no))
-        sdate = period.start_date
-        edate = period.end_date
+        # 取得 workweek_monday / workweek_friday 作為 sdate / edate（填入 master.sdate/edate）
+        from app.services.week_service import get_week_by_date, _now_taiwan_with_minute
+        now_with_minute = _now_taiwan_with_minute()
+        wk_info = await get_week_by_date(now_with_minute, cocode, empno)
+        sdate = wk_info.workweek_monday or wk_info.start_date
+        edate = wk_info.workweek_friday or wk_info.end_date
 
         import httpx
 
@@ -1253,9 +1275,9 @@ async def submit_weekly_report(
 
                 logger.info(f"週報提交成功，已更新草稿狀態: {weekly_no}")
 
-                # 提交成功後清除該員工的 latest submit cache，下次取會拿到新狀態
-                from app.services.week_service import invalidate_latest_submit_cache
-                invalidate_latest_submit_cache(cocode=cocode, empno=empno)
+                # 提交成功後清除該員工的應交週次快取，下次取會拿到新狀態
+                from app.services.week_service import invalidate_user_week_cache
+                invalidate_user_week_cache(cocode=cocode, empno=empno)
 
             return result
 
@@ -1271,6 +1293,115 @@ async def submit_weekly_report(
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"提交週報失敗: {str(e)}")
+
+
+@router.post("/auto-submit")
+async def set_auto_submit(
+    payload: Dict[str, Any],
+    current_user: UserSchema = Depends(get_current_user),
+):
+    """
+    啟用 / 取消自動繳交週報
+
+    payload: { weekly_no, year, week_no, status: 'Y'|'N' }
+    """
+    import httpx
+    from app.core.config import settings
+
+    empno = current_user.employee.empno
+    cocode = (current_user.employee.cocode or "A").upper()
+    weekly_no = payload.get("weekly_no")
+    year = payload.get("year")
+    week_no = payload.get("week_no")
+    status = payload.get("status")
+
+    if status not in ("Y", "N"):
+        raise HTTPException(status_code=400, detail="status 必須為 Y 或 N")
+    if not weekly_no or year is None or week_no is None:
+        raise HTTPException(status_code=400, detail="缺少必要參數 weekly_no/year/week_no")
+
+    request_data = {
+        "weekly_no": int(weekly_no),
+        "yy": str(year),
+        "week_no": int(week_no),
+        "cocode": cocode,
+        "empno": empno,
+        "status": status,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                settings.SET_AUTO_SUBMIT_URL,
+                json=request_data,
+                headers={"Content-Type": "application/json"},
+            )
+            if response.status_code != 200:
+                logger.error(f"SetAutoSubmit CommonAPI 失敗: {response.status_code}, {response.text}")
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"CommonAPI 調用失敗: {response.text}",
+                )
+            return response.json()
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="請求超時")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail=f"請求錯誤: {str(e)}")
+
+
+@router.get("/auto-submit/{weekly_no}")
+async def get_auto_submit_records(
+    weekly_no: str,
+    current_user: UserSchema = Depends(get_current_user),
+):
+    """
+    依 weekly_no 取得自動繳交設定紀錄（過濾為當前使用者）。
+
+    回傳:
+      { status: 'Y'|'N'|'P' }  # 找不到紀錄則為 'N'
+    """
+    import httpx
+    from app.core.config import settings
+
+    empno = current_user.employee.empno
+    cocode = (current_user.employee.cocode or "A").upper()
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                settings.GET_AUTO_SUBMIT_RECORDS_URL,
+                json={"weekly_no": int(weekly_no)},
+                headers={"Content-Type": "application/json"},
+            )
+            if response.status_code != 200:
+                logger.error(f"GetAutoSubmitRecords CommonAPI 失敗: {response.status_code}, {response.text}")
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"CommonAPI 調用失敗: {response.text}",
+                )
+
+            result = response.json()
+            records = result.get("ResponseData") or []
+            # CommonAPI 的 ResponseData 可能是 list 或 string，只在 list 時取
+            if not isinstance(records, list):
+                records = []
+
+            my_record = None
+            for r in records:
+                if not isinstance(r, dict):
+                    continue
+                rec_empno = str(r.get("empno", "")).strip()
+                rec_cocode = str(r.get("cocode", "")).strip().upper()
+                if rec_empno == empno and rec_cocode == cocode:
+                    my_record = r
+                    break
+
+            status_val = (my_record.get("status") if my_record else "N") or "N"
+            return {"status": status_val}
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="請求超時")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail=f"請求錯誤: {str(e)}")
 
 
 @router.get("/report-detail/{weekly_no}")
