@@ -29,6 +29,10 @@ import RevenueTable from "./RevenueTable";
 import WeeklyReportPreviewModal from "./WeeklyReportPreviewModal";
 import { OverdueARData, RevenueData } from "../services/types";
 
+// 自動繳交週報功能開關。後端 API（SetAutoSubmit / GetAutoSubmitRecords / batch）
+// 尚未在正式機完成驗收，先關閉前端 UI 與相關呼叫；驗收完成後改 true 即可。
+const AUTO_SUBMIT_ENABLED = false;
+
 interface FileForUpload {
   name: string;
   type: string;
@@ -176,7 +180,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
       }
 
       // 還原自動繳交勾選狀態（失敗不阻塞主流程）
-      if (data.weekly_no_id) {
+      if (AUTO_SUBMIT_ENABLED && data.weekly_no_id) {
         try {
           const r = await WeeklyReportApi.getAutoSubmitStatus(
             data.weekly_no_id,
@@ -419,6 +423,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
 
   // 取消自動繳交（fire-and-forget，用於規則 2/3 內部呼叫）
   const cancelAutoSubmitSilent = useCallback(() => {
+    if (!AUTO_SUBMIT_ENABLED) return;
     if (!autoSubmitEnabled || !weeklyNo || !authFetch) return;
     setAutoSubmitEnabled(false);
     WeeklyReportApi.setAutoSubmit(
@@ -1080,7 +1085,8 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
             <span className="sm:hidden">預覽</span>
           </button>
 
-          {/* 自動提交週報 */}
+          {/* 自動提交週報（feature flag 控制） */}
+          {AUTO_SUBMIT_ENABLED && (
           <label
             className={`inline-flex items-center px-3 sm:px-4 h-10 text-xs sm:text-sm rounded-lg border flex-shrink-0 ${
               isAutoSubmitDisabled
@@ -1111,6 +1117,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
               {autoSubmitDone ? "已上傳" : "自動提交"}
             </span>
           </label>
+          )}
 
           {/* 提交週報 */}
           <button
@@ -1135,8 +1142,8 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
         </div>
       </div>
 
-      {/* 自動提交週報提示 */}
-      {autoSubmitEnabled && !autoSubmitDone && autoSubmitExecution > 0 && (
+      {/* 自動提交週報提示（feature flag 控制） */}
+      {AUTO_SUBMIT_ENABLED && autoSubmitEnabled && !autoSubmitDone && autoSubmitExecution > 0 && (
         <div className="mb-3 sm:mb-4 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-700">
           已啟用自動提交週報，系統將於{" "}
           <span className="font-semibold">
