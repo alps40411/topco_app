@@ -36,8 +36,6 @@ interface WeeklyReport {
   is_forwarded: boolean;
   is_forwarded_to_me?: boolean;
   can_view_detail: boolean;
-  start_date: string; // 週報開始日期 YYYYMMDD
-  end_date: string; // 週報結束日期 YYYYMMDD
 }
 
 interface WeeklyEmployeeListTabProps {
@@ -64,6 +62,11 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
 
   const [selectedYear, setSelectedYear] = useState<number>(0);
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
+  // 當前選中週次的完整週期（週日~週六），取代 master.SDATE/EDATE（週一~週五）
+  const [weekPeriod, setWeekPeriod] = useState<{
+    startdate: string;
+    enddate: string;
+  } | null>(null);
 
   useEffect(() => {
     if (user?.employee?.empno) {
@@ -133,6 +136,31 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
       return { can_edit: false, can_delete: false };
     }
   };
+
+  // 載入當前選中週次的完整週期（週日~週六）
+  // 後端 /week-period 有永久快取，同週只會打一次 CommonAPI
+  useEffect(() => {
+    if (!authFetch || !selectedYear || !selectedWeek) return;
+    let cancelled = false;
+
+    WeeklyReportApi.getWeekPeriod(selectedYear, selectedWeek, authFetch)
+      .then((data) => {
+        if (!cancelled) {
+          setWeekPeriod({
+            startdate: data.startdate,
+            enddate: data.enddate,
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("載入週期失敗:", err);
+        if (!cancelled) setWeekPeriod(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedYear, selectedWeek, authFetch]);
 
   // 載入週報列表
   useEffect(() => {
@@ -418,9 +446,10 @@ const WeeklyEmployeeListTab: React.FC<WeeklyEmployeeListTabProps> = ({
 
   // 渲染單一週報行
   const renderReportRow = (report: WeeklyReport) => {
+    // 使用 /week-period 取得的完整週期（週日~週六）取代 master.SDATE/EDATE（週一~週五）
     const weeklyPeriod = formatDateRange(
-      report.start_date,
-      report.end_date,
+      weekPeriod?.startdate ?? "",
+      weekPeriod?.enddate ?? "",
       report.week
     );
 

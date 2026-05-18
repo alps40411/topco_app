@@ -186,8 +186,6 @@ export class WeeklyReportApi {
         other_ask: item.OTHER_ASK === "1" || item.OTHER_ASK === "true",
         is_forwarded: item.ISFORWARDED === "1" || item.ISFORWARDED === "true",
         can_view_detail: true, // ✅ 週報系統：所有週報都可查看
-        start_date: item.SDATE, // 週報開始日期
-        end_date: item.EDATE, // 週報結束日期
       };
     });
 
