@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-opus-5"
 
+    # .env 留空行（CLAUDE_MODEL=）時，空字串會蓋掉預設值，這裡回退到預設模型
+    @field_validator("CLAUDE_MODEL", mode="before")
+    @classmethod
+    def _claude_model_fallback(cls, v):
+        return v or "claude-opus-5"
+
     # Phison LLM settings
     PHISON_API_URL: str = ""
     PHISON_USERNAME: str = ""
