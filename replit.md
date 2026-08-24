@@ -9,7 +9,7 @@
 在 Replit 環境中完成了全面的效能優化和環境設置：
 
 1. **冷啟動速度優化**
-   - ✅ AI 服務延遲載入（Azure OpenAI、Phison LLM）- 避免啟動時載入重度函式庫
+   - ✅ AI 服務延遲載入（Claude、Phison LLM）- 避免啟動時載入重度函式庫
    - ✅ 移除 Windows 專用套件（pywin32、pythonnet 等）
    - ✅ 移除不必要的重度套件（ChromaDB、Selenium、Streamlit、Kubernetes 等）
    - ✅ 清理 requirements.txt，創建核心依賴清單
@@ -52,7 +52,7 @@
 - **端口**: 8000 (開發環境)
 - **技術棧**: FastAPI, SQLAlchemy, AsyncPG, Pydantic
 - **資料庫**: PostgreSQL (Legacy), Oracle (透過 oracledb)
-- **AI 服務**: Azure OpenAI, Phison LLM
+- **AI 服務**: Claude (Anthropic), Phison LLM
 
 ### 關鍵服務
 - **CommonAPI**: 檔案上傳/下載、SSO、工作流信箱
@@ -65,7 +65,9 @@
 後端需要在 `backend/.env` 設置：
 - `SECRET_KEY`: JWT 簽名密鑰
 - `LEGACY_DB_*`: PostgreSQL 連接資訊
-- `AZURE_OPENAI_*`: Azure OpenAI 配置（選填）
+- `ANTHROPIC_AWS_API_KEY` / `ANTHROPIC_AWS_WORKSPACE_ID` / `AWS_REGION`: Claude Platform on AWS 設定（公司 workspace 走此模式）
+- `ANTHROPIC_API_KEY`: 第一方 Claude API 金鑰（與上面二擇一）
+- `CLAUDE_MODEL`: Claude 模型 ID（選填，預設 claude-opus-5）
 - `PHISON_*`: Phison LLM 配置（選填）
 - `SSO_MOCK_ENABLED=true`: 開發環境使用 Mock SSO
 

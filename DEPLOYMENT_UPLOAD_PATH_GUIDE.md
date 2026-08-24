@@ -76,7 +76,7 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 
 **已處理的檔案**:
 - ✅ `backend/app/services/record_service.py`: 使用 `settings.STATIC_URL_PREFIX` 生成檔案 URL
-- ✅ `backend/app/services/azure_ai_service.py`: 使用 `settings.STATIC_URL_PREFIX` 處理路徑
+- ✅ `backend/app/services/attachment_service.py`: 使用 `settings.STATIC_URL_PREFIX` 處理路徑
 
 **需要注意的檔案**:
 - ⚠️ `backend/app/api/ai.py`: 第 94-96 行仍使用 `/uploads/` 路徑
@@ -253,11 +253,11 @@ const fileUrl = getFullFileUrl(file.url);
 ### 問題 2: AI 功能無法讀取檔案
 
 **可能原因**:
-- Azure AI Service 中的路徑轉換邏輯錯誤
+- 附件服務中的路徑轉換邏輯錯誤
 - `STATIC_URL_PREFIX` 未正確處理
 
 **檢查**:
-查看 `backend/app/services/azure_ai_service.py` 的路徑處理邏輯
+查看 `backend/app/services/attachment_service.py` 的路徑處理邏輯
 
 ### 問題 3: 開發環境正常,正式環境失敗
 

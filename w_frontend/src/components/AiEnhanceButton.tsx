@@ -36,9 +36,9 @@ const AiEnhanceButton: React.FC<AiEnhanceButtonProps> = ({
 
   const services: ServiceConfig[] = [
     {
-      value: "aoai",
-      label: "Azure OpenAI",
-      logo: "/MyReportAI_Weekly/Microsoft_Azure.png",
+      value: "claude",
+      label: "Claude",
+      logo: "/MyReportAI_Weekly/claude.svg",
       badge: "推薦",
     },
     {
@@ -48,7 +48,8 @@ const AiEnhanceButton: React.FC<AiEnhanceButtonProps> = ({
     },
   ];
 
-  const selectedConfig = services.find((s) => s.value === selectedService)!;
+  const selectedConfig =
+    services.find((s) => s.value === selectedService) ?? services[0];
 
   // 點擊外部關閉下拉選單
   useEffect(() => {

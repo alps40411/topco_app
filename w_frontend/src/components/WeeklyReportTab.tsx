@@ -109,7 +109,7 @@ const WeeklyReportTab: React.FC<WeeklyReportTabProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   // AI 相關狀態
-  const [selectedAiService, setSelectedAiService] = useState<AiService>("aoai");
+  const [selectedAiService, setSelectedAiService] = useState<AiService>("claude");
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isAiViewActive, setIsAiViewActive] = useState(false);
   const [generatingAiFor, setGeneratingAiFor] = useState<Set<number>>(

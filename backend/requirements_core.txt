@@ -26,23 +26,14 @@ requests==2.32.5
 python-dotenv==1.1.1
 python-dateutil==2.9.0.post0
 
-# Azure 服務（核心功能需要）
-azure-core==1.35.0
-azure-ai-documentintelligence==1.0.2
-azure-search-documents==11.5.3
-
-# OpenAI
-openai==1.99.9
-
-# LangChain（如果需要）
-langchain==0.3.27
-langchain-openai==0.3.32
-langchain-core==0.3.74
+# Claude (Anthropic) AI 服務（Claude Platform on AWS）
+anthropic[aws]==1.0.0
 
 # 檔案處理
 openpyxl==3.1.5
 PyPDF2==3.0.1
 python-docx==1.2.0
+python-pptx==1.0.2
 pillow==11.3.0
 
 # 其他工具

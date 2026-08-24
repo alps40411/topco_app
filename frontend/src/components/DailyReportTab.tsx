@@ -126,7 +126,7 @@ const DailyReportTab: React.FC<DailyReportTabProps> = ({
     new Set(),
   );
   const [isFocusMode, setIsFocusMode] = useState(true); // 預設隱藏其他欄位（專注模式）
-  const [selectedAiService, setSelectedAiService] = useState<AiService>("aoai"); // AI 服務選擇
+  const [selectedAiService, setSelectedAiService] = useState<AiService>("claude"); // AI 服務選擇
 
   // --- Modal and New Record State ---
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);

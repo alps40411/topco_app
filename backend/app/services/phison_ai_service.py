@@ -5,6 +5,7 @@ import logging
 from typing import List, Optional
 from datetime import datetime, timedelta
 from app.core.config import settings
+from app.services import ai_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -103,51 +104,12 @@ async def get_phison_enhanced_report(
     # 取得 token
     token = await _get_phison_token()
     if not token:
-        raise ConnectionError(f"無法連接到 Phison AI 服務 ({settings.PHISON_API_URL})，請檢查服務狀態或切換到 Azure OpenAI 服務")
+        raise ConnectionError(f"無法連接到 Phison AI 服務 ({settings.PHISON_API_URL})，請檢查服務狀態或切換到 Claude 服務")
 
-    # 構建 prompt (與 Azure OpenAI 使用相同的格式)
-    system_instruction = (
-        "你是一位專業、精確且一絲不苟的商業報告助理。\n"
-        "你的任務是將使用者在 `<NOTES>` 標籤中提供的零散筆記，以及後方所提供跟工作相關的資料，轉換為一份採用「進度、計畫、問題」(Progress, Plans, Problems) 框架的每日工作報告。\n\n"
-        "請給予我純文字。"
-        "你必須嚴格遵守以下三大原則：\n\n"
-        "1. **絕對接地原則 (Absolute Grounding Principle)**:\n"
-        "   - 報告中的「一、今日進度」部分，必須嚴格且僅僅基於 `<NOTES>` 的文字進行潤飾。\n"
-        "   - **絕對禁止**在任何部分添加筆記中未明確提及的**具體細節**（例如：函式庫名稱、錯誤代碼、特定人名、具體數字等）。這是最高指令。\n\n"
-        "2. **有限推斷原則 (Limited Inference Principle)**:\n"
-        "   - 報告中的「二、明日計畫」部分，允許基於筆記內容進行合理的、高層次的後續步驟建議。\n"
-        "   - 如果筆記內容無法推斷出明確的下一步，你必須在該部分誠實地註明「**待下一步規劃。**」。\n\n"
-        "3. **問題識別原則 (Problem Identification Principle)**:\n"
-        "   - 只有當筆記中**明確提及**了困難、障礙、等待、或不確定的情況時，才能在「三、潛在問題與阻礙」部分中列出。\n"
-        "   - 如果筆記中未提及任何問題，你必須在該部分註明「**目前無明顯阻礙。**」，絕不允許臆測或編造問題。"
-        "--- 範例 --- \n\n"
-        "<EXAMPLE>\n"
-        "INPUT:\n"
-        "<NOTES>\n"
-        "修改前端程式，完成後端auth驗證\n"
-        "</NOTES>\n\n"
-        "OUTPUT:\n"
-        "一、今日進度\n\n"
-        "對前端應用程式進行了修改。\n"
-        "完成了後端的身份驗證功能，為系統安全性奠定基礎。\n\n"
-        "二、明日計畫\n\n"
-        "待下一步規劃。\n\n"
-        "三、潛在問題與阻礙\n\n"
-        "目前無明顯阻礙。\n"
-        "</EXAMPLE>\n\n"
-    )
-
-    # 組合參考資料
-    reference_section = ""
-    if reference_texts:
-        combined_references = "\n\n".join(reference_texts)
-        reference_section = f"\n\n<REFERENCES>\n{combined_references}\n</REFERENCES>"
-
+    # Phison API 只有單一 content 欄位，將共用的 system prompt 與 user prompt 合併送出
     user_prompt = (
-        f"{system_instruction}\n\n"
-        f"請為「{project_name}」這個專案，潤飾以下工作內容，並參考附加的資料，生成一份每日工作報告。\n\n"
-        f"<NOTES>\n{original_content}\n</NOTES>"
-        f"{reference_section}"
+        f"{ai_prompts.DAILY_ENHANCE_SYSTEM}\n\n"
+        + ai_prompts.build_daily_enhance_user_prompt(project_name, original_content, reference_texts)
     )
 
     # 呼叫 Phison Chat API
@@ -155,7 +117,7 @@ async def get_phison_enhanced_report(
     payload = {
         "content": user_prompt,
         "maxTokens": 1500,
-        "temperature": 1  # 與 Azure OpenAI 保持一致
+        "temperature": 1
     }
 
     headers = {
@@ -236,17 +198,10 @@ async def get_phison_weekly_report(
     # 取得 token
     token = await _get_phison_token()
     if not token:
-        raise ConnectionError(f"無法連接到 Phison AI 服務 ({settings.PHISON_API_URL})，請檢查服務狀態或切換到 Azure OpenAI 服務")
+        raise ConnectionError(f"無法連接到 Phison AI 服務 ({settings.PHISON_API_URL})，請檢查服務狀態或切換到 Claude 服務")
 
     # 週報專用 prompt（簡化版，避免過長）
-    system_instruction = (
-        "你是專業的商業報告助理，專門撰寫週報內容。\n"
-        "請將使用者提供的零散筆記轉換為專業、清晰的週報內容。\n\n"
-        "原則：\n"
-        "1. 只基於提供的內容進行潤飾，不添加未提及的細節\n"
-        "2. 使用專業、正式的商業語言，結構清晰\n"
-        "3. 簡明扼要，適當分段\n"
-    )
+    system_instruction = ai_prompts.WEEKLY_ENHANCE_SYSTEM_COMPACT
 
     # 組合參考資料
     reference_section = ""

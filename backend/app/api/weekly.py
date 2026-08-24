@@ -61,22 +61,23 @@ async def _generate_enhanced_weekly_content(
     subject: str,
     job_item: str,
     attachments: Optional[List[Dict]] = None,
-    ai_service: str = "aoai"
+    ai_service: str = "claude"
 ) -> str:
     """
     使用指定的 AI Service 生成週報增強內容，支援附件處理
-    
+
     Args:
         original_content: 原始週報內容（可能包含 HTML）
         subject: 週報主題
         job_item: 工作項目
         attachments: 附件列表（已標記 is_selected_for_ai 的）
-        ai_service: AI 服務類型（aoai 或 phison）
-    
+        ai_service: AI 服務類型（claude 或 phison）
+
     Returns:
         AI 潤飾後的內容
     """
-    from app.services.azure_ai_service import process_attachments_for_ai, get_ai_enhanced_weekly_report
+    from app.services.attachment_service import process_attachments_for_ai
+    from app.services.claude_ai_service import get_ai_enhanced_weekly_report
     from app.services.phison_ai_service import get_phison_weekly_report
     
     try:
@@ -129,8 +130,8 @@ async def _generate_enhanced_weekly_content(
                 subject=clean_subject,
                 reference_texts=cleaned_reference_texts
             )
-        else:  # aoai (預設)
-            logger.info("調用 Azure OpenAI 服務進行週報內容增強...")
+        else:  # claude (預設)
+            logger.info("調用 Claude 服務進行週報內容增強...")
             enhanced_content = await get_ai_enhanced_weekly_report(
                 original_content=content_to_enhance,
                 job_item=job_item,
@@ -867,7 +868,7 @@ async def get_weekly_report_list(
 async def enhance_weekly_note(
     weekly_no: str,
     seq: int,
-    ai_service: str = "aoai",
+    ai_service: str = "claude",
     current_user: UserSchema = Depends(get_current_user),
     db: Session = Depends(get_legacy_db)
 ):

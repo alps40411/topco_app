@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 
 def _get_ai_services():
     """Lazy import AI services to avoid loading heavy libraries at startup"""
-    from ..services.azure_ai_service import get_ai_enhanced_report, process_attachments_for_ai
+    from ..services.claude_ai_service import get_ai_enhanced_report
+    from ..services.attachment_service import process_attachments_for_ai
     from ..services.phison_ai_service import get_phison_enhanced_report
     return {
-        'azure': (get_ai_enhanced_report, process_attachments_for_ai),
+        'claude': (get_ai_enhanced_report, process_attachments_for_ai),
         'phison': get_phison_enhanced_report
     }
 
@@ -33,7 +34,7 @@ async def enhance_record(
     daily_no: str,
     planno: str,
     sopno: str,
-    ai_service: str = "aoai",  # 新增參數: aoai 或 phison
+    ai_service: str = "claude",  # AI 服務類型: claude 或 phison
     service_cocode: str = "",  # 服務公司代碼
     service_empno: str = "",   # 服務對象員工編號
     current_user: User = Depends(get_current_user),
@@ -193,13 +194,13 @@ async def _generate_enhanced_content(
     original_content: str,
     work_description: str,
     attachments: Optional[List[Dict]] = None,
-    ai_service: str = "aoai"
+    ai_service: str = "claude"
 ):
     """使用指定的 AI Service 生成增強內容，支援附件處理"""
     try:
         # 延遲載入 AI 服務
         services = _get_ai_services()
-        get_ai_enhanced_report, process_attachments_for_ai = services['azure']
+        get_ai_enhanced_report, process_attachments_for_ai = services['claude']
         get_phison_enhanced_report = services['phison']
         
         logger.info(f"開始生成增強內容，工作描述: {work_description}")
@@ -232,8 +233,8 @@ async def _generate_enhanced_content(
                 project_name=work_description,
                 reference_texts=reference_texts
             )
-        else:  # aoai (預設)
-            logger.info("調用 Azure OpenAI 服務進行內容增強...")
+        else:  # claude (預設)
+            logger.info("調用 Claude 服務進行內容增強...")
             enhanced_content = await get_ai_enhanced_report(
                 original_content=content_to_enhance,
                 project_name=work_description,

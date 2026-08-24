@@ -18,14 +18,14 @@ class Settings(BaseSettings):
     LEGACY_DB_PORT: str = "5432"
     LEGACY_DB_SERVICE: str = ""  # database name
 
-    # Azure OpenAI settings
-    AZURE_OPENAI_KEY: str = ""
-    AZURE_OPENAI_ENDPOINT: str = ""
-    AZURE_OPENAI_DEPLOYMENT_NAME: str = ""
-
-    # Azure Document Intelligence settings
-    AZURE_DOC_INTELLIGENCE_KEY: str = ""
-    AZURE_DOC_INTELLIGENCE_ENDPOINT: str = ""
+    # Claude (Anthropic) AI settings
+    # 二擇一：Claude Platform on AWS（設定 ANTHROPIC_AWS_*，公司 workspace 走此模式）
+    # 或第一方 Claude API（只設定 ANTHROPIC_API_KEY）
+    ANTHROPIC_AWS_API_KEY: str = ""
+    ANTHROPIC_AWS_WORKSPACE_ID: str = ""
+    AWS_REGION: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-opus-5"
 
     # Phison LLM settings
     PHISON_API_URL: str = ""

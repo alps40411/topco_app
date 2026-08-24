@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
-export type AiService = "aoai" | "phison";
+export type AiService = "claude" | "phison";
 
 interface AiServiceSelectorProps {
   selectedService: AiService;
@@ -34,9 +34,9 @@ const AiServiceSelector: React.FC<AiServiceSelectorProps> = ({
 
   const services: ServiceConfig[] = [
     {
-      value: "aoai",
-      label: "Azure OpenAI",
-      logo: "/MyReportAI/Microsoft_Azure.png",
+      value: "claude",
+      label: "Claude",
+      logo: "/MyReportAI/claude.svg",
       badge: "推薦",
     },
     {
@@ -46,7 +46,8 @@ const AiServiceSelector: React.FC<AiServiceSelectorProps> = ({
     },
   ];
 
-  const selectedConfig = services.find((s) => s.value === selectedService)!;
+  const selectedConfig =
+    services.find((s) => s.value === selectedService) ?? services[0];
 
   // 點擊外部關閉下拉選單
   useEffect(() => {
