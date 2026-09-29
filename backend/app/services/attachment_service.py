@@ -54,19 +54,16 @@ async def extract_text_from_commonapi_url(url_path: str, file_name: str) -> str:
 
     try:
         # 組合完整的 CommonAPI URL
-        if url_path.startswith('/'):
-            # 相對路徑：使用內網 API 基礎 URL
+        if '/CommonApi/' in url_path:
+            # DB 內歷史網址的主機各異（外網 portal 各路由、舊內網 IP、/CommonApi 相對路徑），
+            # 一律改走目前設定的內網主機，避免外網 SSO 認證與舊主機下線
+            full_url = settings.COMMONAPI_BASE_URL + url_path[url_path.index('/CommonApi/') + len('/CommonApi'):]
+            logger.info(f"附件網址改走目前 CommonAPI 主機: {settings.COMMONAPI_BASE_URL}")
+        elif url_path.startswith('/'):
+            # 不含 /CommonApi 的相對路徑：直接接在內網 API 基礎 URL 後
             full_url = f"{settings.COMMONAPI_BASE_URL}{url_path}"
         else:
-            # 完整 URL：如果是外網域名，替換為內網 IP（避免認證問題）
-            if 'portal.topco-global.com/tap1-98/CommonApi' in url_path:
-                full_url = url_path.replace(
-                    'https://portal.topco-global.com/tap1-98/CommonApi',
-                    settings.COMMONAPI_BASE_URL
-                )
-                logger.info(f"替換外網域名為內網 IP: {settings.COMMONAPI_BASE_URL}")
-            else:
-                full_url = url_path
+            full_url = url_path
 
         logger.info(f"下載 URL: {full_url}")
 

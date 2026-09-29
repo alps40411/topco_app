@@ -6,6 +6,8 @@ import time
 import httpx
 from typing import List, Dict, Any, Optional
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # 全局緩存
@@ -17,7 +19,7 @@ class CorpEmployeeService:
 
     def __init__(self):
         # API 端點
-        self.api_url = "http://10.129.1.98/CommonApi/MyReport/GetForwardList"
+        self.api_url = settings.MYREPORT_GET_FORWARD_LIST_URL
         # HTTP 客戶端超時設置
         self.timeout = 30.0
 
